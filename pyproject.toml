@@ -12,17 +12,19 @@ requires-python = ">=3.13"
 dependencies = [
     "cyclopts>=4.16.1",
     "fastapi>=0.136.3",
-    "logfire>=4.34.0",
+    "httpx>=0.28.1",
+    "logfire[fastapi,system-metrics]>=4.34.0",
     "loguru>=0.7.3",
     "niquests>=3.18.8",
     "pydantic-settings[yaml]>=2.14.1",
+    "uvicorn>=0.48.0",
 ]
 dynamic = ["version"]
 
 
 
 [project.scripts]
-trader = "proxy.cli.cli:cli"
+proxy = "proxy.cli.cli:cli"
 
 
 [dependency-groups]
