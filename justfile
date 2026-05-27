@@ -38,3 +38,19 @@ publish:
     rm -rf dist
     uv build
     uv publish --token $PYPI_TOKEN
+
+config-schema:
+    uv run proxy config-schema ./resources/config.schema.json
+
+inspector:
+    npx -y @modelcontextprotocol/inspector
+
+compose:
+    docker compose up -y -d --wait
+
+stop:
+    docker compose --profile "*" down
+
+dev:
+    @just compose
+    uv run --env-file ".env" proxy run

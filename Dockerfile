@@ -34,4 +34,4 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 ENTRYPOINT []
 
-CMD proxy run --host 0.0.0.0 --port ${BACKEND__HOST__PORT} --no-reload --root-path ${ROOT_PATH}
+CMD proxy run --host 0.0.0.0 --port 8008 --no-reload
