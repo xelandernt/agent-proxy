@@ -1,0 +1,58 @@
+[build-system]
+requires = [
+    "hatchling", "hatch-vcs"
+]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-proxy"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cyclopts>=4.16.1",
+    "fastapi>=0.136.3",
+    "logfire>=4.34.0",
+    "loguru>=0.7.3",
+    "niquests>=3.18.8",
+    "pydantic-settings[yaml]>=2.14.1",
+]
+dynamic = ["version"]
+
+
+
+[project.scripts]
+trader = "proxy.cli.cli:cli"
+
+
+[dependency-groups]
+dev = [
+    "prek>=0.4.3",
+    "pyrefly>=1.0.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.15.14",
+]
+
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+    "--ignore=.tox/",
+    "--ignore=tmp/"
+]
+pythonpath=["src", "tests"]
+
+[tool.hatch.version]
+source = "vcs"
+fallback-version = "0.0.1"
+
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/proxy"]
