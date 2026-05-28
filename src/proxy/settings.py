@@ -10,14 +10,19 @@ from pydantic_settings import (
     SettingsConfigDict,
     YamlConfigSettingsSource,
 )
+from sqlalchemy.engine import URL, make_url
 
 CONFIG_DIRECTORY = ".proxy"
 CONFIG_FILE_ENV = "PROXY_CONFIG_FILE"
 DEFAULT_CONFIG_FILE = Path(CONFIG_DIRECTORY) / "config.yaml"
-_NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
+NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 
 
-class _Settings(BaseSettings):
+def default_session_registry_password() -> SecretStr:
+    return SecretStr("postgres")
+
+
+class ProxySettings(BaseSettings):
     """Base settings class for all project settings."""
 
     @classmethod
@@ -49,10 +54,10 @@ class ConfigHost(BaseModel):
 class ConfigCors(BaseModel):
     """Cors configuration."""
 
-    origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    origins: list[str] = Field(default_factory=lambda: ["*"])
     allow_credentials: bool = Field(
-        default=True,
-        description="If this is true, then `*` in origins will be ignored as per CORS spec.",
+        default=False,
+        description="Credentials cannot be enabled when all origins are allowed.",
     )
     allow_methods: list[str] = Field(default_factory=lambda: ["*"])
     allow_headers: list[str] = Field(default_factory=lambda: ["*"])
@@ -76,6 +81,20 @@ class ConfigDisabledAuthProvider(BaseModel):
     """Anonymous passthrough for a group of MCP servers."""
 
     provider: Literal["disabled"] = "disabled"
+
+
+class ConfigOidcAuthProvider(BaseModel):
+    """Generic OIDC bearer-token validation settings."""
+
+    provider: Literal["oidc"] = "oidc"
+    issuer: str
+    allowed_algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
+    clock_skew_seconds: int = Field(default=30, ge=0)
+    discovery_ttl_seconds: int = Field(default=3600, ge=60)
+
+    @property
+    def issuer_url(self) -> str:
+        return self.issuer.rstrip("/")
 
 
 class ConfigEntraIdAuthProvider(BaseModel):
@@ -106,7 +125,7 @@ class ConfigEntraIdAuthProvider(BaseModel):
 
 
 ConfigAuthProvider = Annotated[
-    ConfigDisabledAuthProvider | ConfigEntraIdAuthProvider,
+    ConfigDisabledAuthProvider | ConfigOidcAuthProvider | ConfigEntraIdAuthProvider,
     Field(discriminator="provider"),
 ]
 
@@ -114,7 +133,7 @@ ConfigAuthProvider = Annotated[
 class ConfigMcpServer(BaseModel):
     """Configuration for an upstream MCP HTTP endpoint."""
 
-    name: str = Field(pattern=_NAME_PATTERN)
+    name: str = Field(pattern=NAME_PATTERN)
     endpoint: AnyHttpUrl
     resource: AnyHttpUrl | None = None
     description: str | None = None
@@ -124,7 +143,7 @@ class ConfigMcpServer(BaseModel):
 class ConfigMcpGroup(BaseModel):
     """A group of MCP servers sharing one auth provider."""
 
-    name: str = Field(pattern=_NAME_PATTERN)
+    name: str = Field(pattern=NAME_PATTERN)
     auth: ConfigAuthProvider = Field(default_factory=ConfigDisabledAuthProvider)
     default_required_scopes: list[str] = Field(default_factory=list)
     servers: list[ConfigMcpServer] = Field(min_length=1)
@@ -152,6 +171,69 @@ class ConfigMcpGroup(BaseModel):
                 f"Missing resource for: {missing}."
             )
         return self
+
+
+class ConfigMcpSessionRegistry(BaseModel):
+    """Configuration for protected MCP session ownership storage."""
+
+    driver: str = "postgresql+asyncpg"
+    address: str = "127.0.0.1"
+    port: int = 5432
+    username: str = "postgres"
+    password: SecretStr = Field(default_factory=default_session_registry_password)
+    database: str = "agent_proxy"
+    sslmode: str | None = None
+    options: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_from_url(cls, raw_value: object) -> object:
+        if not isinstance(raw_value, dict) or "url" not in raw_value:
+            return raw_value
+
+        value = dict(raw_value)
+        raw_url = value.pop("url")
+        if raw_url is None:
+            return value
+
+        url = make_url(
+            raw_url.get_secret_value()
+            if isinstance(raw_url, SecretStr)
+            else str(raw_url)
+        )
+        query = {str(key): str(query_value) for key, query_value in url.query.items()}
+        sslmode = query.pop("sslmode", None)
+
+        defaults = {
+            "driver": url.drivername,
+            "address": url.host or cls.model_fields["address"].default,
+            "port": url.port or cls.model_fields["port"].default,
+            "username": url.username or cls.model_fields["username"].default,
+            "password": SecretStr(url.password)
+            if url.password is not None
+            else default_session_registry_password(),
+            "database": url.database or cls.model_fields["database"].default,
+            "sslmode": sslmode,
+            "options": query,
+        }
+        for field_name, default_value in defaults.items():
+            value.setdefault(field_name, default_value)
+        return value
+
+    @property
+    def url(self) -> str:
+        query = dict(self.options)
+        if self.sslmode is not None:
+            query["sslmode"] = self.sslmode
+        return URL.create(
+            drivername=self.driver,
+            username=self.username,
+            password=self.password.get_secret_value(),
+            host=self.address,
+            port=self.port,
+            database=self.database,
+            query=query,
+        ).render_as_string(hide_password=False)
 
 
 @dataclass(frozen=True)
@@ -192,7 +274,7 @@ class ConfigMcp(BaseModel):
         return None
 
 
-class Config(_Settings):
+class Config(ProxySettings):
     model_config = SettingsConfigDict(
         env_prefix="PROXY__",
         env_nested_delimiter="__",
@@ -203,7 +285,29 @@ class Config(_Settings):
     host: ConfigHost = Field(default_factory=ConfigHost)
     logfire: ConfigLogfire = Field(default_factory=ConfigLogfire)
     middleware: ConfigMiddleware = Field(default_factory=ConfigMiddleware)
+    session_registry: ConfigMcpSessionRegistry = Field(
+        default_factory=ConfigMcpSessionRegistry
+    )
     mcp: ConfigMcp = Field(default_factory=ConfigMcp)
+
+    @model_validator(mode="before")
+    @classmethod
+    def move_legacy_session_registry(cls, raw_value: object) -> object:
+        if not isinstance(raw_value, dict):
+            return raw_value
+
+        value = dict(raw_value)
+        if "session_registry" in value:
+            return value
+
+        mcp = value.get("mcp")
+        if not isinstance(mcp, dict) or "session_registry" not in mcp:
+            return value
+
+        mcp_value = dict(mcp)
+        value["session_registry"] = mcp_value.pop("session_registry")
+        value["mcp"] = mcp_value
+        return value
 
     def get_server(self, name: str) -> ResolvedMcpServer | None:
         return self.mcp.get_server(name)

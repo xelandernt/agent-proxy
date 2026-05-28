@@ -11,16 +11,22 @@ import jwt
 import niquests
 from fastapi import HTTPException, Request, status
 from jwt.algorithms import RSAAlgorithm
+from loguru import logger
 
 from proxy.settings import (
+    Config,
     ConfigAuthProvider,
     ConfigDisabledAuthProvider,
     ConfigEntraIdAuthProvider,
     ConfigMcpGroup,
     ConfigMcpServer,
+    ConfigOidcAuthProvider,
 )
 
+OidcAuthProviderConfig = ConfigOidcAuthProvider | ConfigEntraIdAuthProvider
+
 AUTHORIZATION_HEADER = "Authorization"
+_AUTH_PROVIDER_CACHE: tuple[int, dict[str, "AuthProvider"]] | None = None
 
 
 @dataclass(frozen=True)
@@ -63,7 +69,7 @@ class AuthProvider(Protocol):
     ) -> AuthenticatedPrincipal: ...
 
 
-class DisabledAuthProvider:
+class DisabledAuthProvider(AuthProvider):
     def describe_resource(
         self,
         *,
@@ -99,7 +105,7 @@ class OAuthBearerAuthProvider(ABC):
         server: ConfigMcpServer,
     ) -> ProtectedResourceAuthMetadata:
         return ProtectedResourceAuthMetadata(
-            resource=_server_resource(server),
+            resource=server_resource(server),
             authorization_servers=self.authorization_servers(),
             scopes_supported=group.required_scopes_for_server(server),
         )
@@ -173,8 +179,8 @@ class OAuthBearerAuthProvider(ABC):
         raise NotImplementedError
 
 
-class EntraIdAuthProvider(OAuthBearerAuthProvider):
-    def __init__(self, config: ConfigEntraIdAuthProvider) -> None:
+class OidcAuthProvider(OAuthBearerAuthProvider):
+    def __init__(self, config: OidcAuthProviderConfig) -> None:
         self._config = config
         self._lock = threading.Lock()
         self._metadata_cache: dict[str, Any] | None = None
@@ -188,8 +194,8 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
     def authenticate_token(
         self, token: str, *, server: ConfigMcpServer
     ) -> AuthenticatedPrincipal:
-        metadata = self._get_metadata()
-        signing_key = self._get_signing_key(token, str(metadata["jwks_uri"]))
+        metadata = self.discovery_metadata()
+        signing_key = self.signing_key(token, str(metadata["jwks_uri"]))
 
         try:
             claims = jwt.decode(
@@ -207,25 +213,37 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
         except jwt.PyJWTError as exc:
             raise TokenValidationError("Access token validation failed.") from exc
 
-        granted_scopes = frozenset(_extract_scopes(claims))
-        audiences = _extract_audiences(claims)
-        expected_resource = _server_resource(server)
-        if not _audiences_match_resource(audiences, expected_resource):
+        granted_scopes = frozenset(extract_scopes(claims))
+        audiences = extract_audiences(claims)
+        expected_resource = server_resource(server)
+        if not audiences_match_resource(audiences, expected_resource):
             raise TokenValidationError(
                 "Access token audience does not match this MCP server."
             )
 
+        subject = principal_subject(claims)
+        logger.debug(
+            "Authenticated MCP principal server={server_name} issuer={issuer} "
+            "subject={subject} client_id={client_id} audiences={audiences}",
+            server_name=server.name,
+            issuer=str(claims["iss"]),
+            subject=subject,
+            client_id=optional_string(claims.get("azp"))
+            or optional_string(claims.get("appid")),
+            audiences=audiences,
+        )
+
         return AuthenticatedPrincipal(
-            subject=str(claims["sub"]),
+            subject=subject,
             issuer=str(claims["iss"]),
             audiences=audiences,
             granted_scopes=granted_scopes,
-            client_id=_optional_string(claims.get("azp"))
-            or _optional_string(claims.get("appid")),
-            token_id=_optional_string(claims.get("jti")),
+            client_id=optional_string(claims.get("azp"))
+            or optional_string(claims.get("appid")),
+            token_id=optional_string(claims.get("jti")),
         )
 
-    def _get_metadata(self) -> dict[str, Any]:
+    def discovery_metadata(self) -> dict[str, Any]:
         with self._lock:
             if (
                 self._metadata_cache is not None
@@ -233,12 +251,12 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
             ):
                 return self._metadata_cache
 
-        metadata = self._fetch_json(
+        metadata = self.fetch_json(
             f"{self._config.issuer_url}/.well-known/openid-configuration"
         )
 
-        issuer = _optional_string(metadata.get("issuer"))
-        jwks_uri = _optional_string(metadata.get("jwks_uri"))
+        issuer = optional_string(metadata.get("issuer"))
+        jwks_uri = optional_string(metadata.get("jwks_uri"))
         if issuer is None or jwks_uri is None:
             raise TokenValidationError(
                 "OIDC discovery metadata is missing required fields."
@@ -251,14 +269,14 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
             )
             return metadata
 
-    def _get_signing_key(self, token: str, jwks_uri: str) -> Any:
+    def signing_key(self, token: str, jwks_uri: str) -> Any:
         try:
             unverified_header = jwt.get_unverified_header(token)
         except jwt.PyJWTError as exc:
             raise TokenValidationError("Access token header is malformed.") from exc
 
-        algorithm = _optional_string(unverified_header.get("alg"))
-        key_id = _optional_string(unverified_header.get("kid"))
+        algorithm = optional_string(unverified_header.get("alg"))
+        key_id = optional_string(unverified_header.get("kid"))
 
         if algorithm is None or algorithm not in self._config.allowed_algorithms:
             raise TokenValidationError(
@@ -267,11 +285,11 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
         if key_id is None:
             raise TokenValidationError("Access token is missing a key identifier.")
 
-        jwks = self._get_jwks(jwks_uri)
-        key = _find_jwk(jwks, key_id)
+        jwks = self.jwks(jwks_uri)
+        key = find_jwk(jwks, key_id)
         if key is None:
-            jwks = self._get_jwks(jwks_uri, force_refresh=True)
-            key = _find_jwk(jwks, key_id)
+            jwks = self.jwks(jwks_uri, force_refresh=True)
+            key = find_jwk(jwks, key_id)
         if key is None:
             raise TokenValidationError(
                 "Signing key was not found in the configured JWKS."
@@ -282,9 +300,7 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
         except (TypeError, ValueError, jwt.PyJWTError) as exc:
             raise TokenValidationError("Signing key is invalid.") from exc
 
-    def _get_jwks(
-        self, jwks_uri: str, *, force_refresh: bool = False
-    ) -> dict[str, Any]:
+    def jwks(self, jwks_uri: str, *, force_refresh: bool = False) -> dict[str, Any]:
         with self._lock:
             if (
                 not force_refresh
@@ -293,7 +309,7 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
             ):
                 return self._jwks_cache
 
-        jwks = self._fetch_json(jwks_uri)
+        jwks = self.fetch_json(jwks_uri)
         if not isinstance(jwks.get("keys"), list):
             raise TokenValidationError(
                 "JWKS payload does not contain any signing keys."
@@ -306,7 +322,7 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
             )
             return jwks
 
-    def _fetch_json(self, url: str) -> dict[str, Any]:
+    def fetch_json(self, url: str) -> dict[str, Any]:
         try:
             with niquests.Session(timeout=10.0) as session:
                 response = session.get(url, allow_redirects=False)
@@ -331,8 +347,8 @@ class EntraIdAuthProvider(OAuthBearerAuthProvider):
 def build_auth_provider(config: ConfigAuthProvider) -> AuthProvider:
     if isinstance(config, ConfigDisabledAuthProvider):
         return DisabledAuthProvider()
-    if isinstance(config, ConfigEntraIdAuthProvider):
-        return EntraIdAuthProvider(config)
+    if isinstance(config, ConfigOidcAuthProvider | ConfigEntraIdAuthProvider):
+        return OidcAuthProvider(config)
     raise ValueError(f"Unsupported auth provider configuration: {type(config)!r}")
 
 
@@ -340,6 +356,17 @@ def build_auth_provider_registry(
     groups: Iterable[ConfigMcpGroup],
 ) -> dict[str, AuthProvider]:
     return {group.name: build_auth_provider(group.auth) for group in groups}
+
+
+def get_auth_provider_registry(config: Config) -> dict[str, AuthProvider]:
+    global _AUTH_PROVIDER_CACHE
+
+    if _AUTH_PROVIDER_CACHE is None or _AUTH_PROVIDER_CACHE[0] != id(config):
+        _AUTH_PROVIDER_CACHE = (
+            id(config),
+            build_auth_provider_registry(config.mcp.groups),
+        )
+    return _AUTH_PROVIDER_CACHE[1]
 
 
 def build_auth_challenge(
@@ -363,12 +390,16 @@ def build_auth_challenge(
     return ", ".join(parts)
 
 
-def _extract_scopes(claims: dict[str, Any]) -> set[str]:
+def extract_scopes(claims: dict[str, Any]) -> set[str]:
     scopes: set[str] = set()
 
     scope_claim = claims.get("scp")
     if isinstance(scope_claim, str):
         scopes.update(part for part in scope_claim.split(" ") if part)
+
+    oauth_scope_claim = claims.get("scope")
+    if isinstance(oauth_scope_claim, str):
+        scopes.update(part for part in oauth_scope_claim.split(" ") if part)
 
     roles_claim = claims.get("roles")
     if isinstance(roles_claim, list):
@@ -377,39 +408,43 @@ def _extract_scopes(claims: dict[str, Any]) -> set[str]:
     return scopes
 
 
-def _extract_audiences(claims: dict[str, Any]) -> tuple[str, ...]:
+def extract_audiences(claims: dict[str, Any]) -> tuple[str, ...]:
     audience_claim = claims.get("aud")
     if isinstance(audience_claim, list):
         return tuple(str(audience) for audience in audience_claim)
     return (str(audience_claim),)
 
 
-def _find_jwk(jwks: dict[str, Any], key_id: str) -> dict[str, Any] | None:
+def principal_subject(claims: dict[str, Any]) -> str:
+    return optional_string(claims.get("oid")) or str(claims["sub"])
+
+
+def find_jwk(jwks: dict[str, Any], key_id: str) -> dict[str, Any] | None:
     for key in jwks["keys"]:
         if key.get("kid") == key_id:
             return key
     return None
 
 
-def _audiences_match_resource(
+def audiences_match_resource(
     audiences: tuple[str, ...], configured_resource: str
 ) -> bool:
-    expected_resource = _normalize_resource_uri(configured_resource)
+    expected_resource = normalize_resource_uri(configured_resource)
     if expected_resource is None:
         return False
     return any(
-        _normalize_resource_uri(audience) == expected_resource for audience in audiences
+        normalize_resource_uri(audience) == expected_resource for audience in audiences
     )
 
 
-def _optional_string(value: Any) -> str | None:
+def optional_string(value: Any) -> str | None:
     if value is None:
         return None
     text = str(value).strip()
     return text or None
 
 
-def _normalize_resource_uri(value: str) -> str | None:
+def normalize_resource_uri(value: str) -> str | None:
     parsed = urlsplit(value)
     if parsed.scheme.lower() not in {"http", "https"}:
         return None
@@ -438,7 +473,7 @@ def _normalize_resource_uri(value: str) -> str | None:
     return urlunsplit(normalized)
 
 
-def _server_resource(server: ConfigMcpServer) -> str:
+def server_resource(server: ConfigMcpServer) -> str:
     if server.resource is None:
         raise TokenValidationError(
             f"MCP server '{server.name}' is missing a configured canonical resource URL."

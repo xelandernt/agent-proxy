@@ -220,3 +220,4 @@ __marimo__/
 
 # Agents
 .agents/skills
+.codex/*

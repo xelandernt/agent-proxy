@@ -10,13 +10,16 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "asyncpg>=0.30.0",
     "cyclopts>=4.16.1",
     "fastapi>=0.136.3",
+    "greenlet>=3.2.4",
     "logfire[fastapi,system-metrics]>=4.34.0",
     "loguru>=0.7.3",
     "niquests>=3.18.8",
     "pydantic-settings[yaml]>=2.14.1",
     "pyjwt[crypto]>=2.10.1",
+    "sqlalchemy>=2.0.43",
     "uvicorn>=0.48.0",
 ]
 dynamic = ["version"]
@@ -35,6 +38,7 @@ dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.15.14",
+    "testcontainers>=4.13.2",
 ]
 
 

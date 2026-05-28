@@ -1,11 +1,15 @@
+from contextlib import asynccontextmanager
+import sys
+from typing import Any
+
 from fastapi import FastAPI
 import logfire
 from loguru import logger
 from starlette.middleware.cors import CORSMiddleware
 
-from proxy.app.auth import build_auth_provider_registry
+from proxy.app.mcp.dependencies import get_config
 from proxy.app.mcp.endpoints import router as mcp_router
-from proxy.app.mcp.sessions import SessionRegistry
+from proxy.app.mcp.sessions import shutdown_session_registry, startup_session_registry
 from proxy.settings import CONFIG, Config
 
 _OBSERVABILITY_CONFIGURED = False
@@ -14,11 +18,17 @@ _OBSERVABILITY_CONFIGURED = False
 def create_app(config: Config | None = None) -> FastAPI:
     settings = config or CONFIG
 
-    app = FastAPI(title="Agent Proxy")
-    app.state.config = settings
-    app.state.auth_providers = build_auth_provider_registry(settings.mcp.groups)
-    app.state.mcp_session_registry = SessionRegistry()
-    app.state.upstream_asgi_app = None
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        await startup_session_registry(settings.session_registry)
+        try:
+            yield
+        finally:
+            await shutdown_session_registry(settings.session_registry)
+
+    app = FastAPI(title="Agent Proxy", lifespan=lifespan)
+    if config is not None:
+        app.dependency_overrides[get_config] = lambda: config
 
     app.add_middleware(
         CORSMiddleware,
@@ -27,12 +37,12 @@ def create_app(config: Config | None = None) -> FastAPI:
         allow_headers=settings.middleware.cors.allow_headers,
         allow_credentials=settings.middleware.cors.allow_credentials,
     )
-    _configure_observability(app, settings)
+    configure_observability(app, settings)
     app.include_router(mcp_router)
     return app
 
 
-def _configure_observability(app: FastAPI, settings: Config) -> None:
+def configure_observability(app: FastAPI, settings: Config) -> None:
     global _OBSERVABILITY_CONFIGURED
     if _OBSERVABILITY_CONFIGURED:
         return
@@ -47,7 +57,17 @@ def _configure_observability(app: FastAPI, settings: Config) -> None:
     )
     logfire.instrument_fastapi(app)
     logfire.instrument_system_metrics(base="basic")
-    logger.configure(handlers=[logfire.loguru_handler()])
+    handlers: list[Any] = []
+    if settings.logfire.environment == "dev":
+        handlers.append(
+            {
+                "sink": sys.stderr,
+                "level": "DEBUG",
+                "format": "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {message}",
+            }
+        )
+    handlers.append(logfire.loguru_handler())
+    logger.configure(handlers=handlers)
     _OBSERVABILITY_CONFIGURED = True
 
 

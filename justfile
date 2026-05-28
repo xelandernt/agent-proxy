@@ -17,8 +17,6 @@ lint:
 
 # test project
 test *args:
-    uv run --no-sync cargo test --profile release
-    uv run --no-sync maturin develop
     uv run --no-sync pytest {{ args }}
 
 # type check project
@@ -46,7 +44,7 @@ inspector:
     npx -y @modelcontextprotocol/inspector
 
 compose:
-    docker compose up -y -d --wait
+    docker compose up -d --wait
 
 stop:
     docker compose --profile "*" down

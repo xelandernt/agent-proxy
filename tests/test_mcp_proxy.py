@@ -1,12 +1,26 @@
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response, status
 from fastapi.testclient import TestClient
 import pytest
+from testcontainers.postgres import PostgresContainer
+from uuid import uuid4
 
 from proxy.app.auth import (
     AuthenticatedPrincipal,
+    DisabledAuthProvider,
     ProtectedResourceAuthMetadata,
+    extract_scopes,
+    get_auth_provider_registry,
+    principal_subject,
+)
+from proxy.app.mcp.endpoints import ServerDep, get_auth_provider, get_upstream_asgi_app
+from proxy.app.mcp.sessions import (
+    SessionBinding,
+    SessionOwner,
+    SessionRegistryDatabase,
+    SqlAlchemySessionRegistry,
 )
 from proxy.app.main import create_app
 from proxy.settings import (
@@ -15,6 +29,7 @@ from proxy.settings import (
     ConfigEntraIdAuthProvider,
     ConfigMcp,
     ConfigMcpGroup,
+    ConfigMcpSessionRegistry,
     ConfigMcpServer,
 )
 
@@ -43,42 +58,72 @@ class StaticAuthProvider:
         server: ConfigMcpServer,
         resource_metadata_url: str,
     ) -> AuthenticatedPrincipal:
-        if authorization == "Bearer token-alice":
-            subject = "alice"
-        elif authorization == "Bearer token-bob":
-            subject = "bob"
-        else:
+        token_to_principal = {
+            "Bearer token-alice": ("alice", "test-client"),
+            "Bearer token-alice-rotated-client": ("alice", "rotated-client"),
+            "Bearer token-bob": ("bob", "test-client"),
+        }
+        principal = (
+            None if authorization is None else token_to_principal.get(authorization)
+        )
+        if principal is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token.",
             )
+        subject, client_id = principal
 
         return AuthenticatedPrincipal(
             subject=subject,
             issuer="https://login.microsoftonline.com/test-tenant/v2.0",
             audiences=(str(server.resource),),
             granted_scopes=frozenset(group.required_scopes_for_server(server)),
-            client_id="test-client",
+            client_id=client_id,
             token_id=None,
         )
 
 
+@dataclass
+class BackendAppFixture:
+    app: FastAPI
+    last_request: dict[str, str | None]
+    keep_session_on_delete: bool = False
+
+
 @pytest.fixture()
-def backend_app() -> FastAPI:
+def backend_app() -> "BackendAppFixture":
     app = FastAPI()
     sessions: set[str] = set()
-    last_request: dict[str, str | None] = {"authorization": None, "session_id": None}
-    app.state.last_request = last_request
+    last_request: dict[str, str | None] = {
+        "authorization": None,
+        "session_id": None,
+        "method": None,
+        "custom_header": None,
+    }
+    backend = BackendAppFixture(app=app, last_request=last_request)
 
-    @app.post("/mcp", response_model=None)
+    @app.api_route("/mcp", methods=["POST", "DELETE"], response_model=None)
     async def handle_mcp(
         request: Request,
         response: Response,
         authorization: str | None = Header(default=None, alias="Authorization"),
         mcp_session_id: str | None = Header(default=None, alias="MCP-Session-Id"),
+        x_custom_trace: str | None = Header(default=None, alias="X-Custom-Trace"),
     ) -> Response | dict:
         last_request["authorization"] = authorization
         last_request["session_id"] = mcp_session_id
+        last_request["method"] = request.method
+        last_request["custom_header"] = x_custom_trace
+
+        if request.method == "DELETE":
+            if mcp_session_id is None or mcp_session_id not in sessions:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session."
+                )
+            if not backend.keep_session_on_delete:
+                sessions.remove(mcp_session_id)
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
         payload = await request.json()
 
         if payload["method"] == "initialize":
@@ -106,12 +151,30 @@ def backend_app() -> FastAPI:
             "result": {"tools": []},
         }
 
-    return app
+    return backend
+
+
+@pytest.fixture(scope="session")
+def postgres_database_url() -> Iterator[str]:
+    with PostgresContainer(
+        "postgres:17-alpine",
+        username="postgres",
+        password="postgres",
+        dbname="agent_proxy",
+    ) as postgres:
+        yield (
+            "postgresql+asyncpg://postgres:postgres@"
+            f"{postgres.get_container_host_ip()}:{postgres.get_exposed_port(5432)}"
+            "/agent_proxy"
+        )
 
 
 @pytest.fixture()
-def config() -> Config:
+def config(postgres_database_url: str) -> Config:
     return Config(
+        session_registry=ConfigMcpSessionRegistry.model_validate(
+            {"url": postgres_database_url}
+        ),
         mcp=ConfigMcp(
             groups=[
                 ConfigMcpGroup(
@@ -138,25 +201,50 @@ def config() -> Config:
                         )
                     ],
                 ),
-            ]
-        )
+            ],
+        ),
     )
 
 
 @pytest.fixture()
-def client(config: Config, backend_app: FastAPI) -> Iterator[TestClient]:
-    app = create_app(config)
-    app.state.auth_providers["secure"] = StaticAuthProvider()
-    app.state.upstream_asgi_app = backend_app
+def client(
+    config: Config,
+    backend_app: "BackendAppFixture",
+    postgres_database_url: str,
+) -> Iterator[TestClient]:
+    test_config = config.model_copy(
+        update={
+            "session_registry": ConfigMcpSessionRegistry.model_validate(
+                {"url": postgres_database_url}
+            )
+        }
+    )
+    app = create_app(test_config)
+    app.dependency_overrides[get_upstream_asgi_app] = lambda: backend_app.app
+
+    async def override_auth_provider(server: ServerDep):
+        if server.group.name == "secure":
+            return StaticAuthProvider()
+        return DisabledAuthProvider()
+
+    app.dependency_overrides[get_auth_provider] = override_auth_provider
     with TestClient(app) as test_client:
         yield test_client
 
 
 def test_missing_token_returns_mcp_auth_challenge(
-    config: Config, backend_app: FastAPI
+    config: Config, backend_app: "BackendAppFixture", postgres_database_url: str
 ) -> None:
-    app = create_app(config)
-    app.state.upstream_asgi_app = backend_app
+    app = create_app(
+        config.model_copy(
+            update={
+                "session_registry": ConfigMcpSessionRegistry.model_validate(
+                    {"url": postgres_database_url}
+                )
+            }
+        )
+    )
+    app.dependency_overrides[get_upstream_asgi_app] = lambda: backend_app.app
 
     with TestClient(app) as test_client:
         response = test_client.post(
@@ -190,7 +278,7 @@ def test_protected_resource_metadata_is_group_specific(client: TestClient) -> No
 
 def test_disabled_group_forwards_initialize_without_auth(
     client: TestClient,
-    backend_app: FastAPI,
+    backend_app: "BackendAppFixture",
 ) -> None:
     response = client.post(
         "/mcp/public-demo",
@@ -209,12 +297,12 @@ def test_disabled_group_forwards_initialize_without_auth(
     assert response.status_code == 200
     assert response.headers["mcp-session-id"] == "session-1"
     assert response.json()["result"]["serverInfo"]["name"] == "demo-backend"
-    assert backend_app.state.last_request["authorization"] is None
+    assert backend_app.last_request["authorization"] is None
 
 
 def test_secure_group_forwards_after_authentication(
     client: TestClient,
-    backend_app: FastAPI,
+    backend_app: "BackendAppFixture",
 ) -> None:
     initialize_response = client.post(
         "/mcp/secure-demo",
@@ -239,14 +327,16 @@ def test_secure_group_forwards_after_authentication(
             "Accept": "application/json, text/event-stream",
             "Content-Type": "application/json",
             "MCP-Session-Id": session_id,
+            "X-Custom-Trace": "trace-123",
         },
         json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
     )
 
     assert tools_response.status_code == 200
     assert tools_response.json()["result"]["tools"] == []
-    assert backend_app.state.last_request["authorization"] is None
-    assert backend_app.state.last_request["session_id"] == session_id
+    assert backend_app.last_request["authorization"] is None
+    assert backend_app.last_request["session_id"] == session_id
+    assert backend_app.last_request["custom_header"] == "trace-123"
 
 
 def test_secure_group_rejects_session_reuse_by_other_principal(
@@ -283,18 +373,146 @@ def test_secure_group_rejects_session_reuse_by_other_principal(
     assert tools_response.json()["detail"] == "Unknown session."
 
 
+def test_secure_group_allows_session_reuse_by_same_subject_with_new_client_id(
+    client: TestClient,
+) -> None:
+    initialize_response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
+        },
+    )
+
+    session_id = initialize_response.headers["mcp-session-id"]
+    tools_response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice-rotated-client",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Session-Id": session_id,
+        },
+        json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+    )
+
+    assert tools_response.status_code == 200
+    assert tools_response.json()["result"]["tools"] == []
+
+
+def test_secure_group_keeps_binding_when_upstream_delete_does_not_end_session(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    backend_app.keep_session_on_delete = True
+
+    initialize_response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
+        },
+    )
+
+    session_id = initialize_response.headers["mcp-session-id"]
+    delete_response = client.delete(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "MCP-Session-Id": session_id,
+        },
+    )
+    tools_response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Session-Id": session_id,
+        },
+        json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+    )
+
+    assert delete_response.status_code == 204
+    assert tools_response.status_code == 200
+    assert tools_response.json()["result"]["tools"] == []
+
+
+def test_secure_group_rejects_initialize_rebinding_existing_session_to_other_principal(
+    client: TestClient,
+) -> None:
+    first_initialize = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
+        },
+    )
+    second_initialize = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-bob",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
+        },
+    )
+
+    assert first_initialize.status_code == 200
+    assert second_initialize.status_code == 409
+    assert (
+        second_initialize.json()["detail"]
+        == "Protected session is already bound to another principal."
+    )
+
+
 def test_malformed_secure_token_returns_auth_challenge(
     config: Config,
-    backend_app: FastAPI,
+    backend_app: "BackendAppFixture",
     monkeypatch: pytest.MonkeyPatch,
+    postgres_database_url: str,
 ) -> None:
-    app = create_app(config)
-    app.state.upstream_asgi_app = backend_app
+    test_config = config.model_copy(
+        update={
+            "session_registry": ConfigMcpSessionRegistry.model_validate(
+                {"url": postgres_database_url}
+            )
+        }
+    )
+    app = create_app(test_config)
+    app.dependency_overrides[get_upstream_asgi_app] = lambda: backend_app.app
 
-    secure_provider = app.state.auth_providers["secure"]
+    secure_provider = get_auth_provider_registry(test_config)["secure"]
     monkeypatch.setattr(
         secure_provider,
-        "_get_metadata",
+        "discovery_metadata",
         lambda: {
             "issuer": "https://login.microsoftonline.com/test-tenant/v2.0",
             "jwks_uri": "https://login.microsoftonline.com/test-tenant/discovery/v2.0/keys",
@@ -310,3 +528,107 @@ def test_malformed_secure_token_returns_auth_challenge(
 
     assert response.status_code == 401
     assert "resource_metadata=" in response.headers["www-authenticate"]
+
+
+def test_extract_scopes_includes_oauth_scope_claim() -> None:
+    scopes = extract_scopes({"scope": "openid profile mcp.access"})
+
+    assert scopes == {"openid", "profile", "mcp.access"}
+
+
+def test_extract_scopes_includes_entra_scp_claim() -> None:
+    scopes = extract_scopes({"scp": "Files.Read User.Read"})
+
+    assert scopes == {"Files.Read", "User.Read"}
+
+
+def test_extract_scopes_includes_entra_roles_claim() -> None:
+    scopes = extract_scopes({"roles": ["Admin", "Reader"]})
+
+    assert scopes == {"Admin", "Reader"}
+
+
+def test_principal_subject_prefers_entra_object_id() -> None:
+    subject = principal_subject({"oid": "user-object-id", "sub": "pairwise-subject"})
+
+    assert subject == "user-object-id"
+
+
+def test_principal_subject_falls_back_to_subject_claim() -> None:
+    subject = principal_subject({"sub": "generic-oidc-subject"})
+
+    assert subject == "generic-oidc-subject"
+
+
+@pytest.mark.asyncio
+async def test_sqlalchemy_session_registry_persists_bindings_between_instances(
+    postgres_database_url: str,
+) -> None:
+    server_name = f"secure-demo-{uuid4()}"
+    session_id = f"session-{uuid4()}"
+    owner = SessionOwner(
+        issuer="https://issuer.example.com",
+        subject="alice",
+    )
+
+    database = SessionRegistryDatabase(database_url=postgres_database_url)
+    await database.startup()
+    try:
+        async with database.session_factory() as first_session:
+            first_registry = SqlAlchemySessionRegistry(first_session)
+            await first_registry.bind(
+                server_name=server_name,
+                session_id=session_id,
+                owner=owner,
+                client_id="test-client",
+            )
+
+        async with database.session_factory() as second_session:
+            second_registry = SqlAlchemySessionRegistry(second_session)
+            assert (
+                await second_registry.get(
+                    server_name=server_name,
+                    session_id=session_id,
+                )
+                == owner
+            )
+    finally:
+        await database.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_sqlalchemy_session_registry_updates_client_id_for_same_subject(
+    postgres_database_url: str,
+) -> None:
+    server_name = f"secure-demo-{uuid4()}"
+    session_id = f"session-{uuid4()}"
+    owner = SessionOwner(
+        issuer="https://issuer.example.com",
+        subject="alice",
+    )
+
+    database = SessionRegistryDatabase(database_url=postgres_database_url)
+    await database.startup()
+    try:
+        async with database.session_factory() as session:
+            registry = SqlAlchemySessionRegistry(session)
+            await registry.bind(
+                server_name=server_name,
+                session_id=session_id,
+                owner=owner,
+                client_id="client-a",
+            )
+            await registry.bind(
+                server_name=server_name,
+                session_id=session_id,
+                owner=owner,
+                client_id="client-b",
+            )
+            binding = await session.get(
+                SessionBinding,
+                {"server_name": server_name, "session_id": session_id},
+            )
+            assert binding is not None
+            assert binding.client_id == "client-b"
+    finally:
+        await database.shutdown()
