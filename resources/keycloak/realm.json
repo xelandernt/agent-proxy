@@ -15,6 +15,80 @@
   "clientProfiles": {
     "profiles": []
   },
+  "components": {
+    "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
+      {
+        "id": "0f1d299e-8e22-4cd7-a97a-b9e4a628d7eb",
+        "name": "Trusted Hosts",
+        "providerId": "trusted-hosts",
+        "subType": "anonymous",
+        "subComponents": {},
+        "config": {
+          "host-sending-registration-request-must-match": [
+            "false"
+          ],
+          "client-uris-must-match": [
+            "true"
+          ],
+          "trusted-hosts": [
+            "localhost",
+            "127.0.0.1"
+          ]
+        }
+      },
+      {
+        "id": "4e148653-29e8-45ea-8439-2e232e10475a",
+        "name": "Allowed Client Scopes",
+        "providerId": "allowed-client-templates",
+        "subType": "anonymous",
+        "subComponents": {},
+        "config": {
+          "allow-default-scopes": [
+            "true"
+          ]
+        }
+      },
+      {
+        "id": "caa5cfe4-27eb-4f7c-9ad6-2840adbb9dd9",
+        "name": "Allowed Protocol Mapper Types",
+        "providerId": "allowed-protocol-mappers",
+        "subType": "anonymous",
+        "subComponents": {},
+        "config": {
+          "allowed-protocol-mapper-types": [
+            "oidc-address-mapper",
+            "oidc-full-name-mapper",
+            "oidc-sha256-pairwise-sub-mapper",
+            "oidc-usermodel-attribute-mapper",
+            "oidc-usermodel-property-mapper",
+            "saml-role-list-mapper",
+            "saml-user-attribute-mapper",
+            "saml-user-property-mapper"
+          ]
+        }
+      },
+      {
+        "id": "9016b438-0d09-4df0-a226-bdf0424788ac",
+        "name": "Full Scope Disabled",
+        "providerId": "scope",
+        "subType": "anonymous",
+        "subComponents": {},
+        "config": {}
+      },
+      {
+        "id": "ad7f249d-5d46-4fc7-837e-7c8d03c09e3a",
+        "name": "Max Clients Limit",
+        "providerId": "max-clients",
+        "subType": "anonymous",
+        "subComponents": {},
+        "config": {
+          "max-clients": [
+            "200"
+          ]
+        }
+      }
+    ]
+  },
   "defaultDefaultClientScopes": [
     "mcp.access"
   ],
@@ -63,32 +137,6 @@
   ],
   "clients": [
     {
-      "clientId": "mcp-inspector",
-      "name": "MCP Inspector",
-      "description": "Browser client for local MCP Inspector auth flows",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
-      "fullScopeAllowed": true,
-      "redirectUris": [
-        "*"
-      ],
-      "webOrigins": [
-        "*"
-      ],
-      "defaultClientScopes": [
-        "mcp.access"
-      ],
-      "optionalClientScopes": [
-        "offline_access",
-        "mcp.access"
-      ]
-    },
-    {
       "clientId": "aebc6443-996d-45c2-90f0-388ff96faa56",
       "name": "Visual Studio Code",
       "description": "VS Code and GitHub Copilot client used for MCP OAuth flows",
@@ -111,23 +159,6 @@
       ],
       "optionalClientScopes": [
         "offline_access",
-        "mcp.access"
-      ]
-    },
-    {
-      "clientId": "mcp-tester",
-      "name": "MCP Tester",
-      "description": "Service client for local auth smoke tests",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": false,
-      "secret": "mcp-tester-secret",
-      "standardFlowEnabled": false,
-      "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": true,
-      "fullScopeAllowed": false,
-      "defaultClientScopes": [
         "mcp.access"
       ]
     }

@@ -11,9 +11,11 @@ from proxy.app.auth import (
     AuthenticatedPrincipal,
     DisabledAuthProvider,
     ProtectedResourceAuthMetadata,
+    audiences_match_resource,
     extract_scopes,
     get_auth_provider_registry,
     principal_subject,
+    server_accepted_audiences,
 )
 from proxy.app.mcp.endpoints import ServerDep, get_auth_provider, get_upstream_asgi_app
 from proxy.app.mcp.sessions import (
@@ -87,6 +89,7 @@ class StaticAuthProvider:
 class BackendAppFixture:
     app: FastAPI
     last_request: dict[str, str | None]
+    sessions: set[str]
     keep_session_on_delete: bool = False
 
 
@@ -100,7 +103,7 @@ def backend_app() -> "BackendAppFixture":
         "method": None,
         "custom_header": None,
     }
-    backend = BackendAppFixture(app=app, last_request=last_request)
+    backend = BackendAppFixture(app=app, last_request=last_request, sessions=sessions)
 
     @app.api_route("/mcp", methods=["POST", "DELETE"], response_model=None)
     async def handle_mcp(
@@ -274,6 +277,51 @@ def test_protected_resource_metadata_is_group_specific(client: TestClient) -> No
         "resource_name": "secure-demo",
     }
     assert public_response.status_code == 404
+
+
+def test_authorization_scopes_can_differ_from_required_scopes() -> None:
+    group = ConfigMcpGroup(
+        name="secure",
+        auth=ConfigEntraIdAuthProvider(tenant_id="test-tenant"),
+        default_authorization_scopes=["openid", "profile"],
+        servers=[
+            ConfigMcpServer(
+                name="secure-demo",
+                endpoint="http://backend.test/mcp",
+                resource="https://proxy.example.com/mcp/secure-demo",
+            )
+        ],
+    )
+
+    assert group.authorization_scopes_for_server(group.servers[0]) == (
+        "openid",
+        "profile",
+    )
+    assert group.required_scopes_for_server(group.servers[0]) == ()
+
+
+def test_server_accepted_audiences_include_resource_and_extra_audiences() -> None:
+    server = ConfigMcpServer(
+        name="secure-demo",
+        endpoint="http://backend.test/mcp",
+        resource="http://localhost:8008/mcp/secure-demo",
+        accepted_audiences=["api://proxy-api-client-id"],
+    )
+
+    assert server_accepted_audiences(server) == (
+        "http://localhost:8008/mcp/secure-demo",
+        "api://proxy-api-client-id",
+    )
+
+
+def test_audience_match_accepts_api_uri_audience() -> None:
+    assert audiences_match_resource(
+        ("api://proxy-api-client-id",),
+        (
+            "http://localhost:8008/mcp/secure-demo",
+            "api://proxy-api-client-id",
+        ),
+    )
 
 
 def test_disabled_group_forwards_initialize_without_auth(
@@ -451,6 +499,127 @@ def test_secure_group_keeps_binding_when_upstream_delete_does_not_end_session(
     assert delete_response.status_code == 204
     assert tools_response.status_code == 200
     assert tools_response.json()["result"]["tools"] == []
+
+
+def test_secure_group_can_skip_forwarding_delete_for_compatibility(
+    config: Config,
+    backend_app: "BackendAppFixture",
+    postgres_database_url: str,
+) -> None:
+    compat_config = config.model_copy(deep=True)
+    compat_config.mcp.groups[0].servers[0].forward_delete = False
+
+    app = create_app(
+        compat_config.model_copy(
+            update={
+                "session_registry": ConfigMcpSessionRegistry.model_validate(
+                    {"url": postgres_database_url}
+                )
+            }
+        )
+    )
+    app.dependency_overrides[get_upstream_asgi_app] = lambda: backend_app.app
+
+    async def override_auth_provider(server: ServerDep):
+        if server.group.name == "secure":
+            return StaticAuthProvider()
+        return DisabledAuthProvider()
+
+    app.dependency_overrides[get_auth_provider] = override_auth_provider
+
+    with TestClient(app) as test_client:
+        initialize_response = test_client.post(
+            "/mcp/secure-demo",
+            headers={
+                "Authorization": "Bearer token-alice",
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+            },
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
+            },
+        )
+
+        session_id = initialize_response.headers["mcp-session-id"]
+        delete_response = test_client.delete(
+            "/mcp/secure-demo",
+            headers={
+                "Authorization": "Bearer token-alice",
+                "Accept": "application/json, text/event-stream",
+                "MCP-Session-Id": session_id,
+            },
+        )
+        tools_response = test_client.post(
+            "/mcp/secure-demo",
+            headers={
+                "Authorization": "Bearer token-alice",
+                "Accept": "application/json, text/event-stream",
+                "Content-Type": "application/json",
+                "MCP-Session-Id": session_id,
+            },
+            json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        )
+
+    assert delete_response.status_code == 204
+    assert backend_app.last_request["method"] == "POST"
+    assert tools_response.status_code == 200
+    assert tools_response.json()["result"]["tools"] == []
+
+
+def test_secure_group_recovers_missing_local_binding_from_upstream_session(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    backend_app.sessions.add("session-recovered")
+
+    recovered_response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Session-Id": "session-recovered",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+    )
+    rejected_response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-bob",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Session-Id": "session-recovered",
+        },
+        json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+    )
+
+    assert recovered_response.status_code == 200
+    assert recovered_response.json()["result"]["tools"] == []
+    assert rejected_response.status_code == 404
+    assert rejected_response.json()["detail"] == "Unknown session."
+
+
+def test_secure_group_forwards_unbound_unknown_session_to_upstream(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Session-Id": "session-missing",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Unknown session."
+    assert backend_app.last_request["session_id"] == "session-missing"
 
 
 def test_secure_group_rejects_initialize_rebinding_existing_session_to_other_principal(

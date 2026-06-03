@@ -107,7 +107,7 @@ class OAuthBearerAuthProvider(ABC):
         return ProtectedResourceAuthMetadata(
             resource=server_resource(server),
             authorization_servers=self.authorization_servers(),
-            scopes_supported=group.required_scopes_for_server(server),
+            scopes_supported=group.authorization_scopes_for_server(server),
         )
 
     def authenticate_request(
@@ -120,10 +120,11 @@ class OAuthBearerAuthProvider(ABC):
         resource_metadata_url: str,
     ) -> AuthenticatedPrincipal:
         required_scopes = group.required_scopes_for_server(server)
+        authorization_scopes = group.authorization_scopes_for_server(server)
         challenge_headers = {
             "WWW-Authenticate": build_auth_challenge(
                 resource_metadata_url=resource_metadata_url,
-                scopes=required_scopes,
+                scopes=authorization_scopes,
             )
         }
 
@@ -215,8 +216,8 @@ class OidcAuthProvider(OAuthBearerAuthProvider):
 
         granted_scopes = frozenset(extract_scopes(claims))
         audiences = extract_audiences(claims)
-        expected_resource = server_resource(server)
-        if not audiences_match_resource(audiences, expected_resource):
+        expected_audiences = server_accepted_audiences(server)
+        if not audiences_match_resource(audiences, expected_audiences):
             raise TokenValidationError(
                 "Access token audience does not match this MCP server."
             )
@@ -427,13 +428,17 @@ def find_jwk(jwks: dict[str, Any], key_id: str) -> dict[str, Any] | None:
 
 
 def audiences_match_resource(
-    audiences: tuple[str, ...], configured_resource: str
+    audiences: tuple[str, ...], configured_resources: Iterable[str]
 ) -> bool:
-    expected_resource = normalize_resource_uri(configured_resource)
-    if expected_resource is None:
+    expected_resources = {
+        normalized
+        for resource in configured_resources
+        if (normalized := normalize_resource_uri(resource)) is not None
+    }
+    if not expected_resources:
         return False
     return any(
-        normalize_resource_uri(audience) == expected_resource for audience in audiences
+        normalize_resource_uri(audience) in expected_resources for audience in audiences
     )
 
 
@@ -446,13 +451,14 @@ def optional_string(value: Any) -> str | None:
 
 def normalize_resource_uri(value: str) -> str | None:
     parsed = urlsplit(value)
-    if parsed.scheme.lower() not in {"http", "https"}:
-        return None
+    if not parsed.scheme:
+        return optional_string(value)
     hostname = parsed.hostname
     if hostname is None:
-        return None
+        return value
+
     port = parsed.port
-    default_port = 80 if parsed.scheme.lower() == "http" else 443
+    default_port = {"http": 80, "https": 443}.get(parsed.scheme.lower())
     normalized_netloc = hostname.lower()
     if port is not None and port != default_port:
         normalized_netloc = f"{normalized_netloc}:{port}"
@@ -479,3 +485,7 @@ def server_resource(server: ConfigMcpServer) -> str:
             f"MCP server '{server.name}' is missing a configured canonical resource URL."
         )
     return str(server.resource)
+
+
+def server_accepted_audiences(server: ConfigMcpServer) -> tuple[str, ...]:
+    return (server_resource(server), *server.accepted_audiences)

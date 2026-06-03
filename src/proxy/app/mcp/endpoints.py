@@ -156,13 +156,26 @@ async def proxy_mcp_backend(
         has_session=session_id is not None,
     )
 
+    request_session_bound = False
     if requires_session_binding(server) and session_id is not None:
-        await verify_session_owner(
+        request_session_bound = await verify_session_owner(
             registry=registry,
             server=server,
             session_id=session_id,
             owner=owner,
         )
+
+    if request.method == "DELETE" and not server.server.forward_delete:
+        logger.debug(
+            "Skipping upstream MCP DELETE server={server_name} issuer={issuer} "
+            "subject={subject} client_id={client_id} has_session={has_session}",
+            server_name=server.server.name,
+            issuer=owner.issuer,
+            subject=owner.subject,
+            client_id=principal.client_id,
+            has_session=session_id is not None,
+        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     try:
         upstream_handle = await run_in_threadpool(
@@ -186,6 +199,7 @@ async def proxy_mcp_backend(
         server=server,
         principal=principal,
         request_session_id=session_id,
+        request_session_bound=request_session_bound,
         jsonrpc_method=jsonrpc_method,
         response=upstream_handle.response,
     )

@@ -29,10 +29,19 @@ async def verify_session_owner(
     server: ResolvedMcpServer,
     session_id: str,
     owner: SessionOwner,
-) -> None:
+) -> bool:
     bound_owner = await registry.get(
         server_name=server.server.name, session_id=session_id
     )
+    if bound_owner is None:
+        logger.debug(
+            "Protected MCP session is not bound locally server={server_name} "
+            "request_issuer={request_issuer} request_subject={request_subject}",
+            server_name=server.server.name,
+            request_issuer=owner.issuer,
+            request_subject=owner.subject,
+        )
+        return False
     if bound_owner != owner:
         logger.warning(
             "Protected MCP session mismatch server={server_name} "
@@ -54,6 +63,7 @@ async def verify_session_owner(
         issuer=owner.issuer,
         subject=owner.subject,
     )
+    return True
 
 
 async def synchronize_session_binding(
@@ -63,6 +73,7 @@ async def synchronize_session_binding(
     server: ResolvedMcpServer,
     principal: AuthenticatedPrincipal,
     request_session_id: str | None,
+    request_session_bound: bool,
     jsonrpc_method: str | None,
     response: niquests.Response,
 ) -> None:
@@ -84,6 +95,33 @@ async def synchronize_session_binding(
             server_name=server.server.name,
             session_id=request_session_id,
         )
+        return
+
+    if (
+        request_session_id is not None
+        and not request_session_bound
+        and 200 <= response_status < 300
+    ):
+        logger.debug(
+            "Recovered protected MCP session binding server={server_name} "
+            "issuer={issuer} subject={subject} client_id={client_id}",
+            server_name=server.server.name,
+            issuer=owner.issuer,
+            subject=owner.subject,
+            client_id=principal.client_id,
+        )
+        try:
+            await registry.bind(
+                server_name=server.server.name,
+                session_id=request_session_id,
+                owner=owner,
+                client_id=principal.client_id,
+            )
+        except SessionOwnershipConflictError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Protected session is already bound to another principal.",
+            ) from exc
         return
 
     response_session_id = optional_header_value(response.headers.get("mcp-session-id"))

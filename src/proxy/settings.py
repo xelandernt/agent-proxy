@@ -135,9 +135,12 @@ class ConfigMcpServer(BaseModel):
 
     name: str = Field(pattern=NAME_PATTERN)
     endpoint: AnyHttpUrl
-    resource: AnyHttpUrl | None = None
+    resource: str | None = None
+    accepted_audiences: list[str] = Field(default_factory=list)
     description: str | None = None
+    authorization_scopes: list[str] | None = None
     required_scopes: list[str] | None = None
+    forward_delete: bool = True
 
 
 class ConfigMcpGroup(BaseModel):
@@ -145,8 +148,20 @@ class ConfigMcpGroup(BaseModel):
 
     name: str = Field(pattern=NAME_PATTERN)
     auth: ConfigAuthProvider = Field(default_factory=ConfigDisabledAuthProvider)
+    default_authorization_scopes: list[str] | None = None
     default_required_scopes: list[str] = Field(default_factory=list)
     servers: list[ConfigMcpServer] = Field(min_length=1)
+
+    def authorization_scopes_for_server(
+        self, server: ConfigMcpServer
+    ) -> tuple[str, ...]:
+        if server.authorization_scopes is not None:
+            configured_scopes = server.authorization_scopes
+        elif self.default_authorization_scopes is not None:
+            configured_scopes = self.default_authorization_scopes
+        else:
+            configured_scopes = self.required_scopes_for_server(server)
+        return tuple(sorted(set(configured_scopes)))
 
     def required_scopes_for_server(self, server: ConfigMcpServer) -> tuple[str, ...]:
         configured_scopes = (
