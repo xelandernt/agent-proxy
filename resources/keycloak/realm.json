@@ -137,6 +137,32 @@
   ],
   "clients": [
     {
+      "clientId": "local-mcp-client",
+      "name": "Local MCP Client",
+      "description": "Pre-created public client for local MCP client development. Use this client_id when a client needs a known static client registration.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "defaultClientScopes": [
+        "mcp.access"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "mcp.access"
+      ]
+    },
+    {
       "clientId": "aebc6443-996d-45c2-90f0-388ff96faa56",
       "name": "Visual Studio Code",
       "description": "VS Code and GitHub Copilot client used for MCP OAuth flows",

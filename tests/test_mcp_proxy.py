@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 from dataclasses import dataclass
 
@@ -89,8 +90,13 @@ class StaticAuthProvider:
 class BackendAppFixture:
     app: FastAPI
     last_request: dict[str, str | None]
+    last_body: bytes | None
+    last_query: str | None
     sessions: set[str]
     keep_session_on_delete: bool = False
+    custom_status_code: int | None = None
+    custom_headers: dict[str, str] | None = None
+    use_event_stream: bool = False
 
 
 @pytest.fixture()
@@ -103,9 +109,15 @@ def backend_app() -> "BackendAppFixture":
         "method": None,
         "custom_header": None,
     }
-    backend = BackendAppFixture(app=app, last_request=last_request, sessions=sessions)
+    backend = BackendAppFixture(
+        app=app,
+        last_request=last_request,
+        last_body=None,
+        last_query=None,
+        sessions=sessions,
+    )
 
-    @app.api_route("/mcp", methods=["POST", "DELETE"], response_model=None)
+    @app.api_route("/mcp", methods=["GET", "POST", "DELETE"], response_model=None)
     async def handle_mcp(
         request: Request,
         response: Response,
@@ -117,6 +129,17 @@ def backend_app() -> "BackendAppFixture":
         last_request["session_id"] = mcp_session_id
         last_request["method"] = request.method
         last_request["custom_header"] = x_custom_trace
+        backend.last_query = str(request.url.query) if request.url.query else None
+
+        if request.method == "GET":
+            for key, value in (backend.custom_headers or {}).items():
+                response.headers[key] = value
+            response.status_code = backend.custom_status_code or 200
+            return Response(
+                content=b"{}",
+                status_code=response.status_code,
+                headers=response.headers,
+            )
 
         if request.method == "DELETE":
             if mcp_session_id is None or mcp_session_id not in sessions:
@@ -125,15 +148,23 @@ def backend_app() -> "BackendAppFixture":
                 )
             if not backend.keep_session_on_delete:
                 sessions.remove(mcp_session_id)
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
+            for key, value in (backend.custom_headers or {}).items():
+                response.headers[key] = value
+            response.status_code = backend.custom_status_code or 204
+            return Response(
+                content=b"{}",
+                status_code=response.status_code,
+                headers=response.headers,
+            )
 
+        backend.last_body = await request.body()
         payload = await request.json()
 
         if payload["method"] == "initialize":
             session_id = "session-1"
             sessions.add(session_id)
             response.headers["MCP-Session-Id"] = session_id
-            return {
+            json_body = {
                 "jsonrpc": "2.0",
                 "id": payload["id"],
                 "result": {
@@ -142,17 +173,25 @@ def backend_app() -> "BackendAppFixture":
                     "serverInfo": {"name": "demo-backend", "version": "0.1.0"},
                 },
             }
-
-        if mcp_session_id not in sessions:
+        elif mcp_session_id not in sessions:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session."
             )
+        else:
+            json_body = {
+                "jsonrpc": "2.0",
+                "id": payload["id"],
+                "result": {"tools": []},
+            }
 
-        return {
-            "jsonrpc": "2.0",
-            "id": payload["id"],
-            "result": {"tools": []},
-        }
+        for key, value in (backend.custom_headers or {}).items():
+            response.headers[key] = value
+        return Response(
+            content=json.dumps(json_body).encode(),
+            status_code=backend.custom_status_code or 200,
+            headers=dict(response.headers),
+            media_type="application/json",
+        )
 
     return backend
 
@@ -501,74 +540,6 @@ def test_secure_group_keeps_binding_when_upstream_delete_does_not_end_session(
     assert tools_response.json()["result"]["tools"] == []
 
 
-def test_secure_group_can_skip_forwarding_delete_for_compatibility(
-    config: Config,
-    backend_app: "BackendAppFixture",
-    postgres_database_url: str,
-) -> None:
-    compat_config = config.model_copy(deep=True)
-    compat_config.mcp.groups[0].servers[0].forward_delete = False
-
-    app = create_app(
-        compat_config.model_copy(
-            update={
-                "session_registry": ConfigMcpSessionRegistry.model_validate(
-                    {"url": postgres_database_url}
-                )
-            }
-        )
-    )
-    app.dependency_overrides[get_upstream_asgi_app] = lambda: backend_app.app
-
-    async def override_auth_provider(server: ServerDep):
-        if server.group.name == "secure":
-            return StaticAuthProvider()
-        return DisabledAuthProvider()
-
-    app.dependency_overrides[get_auth_provider] = override_auth_provider
-
-    with TestClient(app) as test_client:
-        initialize_response = test_client.post(
-            "/mcp/secure-demo",
-            headers={
-                "Authorization": "Bearer token-alice",
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-            },
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "initialize",
-                "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
-            },
-        )
-
-        session_id = initialize_response.headers["mcp-session-id"]
-        delete_response = test_client.delete(
-            "/mcp/secure-demo",
-            headers={
-                "Authorization": "Bearer token-alice",
-                "Accept": "application/json, text/event-stream",
-                "MCP-Session-Id": session_id,
-            },
-        )
-        tools_response = test_client.post(
-            "/mcp/secure-demo",
-            headers={
-                "Authorization": "Bearer token-alice",
-                "Accept": "application/json, text/event-stream",
-                "Content-Type": "application/json",
-                "MCP-Session-Id": session_id,
-            },
-            json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
-        )
-
-    assert delete_response.status_code == 204
-    assert backend_app.last_request["method"] == "POST"
-    assert tools_response.status_code == 200
-    assert tools_response.json()["result"]["tools"] == []
-
-
 def test_secure_group_recovers_missing_local_binding_from_upstream_session(
     client: TestClient,
     backend_app: "BackendAppFixture",
@@ -801,3 +772,198 @@ async def test_sqlalchemy_session_registry_updates_client_id_for_same_subject(
             assert binding.client_id == "client-b"
     finally:
         await database.shutdown()
+
+
+def test_keycloak_realm_contains_static_client() -> None:
+    import json
+    from pathlib import Path
+
+    realm_path = Path(__file__).parents[1] / "resources" / "keycloak" / "realm.json"
+    realm = json.loads(realm_path.read_text())
+
+    client_ids = {c["clientId"] for c in realm["clients"]}
+    assert "local-mcp-client" in client_ids, (
+        "Realm must contain a static public client named 'local-mcp-client'"
+    )
+
+    local_client = next(
+        c for c in realm["clients"] if c["clientId"] == "local-mcp-client"
+    )
+    assert local_client.get("publicClient") is True, (
+        "Static local client must be a public client"
+    )
+    assert "mcp.access" in local_client.get("defaultClientScopes", []), (
+        "Static local client must include the mcp.access scope"
+    )
+
+    dcr_policies = [
+        c
+        for c in realm.get("components", {}).get(
+            "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy",
+            [],
+        )
+        if c.get("subType") == "anonymous"
+    ]
+    assert len(dcr_policies) > 0, "Realm must have anonymous DCR policies"
+    trusted_hosts = next(
+        (p for p in dcr_policies if p["providerId"] == "trusted-hosts"), None
+    )
+    assert trusted_hosts is not None, "Realm must have a trusted-hosts DCR policy"
+    allowed_hosts = trusted_hosts["config"].get("trusted-hosts", [])
+    assert "localhost" in allowed_hosts, "Trusted-hosts policy must allow localhost"
+    assert "127.0.0.1" in allowed_hosts, "Trusted-hosts policy must allow 127.0.0.1"
+
+    scope_names = {s["name"] for s in realm.get("clientScopes", [])}
+    assert "mcp.access" in scope_names, "Realm must define an mcp.access client scope"
+
+    mcp_scope = next(s for s in realm["clientScopes"] if s["name"] == "mcp.access")
+    audience_mappers = [
+        m
+        for m in mcp_scope.get("protocolMappers", [])
+        if m["protocolMapper"] == "oidc-audience-mapper"
+    ]
+    assert len(audience_mappers) > 0, "mcp.access scope must have an audience mapper"
+    assert any(
+        m["config"].get("included.custom.audience")
+        == "http://localhost:8008/mcp/playwright"
+        for m in audience_mappers
+    ), "Audience mapper must include http://localhost:8008/mcp/playwright"
+
+
+def test_secure_group_delete_forwards_and_removes_binding(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    initialize_response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
+        },
+    )
+
+    session_id = initialize_response.headers["mcp-session-id"]
+    delete_response = client.delete(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "MCP-Session-Id": session_id,
+        },
+    )
+
+    assert delete_response.status_code == 204
+    assert backend_app.last_request["method"] == "DELETE"
+    assert backend_app.last_request["session_id"] == session_id
+
+
+def test_public_group_forwards_query_string(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    response = client.get(
+        "/mcp/public-demo?foo=bar&baz=qux",
+        headers={
+            "Accept": "application/json",
+        },
+    )
+    assert response.status_code == 200
+    assert backend_app.last_query == "foo=bar&baz=qux"
+
+
+def test_public_group_forwards_post_body_byte_for_byte(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    body = b'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+    response = client.post(
+        "/mcp/public-demo",
+        content=body,
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+    )
+    assert response.status_code == 200
+    assert backend_app.last_body == body
+
+
+def test_public_group_strips_authorization_header(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    response = client.post(
+        "/mcp/public-demo",
+        headers={
+            "Authorization": "Bearer some-token",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+    )
+    assert response.status_code == 200
+    assert backend_app.last_request["authorization"] is None
+
+
+def test_public_group_forwards_mcp_headers(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    response = client.post(
+        "/mcp/public-demo",
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "MCP-Session-Id": "test-session",
+            "MCP-Protocol-Version": "2025-03-26",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+    )
+    assert response.status_code == 200
+    assert backend_app.last_request["session_id"] == "test-session"
+
+
+def test_public_group_forwards_accept_header_and_returns_json(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    response = client.post(
+        "/mcp/public-demo",
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json={"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+    )
+    assert response.status_code == 200
+    assert "application/json" in response.headers.get("content-type", "")
+
+
+def test_secure_group_forwards_custom_response_headers(
+    client: TestClient,
+    backend_app: "BackendAppFixture",
+) -> None:
+    backend_app.custom_headers = {"X-Upstream-Trace": "abc123"}
+    response = client.post(
+        "/mcp/secure-demo",
+        headers={
+            "Authorization": "Bearer token-alice",
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"protocolVersion": "2025-03-26", "capabilities": {}},
+        },
+    )
+    # Hop-by-hop headers are stripped; custom headers pass through.
+    assert response.headers.get("x-upstream-trace") == "abc123"

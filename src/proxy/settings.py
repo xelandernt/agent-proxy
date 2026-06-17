@@ -140,7 +140,6 @@ class ConfigMcpServer(BaseModel):
     description: str | None = None
     authorization_scopes: list[str] | None = None
     required_scopes: list[str] | None = None
-    forward_delete: bool = True
 
 
 class ConfigMcpGroup(BaseModel):

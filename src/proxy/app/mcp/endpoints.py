@@ -125,22 +125,18 @@ async def get_protected_resource_metadata(
     )
 
 
-@router.api_route(
-    "/mcp/{name}",
-    methods=["GET", "POST", "DELETE"],
-    name="proxy_mcp_backend",
-)
-async def proxy_mcp_backend(
+async def _forward_mcp_request(
     request: Request,
     server: ServerDep,
     principal: PrincipalDep,
     registry: SessionRegistryDep,
     upstream_app: UpstreamAsgiAppDep,
+    http_method: str,
 ) -> Response:
     body = await request.body()
     forwarded_headers = filter_request_headers(request.headers)
     session_id = optional_header_value(request.headers.get("mcp-session-id"))
-    jsonrpc_method = extract_jsonrpc_method(request.method, body)
+    jsonrpc_method = extract_jsonrpc_method(http_method, body)
     owner = session_owner(principal)
 
     logger.debug(
@@ -148,7 +144,7 @@ async def proxy_mcp_backend(
         "jsonrpc_method={jsonrpc_method} issuer={issuer} subject={subject} "
         "client_id={client_id} has_session={has_session}",
         server_name=server.server.name,
-        http_method=request.method,
+        http_method=http_method,
         jsonrpc_method=jsonrpc_method,
         issuer=owner.issuer,
         subject=owner.subject,
@@ -165,23 +161,11 @@ async def proxy_mcp_backend(
             owner=owner,
         )
 
-    if request.method == "DELETE" and not server.server.forward_delete:
-        logger.debug(
-            "Skipping upstream MCP DELETE server={server_name} issuer={issuer} "
-            "subject={subject} client_id={client_id} has_session={has_session}",
-            server_name=server.server.name,
-            issuer=owner.issuer,
-            subject=owner.subject,
-            client_id=principal.client_id,
-            has_session=session_id is not None,
-        )
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
     try:
         upstream_handle = await run_in_threadpool(
             send_upstream_request,
             url=str(server.server.endpoint),
-            method=request.method,
+            method=http_method,
             body=body,
             headers=forwarded_headers,
             query=request.url.query,
@@ -195,7 +179,7 @@ async def proxy_mcp_backend(
 
     await synchronize_session_binding(
         registry=registry,
-        request_method=request.method,
+        request_method=http_method,
         server=server,
         principal=principal,
         request_session_id=session_id,
@@ -217,4 +201,58 @@ async def proxy_mcp_backend(
         content=payload,
         status_code=response_status_code(upstream_handle.response),
         headers=response_headers,
+    )
+
+
+@router.post("/mcp/{name}", name="proxy_mcp_backend")
+async def post_mcp_backend(
+    request: Request,
+    server: ServerDep,
+    principal: PrincipalDep,
+    registry: SessionRegistryDep,
+    upstream_app: UpstreamAsgiAppDep,
+) -> Response:
+    return await _forward_mcp_request(
+        request=request,
+        server=server,
+        principal=principal,
+        registry=registry,
+        upstream_app=upstream_app,
+        http_method="POST",
+    )
+
+
+@router.get("/mcp/{name}", name="proxy_mcp_backend_get")
+async def get_mcp_backend(
+    request: Request,
+    server: ServerDep,
+    principal: PrincipalDep,
+    registry: SessionRegistryDep,
+    upstream_app: UpstreamAsgiAppDep,
+) -> Response:
+    return await _forward_mcp_request(
+        request=request,
+        server=server,
+        principal=principal,
+        registry=registry,
+        upstream_app=upstream_app,
+        http_method="GET",
+    )
+
+
+@router.delete("/mcp/{name}", name="proxy_mcp_backend_delete")
+async def delete_mcp_backend(
+    request: Request,
+    server: ServerDep,
+    principal: PrincipalDep,
+    registry: SessionRegistryDep,
+    upstream_app: UpstreamAsgiAppDep,
+) -> Response:
+    return await _forward_mcp_request(
+        request=request,
+        server=server,
+        principal=principal,
+        registry=registry,
+        upstream_app=upstream_app,
+        http_method="DELETE",
     )

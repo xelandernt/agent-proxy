@@ -83,9 +83,23 @@ async def synchronize_session_binding(
     owner = session_owner(principal)
     response_status = response_status_code(response)
 
-    # Keep the proxy-side binding until the upstream explicitly rejects the
-    # session. Some MCP clients issue successful DELETEs without ending the
-    # session, and removing the binding early causes proxy-local 404s.
+    # A forwarded successful DELETE means the upstream accepted session
+    # termination. Remove the local binding.
+    if (
+        request_method == "DELETE"
+        and request_session_id is not None
+        and 200 <= response_status < 300
+    ):
+        logger.debug(
+            "Upstream accepted MCP session termination server={server_name}; removing proxy binding",
+            server_name=server.server.name,
+        )
+        await registry.remove(
+            server_name=server.server.name,
+            session_id=request_session_id,
+        )
+        return
+
     if request_session_id is not None and response_status == status.HTTP_404_NOT_FOUND:
         logger.debug(
             "Upstream reported unknown MCP session server={server_name}; removing proxy binding",

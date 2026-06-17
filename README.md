@@ -45,14 +45,11 @@ mcp:
         - name: playwright
           resource: "http://localhost:8008/mcp/playwright"
           endpoint: "http://localhost:8931/mcp"
-          forward_delete: false
 ```
 
 Each group shares one auth provider. Servers in protected groups must configure `resource`; this is the OAuth protected-resource identifier advertised to MCP clients and should match the MCP server URL or origin clients connect to. Access-token audiences are matched against `resource` plus any server-level `accepted_audiences`. Use `accepted_audiences` when the identity provider emits a different audience, such as an Entra ID Application ID URI.
 
 `authorization_scopes` controls what the proxy advertises to OAuth clients in protected-resource metadata. `required_scopes` controls what the proxy enforces on incoming access tokens. If `authorization_scopes` is unset, it defaults to `required_scopes`. Server-level `authorization_scopes` and `required_scopes` inherit from `default_authorization_scopes` and `default_required_scopes`.
-
-`forward_delete` controls whether the proxy forwards HTTP `DELETE` to the upstream MCP server. Leave it enabled by default. Set `forward_delete: false` for upstreams that incorrectly tear down streamable HTTP sessions when clients use `DELETE` as transport cleanup between tool calls. In that mode the proxy returns `204` locally and preserves the upstream session.
 
 `session_registry.url` is derived from those top-level database fields, so application code can use one DSN while config stays split into explicit parts.
 
@@ -76,7 +73,7 @@ The protected-resource metadata endpoint is:
 
 For protected servers, it returns the resource URL, authorization server issuer, supported scopes, and bearer-token support. MCP clients use that metadata to choose the OAuth authorization server and request the correct audience/scope. Anonymous servers return `404` from this metadata endpoint because they do not require OAuth.
 
-MCP OAuth clients then discover authorization-server metadata from the advertised issuer with RFC 8414, usually at `/.well-known/oauth-authorization-server/...`. Copilot and VS Code are stricter here than Codex: if your identity provider only exposes OpenID Connect discovery, those clients can fail before login starts.
+MCP OAuth clients then discover authorization-server metadata from the advertised issuer with RFC 8414, usually at `/.well-known/oauth-authorization-server/...`. Some MCP clients require RFC 8414 metadata; if your identity provider only exposes OpenID Connect discovery, those clients can fail before login starts.
 
 ## Token Validation
 
@@ -181,70 +178,9 @@ The session ID is stored because it is needed to authorize later requests, but i
 
 The proxy validates the bearer token on every protected request. It allows the OAuth client ID to change for the same subject, which supports browser/client refresh flows where the same user gets a token from a different client registration.
 
-The proxy forwards `MCP-Session-Id` to upstream. If upstream returns `404`, the proxy removes its local binding for that session. A successful HTTP `DELETE` does not automatically remove the binding because some MCP clients use `DELETE` for cleanup operations that do not terminate the MCP session.
+The proxy forwards `MCP-Session-Id` to upstream. If upstream returns `404`, the proxy removes its local binding for that session. A successful HTTP `DELETE` removes the local session binding, as the upstream has accepted session termination.
 
 If the proxy loses its local binding but the upstream server still accepts the `MCP-Session-Id`, the proxy re-binds the session to the authenticated principal on the next successful request. This covers proxy restarts or local registry loss without allowing one principal to steal another principal's live session.
-
-## Playwright Compatibility
-
-The Playwright MCP HTTP server currently needs one compatibility behavior that is not safe to assume for every MCP server:
-
-- some clients send HTTP `DELETE` as transport cleanup between tool calls
-- Playwright can treat that `DELETE` as session termination
-- subsequent requests that reuse the same `MCP-Session-Id` then fail with `Session not found`
-
-That failure pattern looks like this:
-
-1. The client initializes successfully and receives an `MCP-Session-Id`.
-2. The client makes one or more successful tool calls.
-3. The client sends HTTP `DELETE /mcp/{name}` with that session ID.
-4. The client expects the session to remain usable.
-5. The next `GET` or `POST` reuses the same session ID and upstream responds `404 Session not found`.
-
-For Playwright, this proxy supports a server-level compatibility switch:
-
-```yaml
-servers:
-  - name: playwright
-    endpoint: "http://localhost:8931/mcp"
-    resource: "http://localhost:8008/mcp/playwright"
-    forward_delete: false
-```
-
-With `forward_delete: false`:
-
-- the proxy still authenticates the request
-- the proxy still checks that the caller owns the `MCP-Session-Id`
-- the proxy returns `204 No Content` to the client
-- the proxy does not send the `DELETE` upstream
-- the upstream Playwright session stays alive for the next tool call
-
-This setting is intentionally per-server because it changes transport semantics. Leave it at the default `true` unless the upstream server is known to misuse or over-interpret `DELETE`.
-
-### Why This Helps Copilot
-
-GitHub Copilot's MCP client is using streamable HTTP against the proxy and, in this setup, it issues `DELETE` requests as part of its session lifecycle between tool calls. When those `DELETE` requests reach the Playwright HTTP server, the upstream session may be torn down even though Copilot still plans to reuse it. The proxy-side `forward_delete: false` workaround prevents that teardown.
-
-### Why Codex Does Not Necessarily Show The Same Failure
-
-Codex is not automatically a reliable control case even if it points at the same proxy and the same upstream Playwright server.
-
-Two clients can share the exact same MCP endpoint and still behave differently at the transport layer:
-
-1. One client may keep a single long-lived streamable HTTP session open.
-2. Another client may send `DELETE` between tool calls and then try to reuse the same `MCP-Session-Id`.
-3. One client may immediately re-run `initialize` after cleanup.
-4. Another may optimistically continue with `GET` or `POST` on the old session.
-
-If only one of those clients triggers the upstream Playwright `DELETE` bug, only that client will observe `Session not found`.
-
-In other words, the important distinction is not "Codex versus Copilot" as product names. The important distinction is the exact HTTP sequence each client emits around `initialize`, `DELETE`, `GET`, and `POST`.
-
-So the practical interpretation is:
-
-- Codex succeeding does not mean the proxy is healthy for Copilot
-- Copilot failing after one tool call does not mean OAuth is fundamentally broken
-- the difference can be entirely explained by transport behavior around `DELETE`
 
 ## Local Development
 
@@ -260,18 +196,18 @@ Start the proxy:
 uv run proxy run
 ```
 
-Compose imports the local Keycloak realm from `resources/keycloak/realm.json`. There is no bootstrap script. The realm includes a permissive local OAuth client with wildcard redirect URIs and web origins so VS Code/Copilot can complete callbacks from any local development origin.
-
-The Compose stack pins Keycloak `26.4` because Keycloak added the RFC 8414 root-level metadata endpoint in `26.4.0`. Older `26.2.x` builds can still work with clients that fall back to OpenID Connect discovery, but Copilot may fail with `Tools: Failed to discover authorization server metadata`.
-
-The realm also enables anonymous dynamic client registration for local development clients that require it. Keycloak's `Trusted Hosts` client-registration policy allows registered client URLs only on `localhost` and `127.0.0.1`; do not copy this local DCR policy to production.
+Compose imports the local Keycloak realm from `resources/keycloak/realm.json`. There is no bootstrap script. The realm includes two pre-created public OAuth clients and supports anonymous dynamic client registration.
 
 Local Keycloak details:
 
 - realm: `agent-proxy`
 - admin console: `admin` / `admin`
-- VS Code / Copilot client: `aebc6443-996d-45c2-90f0-388ff96faa56`
+- static local client: `local-mcp-client` (use when a client needs a known `client_id`)
+- VS Code / Copilot compatible client: `aebc6443-996d-45c2-90f0-388ff96faa56`
 - test user: `admin` / `admin`
+- Keycloak version pins at `26.4` for RFC 8414 root-level metadata endpoint support.
+- The `mcp.access` client scope includes an audience mapper that emits `http://localhost:8008/mcp/playwright`.
+- Anonymous dynamic client registration is enabled with a `Trusted Hosts` policy that allows only `localhost` and `127.0.0.1`. Do not copy this local DCR policy to production.
 
 If a client reports:
 
