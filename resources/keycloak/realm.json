@@ -32,19 +32,8 @@
           ],
           "trusted-hosts": [
             "localhost",
-            "127.0.0.1"
-          ]
-        }
-      },
-      {
-        "id": "4e148653-29e8-45ea-8439-2e232e10475a",
-        "name": "Allowed Client Scopes",
-        "providerId": "allowed-client-templates",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {
-          "allow-default-scopes": [
-            "true"
+            "127.0.0.1",
+            "opencode.ai"
           ]
         }
       },

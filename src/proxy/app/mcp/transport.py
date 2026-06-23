@@ -7,16 +7,6 @@ import niquests
 from fastapi import status
 from starlette.types import ASGIApp
 
-HOP_BY_HOP_HEADERS = {
-    "connection",
-    "keep-alive",
-    "proxy-authenticate",
-    "proxy-authorization",
-    "te",
-    "trailer",
-    "transfer-encoding",
-    "upgrade",
-}
 PROXY_ONLY_REQUEST_HEADERS = {
     "authorization",
     "host",
@@ -29,11 +19,14 @@ class UpstreamResponseHandle:
     response: niquests.Response
 
 
-def filter_request_headers(headers: Mapping[str, str]) -> dict[str, str]:
+def filter_request_headers(
+    headers: Mapping[str, str],
+    strip_headers: set[str],
+) -> dict[str, str]:
     filtered: dict[str, str] = {}
     for header_name, header_value in headers.items():
         normalized_name = header_name.lower()
-        if normalized_name in HOP_BY_HOP_HEADERS:
+        if normalized_name in strip_headers:
             continue
         if normalized_name in PROXY_ONLY_REQUEST_HEADERS:
             continue
@@ -41,11 +34,14 @@ def filter_request_headers(headers: Mapping[str, str]) -> dict[str, str]:
     return filtered
 
 
-def filter_response_headers(headers: Mapping[str, str]) -> dict[str, str]:
+def filter_response_headers(
+    headers: Mapping[str, str],
+    strip_headers: set[str],
+) -> dict[str, str]:
     filtered: dict[str, str] = {}
     for header_name, header_value in headers.items():
         normalized_name = header_name.lower()
-        if normalized_name in HOP_BY_HOP_HEADERS:
+        if normalized_name in strip_headers:
             continue
         filtered[header_name] = header_value
     return filtered

@@ -34,13 +34,6 @@ async def verify_session_owner(
         server_name=server.server.name, session_id=session_id
     )
     if bound_owner is None:
-        logger.debug(
-            "Protected MCP session is not bound locally server={server_name} "
-            "request_issuer={request_issuer} request_subject={request_subject}",
-            server_name=server.server.name,
-            request_issuer=owner.issuer,
-            request_subject=owner.subject,
-        )
         return False
     if bound_owner != owner:
         logger.warning(
@@ -57,12 +50,7 @@ async def verify_session_owner(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Unknown session.",
         )
-    logger.debug(
-        "Protected MCP session owner verified server={server_name} issuer={issuer} subject={subject}",
-        server_name=server.server.name,
-        issuer=owner.issuer,
-        subject=owner.subject,
-    )
+
     return True
 
 
@@ -90,10 +78,6 @@ async def synchronize_session_binding(
         and request_session_id is not None
         and 200 <= response_status < 300
     ):
-        logger.debug(
-            "Upstream accepted MCP session termination server={server_name}; removing proxy binding",
-            server_name=server.server.name,
-        )
         await registry.remove(
             server_name=server.server.name,
             session_id=request_session_id,
@@ -101,10 +85,6 @@ async def synchronize_session_binding(
         return
 
     if request_session_id is not None and response_status == status.HTTP_404_NOT_FOUND:
-        logger.debug(
-            "Upstream reported unknown MCP session server={server_name}; removing proxy binding",
-            server_name=server.server.name,
-        )
         await registry.remove(
             server_name=server.server.name,
             session_id=request_session_id,
@@ -116,14 +96,6 @@ async def synchronize_session_binding(
         and not request_session_bound
         and 200 <= response_status < 300
     ):
-        logger.debug(
-            "Recovered protected MCP session binding server={server_name} "
-            "issuer={issuer} subject={subject} client_id={client_id}",
-            server_name=server.server.name,
-            issuer=owner.issuer,
-            subject=owner.subject,
-            client_id=principal.client_id,
-        )
         try:
             await registry.bind(
                 server_name=server.server.name,
@@ -145,14 +117,6 @@ async def synchronize_session_binding(
         and response_session_id is not None
         and 200 <= response_status < 300
     ):
-        logger.debug(
-            "Initialize created MCP session server={server_name} issuer={issuer} "
-            "subject={subject} client_id={client_id}",
-            server_name=server.server.name,
-            issuer=owner.issuer,
-            subject=owner.subject,
-            client_id=principal.client_id,
-        )
         try:
             await registry.bind(
                 server_name=server.server.name,

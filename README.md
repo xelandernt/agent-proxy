@@ -25,13 +25,23 @@ middleware:
       - "*"
     allow_credentials: false
 
-session_registry:
+database:
   address: 127.0.0.1
   port: 5432
   username: postgres
   password: postgres
   database: agent_proxy
   sslmode: disable
+
+strip_headers:
+  - connection
+  - keep-alive
+  - proxy-authenticate
+  - proxy-authorization
+  - te
+  - trailer
+  - transfer-encoding
+  - upgrade
 
 mcp:
   groups:
@@ -51,7 +61,7 @@ Each group shares one auth provider. Servers in protected groups must configure 
 
 `authorization_scopes` controls what the proxy advertises to OAuth clients in protected-resource metadata. `required_scopes` controls what the proxy enforces on incoming access tokens. If `authorization_scopes` is unset, it defaults to `required_scopes`. Server-level `authorization_scopes` and `required_scopes` inherit from `default_authorization_scopes` and `default_required_scopes`.
 
-`session_registry.url` is derived from those top-level database fields, so application code can use one DSN while config stays split into explicit parts.
+`database.url` is derived from those top-level database fields, so application code can use one DSN while config stays split into explicit parts.
 
 ## Authentication Flow
 
@@ -156,7 +166,7 @@ When forwarding to upstream, the proxy removes only proxy-local or transport-loc
 
 - `Authorization`
 - `Host`
-- HTTP hop-by-hop headers such as `Connection`, `Transfer-Encoding`, and `Upgrade`
+- Configured HTTP hop-by-hop headers (default: `Connection`, `Transfer-Encoding`, `Upgrade`, etc.)
 
 Other request headers pass through to the upstream MCP server, including MCP headers such as `MCP-Session-Id`, `MCP-Protocol-Version`, `Last-Event-ID`, `Accept`, and `Content-Type`.
 
@@ -207,7 +217,13 @@ Local Keycloak details:
 - test user: `admin` / `admin`
 - Keycloak version pins at `26.4` for RFC 8414 root-level metadata endpoint support.
 - The `mcp.access` client scope includes an audience mapper that emits `http://localhost:8008/mcp/playwright`.
-- Anonymous dynamic client registration is enabled with a `Trusted Hosts` policy that allows only `localhost` and `127.0.0.1`. Do not copy this local DCR policy to production.
+- Anonymous dynamic client registration is enabled for local development with a `Trusted Hosts` policy that allows `localhost`, `127.0.0.1`, and `opencode.ai`, plus a `Max Clients Limit` policy. Do not copy this local DCR policy to production.
+
+Client harness requirements:
+
+- Codex: configure the MCP server URL as `http://localhost:8008/mcp/playwright`, then run `codex mcp login playwright`. The OAuth provider must support dynamic client registration and allow the client to request the proxy-advertised `mcp.access` scope.
+- OpenCode: configure a remote MCP server named `playwright` with URL `http://localhost:8008/mcp/playwright`, then run `opencode mcp auth playwright`. The OAuth provider must support dynamic client registration and allow OpenCode's registered client URLs, including `https://opencode.ai`.
+- Both clients require RFC 8414 authorization-server metadata from the OAuth provider and proxy protected-resource metadata from `/.well-known/oauth-protected-resource/mcp/playwright`.
 
 If a client reports:
 
@@ -216,6 +232,14 @@ Policy 'Trusted Hosts' rejected request to client-registration service. Details:
 ```
 
 then Keycloak is rejecting dynamic client registration. If you already started the Compose stack before the local realm included DCR settings, recreate the Keycloak container and volume so the updated realm is imported.
+
+If a client reports:
+
+```text
+Policy 'Allowed Client Scopes' rejected request to client-registration service. Details: Not permitted to use specified clientScope
+```
+
+then Keycloak is rejecting the scopes requested during dynamic client registration. The local development realm should not include the anonymous `Allowed Client Scopes` DCR policy; remove that policy from the running realm or recreate the Keycloak container and volume so the updated realm is imported.
 
 ## Smoke Test
 

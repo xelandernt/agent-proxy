@@ -127,6 +127,7 @@ async def get_protected_resource_metadata(
 
 async def _forward_mcp_request(
     request: Request,
+    config: ConfigDep,
     server: ServerDep,
     principal: PrincipalDep,
     registry: SessionRegistryDep,
@@ -134,7 +135,7 @@ async def _forward_mcp_request(
     http_method: str,
 ) -> Response:
     body = await request.body()
-    forwarded_headers = filter_request_headers(request.headers)
+    forwarded_headers = filter_request_headers(request.headers, config.strip_headers)
     session_id = optional_header_value(request.headers.get("mcp-session-id"))
     jsonrpc_method = extract_jsonrpc_method(http_method, body)
     owner = session_owner(principal)
@@ -188,7 +189,9 @@ async def _forward_mcp_request(
         response=upstream_handle.response,
     )
 
-    response_headers = filter_response_headers(upstream_handle.response.headers)
+    response_headers = filter_response_headers(
+        upstream_handle.response.headers, config.strip_headers
+    )
     if is_event_stream(upstream_handle.response):
         return StreamingResponse(
             stream_upstream_response(upstream_handle),
@@ -207,6 +210,7 @@ async def _forward_mcp_request(
 @router.post("/mcp/{name}", name="proxy_mcp_backend")
 async def post_mcp_backend(
     request: Request,
+    config: ConfigDep,
     server: ServerDep,
     principal: PrincipalDep,
     registry: SessionRegistryDep,
@@ -214,6 +218,7 @@ async def post_mcp_backend(
 ) -> Response:
     return await _forward_mcp_request(
         request=request,
+        config=config,
         server=server,
         principal=principal,
         registry=registry,
@@ -225,6 +230,7 @@ async def post_mcp_backend(
 @router.get("/mcp/{name}", name="proxy_mcp_backend_get")
 async def get_mcp_backend(
     request: Request,
+    config: ConfigDep,
     server: ServerDep,
     principal: PrincipalDep,
     registry: SessionRegistryDep,
@@ -232,6 +238,7 @@ async def get_mcp_backend(
 ) -> Response:
     return await _forward_mcp_request(
         request=request,
+        config=config,
         server=server,
         principal=principal,
         registry=registry,
@@ -243,6 +250,7 @@ async def get_mcp_backend(
 @router.delete("/mcp/{name}", name="proxy_mcp_backend_delete")
 async def delete_mcp_backend(
     request: Request,
+    config: ConfigDep,
     server: ServerDep,
     principal: PrincipalDep,
     registry: SessionRegistryDep,
@@ -250,6 +258,7 @@ async def delete_mcp_backend(
 ) -> Response:
     return await _forward_mcp_request(
         request=request,
+        config=config,
         server=server,
         principal=principal,
         registry=registry,

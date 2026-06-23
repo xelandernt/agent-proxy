@@ -112,7 +112,7 @@ async def shutdown_session_registry(config: ConfigMcpSessionRegistry) -> None:
 
 
 async def get_async_session(config: ConfigDep) -> AsyncIterator[AsyncSession]:
-    database = get_session_registry_database(config.session_registry)
+    database = get_session_registry_database(config.database)
     async with database.session_factory() as session:
         yield session
 
@@ -143,14 +143,6 @@ class SqlAlchemySessionRegistry:
         )
         try:
             await self._session.commit()
-            logger.debug(
-                "Bound protected MCP session server={server_name} issuer={issuer} "
-                "subject={subject} client_id={client_id}",
-                server_name=server_name,
-                issuer=owner.issuer,
-                subject=owner.subject,
-                client_id=client_id,
-            )
             return
         except IntegrityError:
             await self._session.rollback()
@@ -187,12 +179,6 @@ class SqlAlchemySessionRegistry:
         if existing_binding.client_id != client_id:
             existing_binding.client_id = client_id
             await self._session.commit()
-            logger.debug(
-                "Updated protected MCP session client_id server={server_name} "
-                "client_id={client_id}",
-                server_name=server_name,
-                client_id=client_id,
-            )
 
     async def get(self, *, server_name: str, session_id: str) -> SessionOwner | None:
         binding = await self._session.get(
@@ -200,19 +186,7 @@ class SqlAlchemySessionRegistry:
             {"server_name": server_name, "session_id": session_id},
         )
         if binding is None:
-            logger.debug(
-                "No protected MCP session binding found server={server_name}",
-                server_name=server_name,
-            )
             return None
-        logger.debug(
-            "Loaded protected MCP session binding server={server_name} issuer={issuer} "
-            "subject={subject} client_id={client_id}",
-            server_name=server_name,
-            issuer=binding.issuer,
-            subject=binding.subject,
-            client_id=binding.client_id,
-        )
         return SessionOwner(
             issuer=binding.issuer,
             subject=binding.subject,
@@ -226,10 +200,6 @@ class SqlAlchemySessionRegistry:
             )
         )
         await self._session.commit()
-        logger.debug(
-            "Removed protected MCP session binding server={server_name}",
-            server_name=server_name,
-        )
 
 
 async def get_session_registry(session: AsyncSessionDep) -> SessionRegistry:

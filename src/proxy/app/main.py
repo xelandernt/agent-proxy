@@ -1,6 +1,4 @@
 from contextlib import asynccontextmanager
-import sys
-from typing import Any
 
 from fastapi import FastAPI
 import logfire
@@ -20,11 +18,11 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        await startup_session_registry(settings.session_registry)
+        await startup_session_registry(settings.database)
         try:
             yield
         finally:
-            await shutdown_session_registry(settings.session_registry)
+            await shutdown_session_registry(settings.database)
 
     app = FastAPI(title="Agent Proxy", lifespan=lifespan)
     if config is not None:
@@ -57,17 +55,7 @@ def configure_observability(app: FastAPI, settings: Config) -> None:
     )
     logfire.instrument_fastapi(app)
     logfire.instrument_system_metrics(base="basic")
-    handlers: list[Any] = []
-    if settings.logfire.environment == "dev":
-        handlers.append(
-            {
-                "sink": sys.stderr,
-                "level": "DEBUG",
-                "format": "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level} | {message}",
-            }
-        )
-    handlers.append(logfire.loguru_handler())
-    logger.configure(handlers=handlers)
+    logger.configure(handlers=[logfire.loguru_handler()])
     _OBSERVABILITY_CONFIGURED = True
 
 

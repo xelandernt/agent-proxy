@@ -11,7 +11,6 @@ import jwt
 import niquests
 from fastapi import HTTPException, Request, status
 from jwt.algorithms import RSAAlgorithm
-from loguru import logger
 
 from proxy.settings import (
     Config,
@@ -223,16 +222,6 @@ class OidcAuthProvider(OAuthBearerAuthProvider):
             )
 
         subject = principal_subject(claims)
-        logger.debug(
-            "Authenticated MCP principal server={server_name} issuer={issuer} "
-            "subject={subject} client_id={client_id} audiences={audiences}",
-            server_name=server.name,
-            issuer=str(claims["iss"]),
-            subject=subject,
-            client_id=optional_string(claims.get("azp"))
-            or optional_string(claims.get("appid")),
-            audiences=audiences,
-        )
 
         return AuthenticatedPrincipal(
             subject=subject,
