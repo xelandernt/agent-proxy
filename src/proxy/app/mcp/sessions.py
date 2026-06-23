@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from proxy.app.mcp.dependencies import ConfigDep
-from proxy.settings import ConfigMcpSessionRegistry
+from proxy.settings import ConfigDatabase
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,7 @@ _DATABASE_CACHE: tuple[str, SessionRegistryDatabase] | None = None
 
 
 def get_session_registry_database(
-    config: ConfigMcpSessionRegistry,
+    config: ConfigDatabase,
 ) -> SessionRegistryDatabase:
     global _DATABASE_CACHE
 
@@ -98,11 +98,11 @@ def get_session_registry_database(
     return _DATABASE_CACHE[1]
 
 
-async def startup_session_registry(config: ConfigMcpSessionRegistry) -> None:
+async def startup_session_registry(config: ConfigDatabase) -> None:
     await get_session_registry_database(config).startup()
 
 
-async def shutdown_session_registry(config: ConfigMcpSessionRegistry) -> None:
+async def shutdown_session_registry(config: ConfigDatabase) -> None:
     global _DATABASE_CACHE
 
     database = get_session_registry_database(config)

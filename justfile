@@ -1,7 +1,9 @@
+[default]
 [private]
-default:
-    @just --list
+_:
+    @just --list --list-submodules
 
+# upgrade dependencies
 upgrade:
     uv lock --upgrade
     @just install
@@ -18,6 +20,10 @@ lint:
 # test project
 test *args:
     uv run --no-sync pytest {{ args }}
+
+# run Docker-backed integration tests
+test-integration *args:
+    uv run --no-sync pytest tests/integration {{ args }} -q
 
 # type check project
 typecheck:
@@ -37,18 +43,23 @@ publish:
     uv build
     uv publish --token $PYPI_TOKEN
 
+# generate configuration schema
 config-schema:
     uv run proxy config-schema ./resources/config.schema.json
 
+# start mcp inspector
 inspector:
     npx -y @modelcontextprotocol/inspector
 
+# start docker containers
 compose:
     docker compose up -d --wait
 
+# stop docker containers
 stop:
     docker compose --profile "*" down
 
+# start application in development mode
 dev:
     @just compose
     uv run --env-file ".env" proxy run

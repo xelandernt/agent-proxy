@@ -32,7 +32,6 @@ proxy = "proxy.cli.cli:cli"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "prek>=0.4.3",
     "pyrefly>=1.0.0",
     "pytest>=9.0.3",
@@ -47,12 +46,18 @@ project-includes = [
     "**/*.py*",
     "**/*.ipynb",
 ]
+site_package_path = ["src", "tests"]
 
 [tool.pytest.ini_options]
 addopts = [
     "--import-mode=importlib",
     "--ignore=.tox/",
-    "--ignore=tmp/"
+    "--ignore=tmp/",
+    "--strict-markers",
+]
+asyncio_mode = "auto"
+markers = [
+    "integration: Docker-backed integration tests that require a running Docker daemon.",
 ]
 pythonpath=["src", "tests"]
 

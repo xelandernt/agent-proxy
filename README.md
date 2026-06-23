@@ -262,3 +262,21 @@ curl \
 just lint
 just test
 ```
+
+### Integration Tests
+
+Docker-backed integration tests exercise the proxy against real Postgres, Keycloak, and Playwright MCP containers using Testcontainers:
+
+```bash
+# Full integration suite (requires Docker)
+just test-integration
+
+# Or run specific test groups
+uv run pytest tests/integration/test_metadata.py -q
+uv run pytest tests/integration/test_auth.py -q
+uv run pytest tests/integration/test_mcp_proxy.py -q
+
+# Run the entire project test suite (unit + integration)
+just test
+just test -- tests/integration
+```

@@ -183,7 +183,7 @@ class ConfigMcpGroup(BaseModel):
         return self
 
 
-class ConfigMcpSessionRegistry(BaseModel):
+class ConfigDatabase(BaseModel):
     """Configuration for protected MCP session ownership storage."""
 
     driver: str = "postgresql+asyncpg"
@@ -273,7 +273,7 @@ class Config(ProxySettings):
             "upgrade",
         },
     )
-    database: ConfigMcpSessionRegistry = Field(default_factory=ConfigMcpSessionRegistry)
+    database: ConfigDatabase = Field(default_factory=ConfigDatabase)
     mcp: ConfigMcp = Field(default_factory=ConfigMcp)
 
     def get_server(self, name: str) -> ResolvedMcpServer | None:
