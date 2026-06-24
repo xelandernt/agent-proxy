@@ -1,18 +1,77 @@
 # agent-proxy
 
-FastAPI proxy for named MCP HTTP servers.
+A FastAPI reverse proxy that secures and exposes upstream MCP (Model Context Protocol) HTTP servers behind authenticated endpoints. Clients authenticate to the proxy; the proxy strips auth headers and forwards requests upstream.
 
 ## Features
 
-- exposes upstream MCP servers behind `/mcp/{name}`
-- groups MCP servers behind shared auth providers
-- supports anonymous passthrough, generic OIDC, and legacy Entra ID issuer config
-- publishes MCP OAuth protected-resource metadata for protected servers
-- binds protected MCP sessions to the authenticated principal that initialized them
+- Expose multiple upstream MCP servers at `/mcp/{name}`
+- Group servers behind shared authentication providers (OIDC, Entra ID, or disabled/anonymous)
+- Publish OAuth protected-resource metadata at `/.well-known/oauth-protected-resource/mcp/{name}`
+- Bind MCP sessions to the authenticated principal that initialised them — one user cannot reuse another's session
+- Filter proxy-only and hop-by-hop headers from forwarded requests and responses
+- Support both buffered and streaming (SSE) upstream responses
+
+## Quick Start
+
+```bash
+# Start Postgres, Keycloak, and the example MCP server
+just compose
+
+# Start the proxy
+uv run proxy run
+```
+
+The proxy listens on `http://127.0.0.1:8008` by default. See [Configuration](#configuration) to customise.
+
+---
+
+## Usage
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/mcp/{name}` | Proxy a JSON-RPC request to the named MCP server |
+| `GET` | `/mcp/{name}` | Proxy a GET request (e.g. SSE stream) |
+| `DELETE` | `/mcp/{name}` | Proxy a DELETE request (e.g. session teardown) |
+| `GET` | `/.well-known/oauth-protected-resource/mcp/{name}` | OAuth protected-resource metadata (RFC 8414) |
+
+### Smoke Test
+
+```bash
+TOKEN="<access-token>"
+
+curl \
+  -X POST http://localhost:8008/mcp/my-server \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke-test","version":"0.1.0"}}}'
+```
+
 
 ## Configuration
 
-Configuration is loaded from environment variables prefixed with `PROXY__` and from `.proxy/config.yaml`. Set `PROXY_CONFIG_FILE` to use a different YAML file.
+Configuration is loaded from environment variables (prefix `PROXY__`, nested delimiter `__`) and from `.proxy/config.yaml`. Set `PROXY_CONFIG_FILE` to use a different YAML path.
+
+### Minimal Example
+
+```yaml
+mcp:
+  groups:
+    - name: my-group
+      auth:
+        provider: oidc
+        issuer: "http://localhost:8080/realms/agent-proxy"
+      default_required_scopes:
+        - mcp.access
+      servers:
+        - name: my-server
+          resource: "http://localhost:8008/mcp/my-server"
+          endpoint: "http://upstream:8931/mcp"
+```
+
+### Full Reference
 
 ```yaml
 host:
@@ -32,6 +91,7 @@ database:
   password: postgres
   database: agent_proxy
   sslmode: disable
+  options: {}
 
 strip_headers:
   - connection
@@ -45,86 +105,87 @@ strip_headers:
 
 mcp:
   groups:
-    - name: playwright
+    - name: my-group
       auth:
         provider: oidc
         issuer: "http://localhost:8080/realms/agent-proxy"
+      default_authorization_scopes:
+        - openid
+        - profile
+        - mcp.access
       default_required_scopes:
-        - "mcp.access"
+        - mcp.access
       servers:
-        - name: playwright
-          resource: "http://localhost:8008/mcp/playwright"
+        - name: my-server
+          description: "My upstream MCP server"
+          resource: "http://localhost:8008/mcp/my-server"
           endpoint: "http://localhost:8931/mcp"
+          accepted_audiences:
+            - "api://<additional-audience>"
 ```
 
-Each group shares one auth provider. Servers in protected groups must configure `resource`; this is the OAuth protected-resource identifier advertised to MCP clients and should match the MCP server URL or origin clients connect to. Access-token audiences are matched against `resource` plus any server-level `accepted_audiences`. Use `accepted_audiences` when the identity provider emits a different audience, such as an Entra ID Application ID URI.
+### Config Details
 
-`authorization_scopes` controls what the proxy advertises to OAuth clients in protected-resource metadata. `required_scopes` controls what the proxy enforces on incoming access tokens. If `authorization_scopes` is unset, it defaults to `required_scopes`. Server-level `authorization_scopes` and `required_scopes` inherit from `default_authorization_scopes` and `default_required_scopes`.
+**Auth providers** are selected via the `provider` discriminator:
 
-`database.url` is derived from those top-level database fields, so application code can use one DSN while config stays split into explicit parts.
+| Provider | Type | Notes |
+|----------|------|-------|
+| `disabled` | No authentication | Requests accepted as `anonymous` principal |
+| `oidc` | Generic OIDC | Validates JWT against issuer's JWKS |
+| `entra_id` | Microsoft Entra ID | Convenience wrapper around OIDC; can derive issuer from `tenant_id` |
 
-## Authentication Flow
+**Server-level scope inheritance:**
 
-MCP clients authenticate to the proxy, not to the upstream MCP server. The proxy validates the client credential, enforces server access rules, strips proxy-only authentication headers, and then forwards the MCP request upstream.
+- `authorization_scopes` — advertised to OAuth clients in resource metadata. Falls back to `default_authorization_scopes`, then to `required_scopes`.
+- `required_scopes` — enforced on incoming access tokens. Falls back to `default_required_scopes`.
+- Server-level values always override group defaults.
 
-1. A client calls `POST /mcp/{name}`, `GET /mcp/{name}`, or `DELETE /mcp/{name}`.
-2. FastAPI resolves `{name}` to a configured MCP server and group.
-3. For `disabled` groups, the request is accepted as an anonymous principal.
-4. For `oidc` and `entra_id` groups, the proxy requires `Authorization: Bearer <access-token>`.
-5. Missing or malformed bearer tokens return `401` with `WWW-Authenticate`.
-6. Tokens that validate but do not include the required scopes return `403`.
-7. Valid requests are forwarded to the upstream server configured by `endpoint`.
+**Protected groups** (non-`disabled`) require every server to set a `resource` URL. This is the OAuth protected-resource identifier that access-token audiences are matched against.
 
-The protected-resource metadata endpoint is:
+---
 
-```text
-/.well-known/oauth-protected-resource/mcp/{name}
+## Authentication & Authorisation
+
+```
+            ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+  Client ──▶│  Proxy      │────▶│  Auth        │────▶│  Upstream   │
+            │  /mcp/{name}│     │  Provider    │     │  MCP Server │
+            └─────────────┘     └──────────────┘     └─────────────┘
+                  │                                       │
+                  │  /.well-known/oauth-protected-        │  mcp-session-id
+                  │  resource/mcp/{name}                  │
+                  ▼                                       ▼
+            MCP Client                             MCP Session
+            discovers                               bound to
+            auth server                             principal
 ```
 
-For protected servers, it returns the resource URL, authorization server issuer, supported scopes, and bearer-token support. MCP clients use that metadata to choose the OAuth authorization server and request the correct audience/scope. Anonymous servers return `404` from this metadata endpoint because they do not require OAuth.
+1. An MCP client requests the protected-resource metadata endpoint to learn the authorisation server URL and required scopes.
+2. The client obtains an access token from the authorisation server.
+3. The client sends the token as `Authorization: Bearer <token>` to the proxy.
+4. The proxy validates the token (signature, issuer, audience, scopes) against the server's auth provider.
+5. Missing or malformed tokens → `401` with `WWW-Authenticate`.
+6. Tokens lacking required scopes → `403`.
+7. Valid requests are forwarded upstream; the `Authorization` header is **not** sent upstream.
 
-MCP OAuth clients then discover authorization-server metadata from the advertised issuer with RFC 8414, usually at `/.well-known/oauth-authorization-server/...`. Some MCP clients require RFC 8414 metadata; if your identity provider only exposes OpenID Connect discovery, those clients can fail before login starts.
+### Token Validation
 
-## Token Validation
+For OIDC-backed groups, the proxy fetches:
 
-For OIDC-backed groups, the proxy uses the configured issuer to fetch:
+- `/.well-known/openid-configuration` from the configured issuer
+- JWKS from the URI advertised in discovery metadata
 
-- `/.well-known/openid-configuration`
-- the JWKS URI advertised by that discovery document
+Validation steps:
 
-The proxy then validates:
+- JWT signature verification using the matching JWK (by `kid`)
+- Allowed signing algorithm (default: `RS256`)
+- Issuer match
+- `exp` and `iat` with configurable clock skew (default: 30s)
+- Required claims: `sub`, `aud`, `iss`, `exp`, `iat`
+- Audience matched against server `resource` + `accepted_audiences`
+- Required scopes from `scp`, `scope`, or `roles` claims
 
-- token signature using the JWKS signing key
-- allowed signing algorithm
-- issuer
-- `exp` and `iat` with configured clock skew
-- required `sub`, `aud`, `iss`, `exp`, and `iat` claims
-- audience against the configured server `resource`
-- required scopes from `scp`, `scope`, or `roles`
-
-The `entra_id` provider uses the same validation path. It exists as a convenience wrapper for Microsoft Entra ID issuer configuration and can derive the issuer from `authority` plus `tenant_id`.
-
-## Microsoft Entra ID Setup
-
-Use Entra ID when the proxy should trust access tokens issued by a Microsoft tenant. The proxy acts like a protected web API: clients acquire an access token for the proxy resource, then send that token to `Authorization: Bearer <access-token>` on MCP requests.
-
-Create one app registration for the proxy API:
-
-1. In Microsoft Entra ID, create an app registration such as `agent-proxy-api`.
-2. In **Expose an API**, set the Application ID URI, for example `api://<proxy-api-client-id>`.
-3. Add a delegated scope such as `mcp.access` for interactive clients.
-4. Add an app role with value `mcp.access` if daemon or service clients will use client credentials.
-5. Configure the MCP server's `resource` as the MCP URL clients connect to, and add the Entra Application ID URI to `accepted_audiences`.
-6. Use the delegated scope or app-role value in `default_required_scopes` or server-level `required_scopes`.
-
-Create one or more client app registrations:
-
-- Browser, desktop, MCP Inspector, VS Code, and Copilot-style clients should use a public client registration with the authorization-code flow and the exact redirect URIs those clients use.
-- Service clients should use a confidential client registration with client credentials and a secret or certificate.
-- Add API permissions for the proxy API registration and grant the delegated scope or application role.
-- Grant admin consent if your tenant requires it.
-
-Configure the proxy with either an explicit issuer:
+### Entra ID Setup
 
 ```yaml
 auth:
@@ -132,7 +193,7 @@ auth:
   issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0"
 ```
 
-or a tenant ID:
+Or derive from tenant:
 
 ```yaml
 auth:
@@ -140,143 +201,159 @@ auth:
   tenant_id: "<tenant-id>"
 ```
 
-Example server config for Entra ID:
+**Proxy API registration:**
 
-```yaml
-servers:
-  - name: playwright-azure
-    endpoint: "http://localhost:8931/mcp"
-    resource: "http://localhost:8008/mcp/playwright-azure"
-    authorization_scopes:
-      - "openid"
-      - "profile"
-    accepted_audiences:
-      - "api://<proxy-api-client-id>"
-```
+1. Create an app registration for the proxy (e.g. `agent-proxy-api`)
+2. Set an Application ID URI (e.g. `api://<client-id>`)
+3. Add a delegated scope (`mcp.access`) and/or an app role (`mcp.access`)
+4. Configure the MCP server's `resource` as the URL clients connect to
+5. Add the Application ID URI to `accepted_audiences`
 
-For delegated user tokens, Entra puts permissions in the `scp` claim. For client-credentials tokens, Entra uses the `roles` claim. The proxy checks both, plus `scope`, so the same `mcp.access` requirement can work for browser users and service clients.
+**Client registration:**
 
-The proxy uses `oid` as the stable principal identifier when Entra includes it, and falls back to `sub` for generic OIDC tokens. That matters because Entra's `sub` can be pairwise per client app, while `oid` identifies the user or service principal within the tenant.
+- Public clients (desktop, VS Code, Copilot): authorisation-code flow with redirect URIs
+- Confidential clients (services): client-credentials flow with secret or certificate
+- Grant API permissions for the proxy API and admin consent if required
 
-## Credential Handling
+The proxy checks `scp` (delegated), `roles` (app roles), and `scope` claims, so the same scope requirement works for both user tokens and service principals.
 
-Clients send credentials to the proxy with the standard HTTP `Authorization` header. The upstream MCP server does not receive that credential.
+---
 
-When forwarding to upstream, the proxy removes only proxy-local or transport-local headers:
+## Session Handling
 
-- `Authorization`
-- `Host`
-- Configured HTTP hop-by-hop headers (default: `Connection`, `Transfer-Encoding`, `Upgrade`, etc.)
+The proxy keeps a protected-session ownership registry in Postgres so one principal cannot reuse another's MCP session.
 
-Other request headers pass through to the upstream MCP server, including MCP headers such as `MCP-Session-Id`, `MCP-Protocol-Version`, `Last-Event-ID`, `Accept`, and `Content-Type`.
+- On `initialize`, if the upstream responds with `MCP-Session-Id`, the proxy stores `(server, session_id, issuer, subject, client_id)`
+- Subsequent requests with `MCP-Session-Id` must authenticate as the same `(issuer, subject)` pair
+- If a different principal attempts reuse → `409 Conflict`
+- On `DELETE` with `2xx` response → session binding is removed
+- On upstream `404` → stale session binding is removed
+- If the proxy loses its binding (e.g. restart) but the upstream still accepts the session, the session is re-bound on the next successful request
 
-Response headers are also passed back except HTTP hop-by-hop headers.
-
-## MCP Session Handling
-
-The upstream MCP server owns the actual MCP session. The proxy keeps a protected-session ownership registry so one authenticated principal cannot reuse another principal's MCP session.
-
-On `initialize`, if the upstream response includes `MCP-Session-Id`, the proxy stores:
-
-- server name
-- session ID
-- issuer
-- subject
-- client ID when present
-
-The session ID is stored because it is needed to authorize later requests, but it is not logged. Subsequent requests with `MCP-Session-Id` must authenticate as the same `(issuer, subject)` pair. If a different principal tries to reuse the session, the proxy returns `404 Unknown session`.
-
-The proxy validates the bearer token on every protected request. It allows the OAuth client ID to change for the same subject, which supports browser/client refresh flows where the same user gets a token from a different client registration.
-
-The proxy forwards `MCP-Session-Id` to upstream. If upstream returns `404`, the proxy removes its local binding for that session. A successful HTTP `DELETE` removes the local session binding, as the upstream has accepted session termination.
-
-If the proxy loses its local binding but the upstream server still accepts the `MCP-Session-Id`, the proxy re-binds the session to the authenticated principal on the next successful request. This covers proxy restarts or local registry loss without allowing one principal to steal another principal's live session.
+---
 
 ## Local Development
 
-Start Postgres, Keycloak, and the Playwright MCP server:
+### Prerequisites
+
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/)
+- [just](https://just.systems/)
+- Docker
+
+### Setup
 
 ```bash
+# Install dependencies
+uv sync --all-extras
+
+# Install pre-commit hooks
+just hook
+
+# Start dependent services (Postgres, Keycloak, example MCP server)
 just compose
 ```
 
-Start the proxy:
+### Run
 
 ```bash
+# Start the proxy in dev mode (compose + run)
+just dev
+
+# Or separately:
 uv run proxy run
 ```
 
-Compose imports the local Keycloak realm from `resources/keycloak/realm.json`. There is no bootstrap script. The realm includes two pre-created public OAuth clients and supports anonymous dynamic client registration.
+### Local Keycloak Details
 
-Local Keycloak details:
+| Item                     | Value                                  |
+|--------------------------|----------------------------------------|
+| Realm                    | `agent-proxy`                          |
+| Admin console            | `admin` / `admin`                      |
+| Static local client      | `local-mcp-client`                     |
+| VS Code / Copilot client | `aebc6443-996d-45c2-90f0-388ff96faa56` |
+| Test user                | `admin` / `admin`                      |
+| Keycloak version         | 26.4                                   |
 
-- realm: `agent-proxy`
-- admin console: `admin` / `admin`
-- static local client: `local-mcp-client` (use when a client needs a known `client_id`)
-- VS Code / Copilot compatible client: `aebc6443-996d-45c2-90f0-388ff96faa56`
-- test user: `admin` / `admin`
-- Keycloak version pins at `26.4` for RFC 8414 root-level metadata endpoint support.
-- The `mcp.access` client scope includes an audience mapper that emits `http://localhost:8008/mcp/playwright`.
-- Anonymous dynamic client registration is enabled for local development with a `Trusted Hosts` policy that allows `localhost`, `127.0.0.1`, and `opencode.ai`, plus a `Max Clients Limit` policy. Do not copy this local DCR policy to production.
+The `mcp.access` client scope includes an audience mapper that emits the proxy's resource URL. Anonymous dynamic client registration is enabled for `localhost`, `127.0.0.1`, and `opencode.ai`.
 
-Client harness requirements:
+### Client Integration
 
-- Codex: configure the MCP server URL as `http://localhost:8008/mcp/playwright`, then run `codex mcp login playwright`. The OAuth provider must support dynamic client registration and allow the client to request the proxy-advertised `mcp.access` scope.
-- OpenCode: configure a remote MCP server named `playwright` with URL `http://localhost:8008/mcp/playwright`, then run `opencode mcp auth playwright`. The OAuth provider must support dynamic client registration and allow OpenCode's registered client URLs, including `https://opencode.ai`.
-- Both clients require RFC 8414 authorization-server metadata from the OAuth provider and proxy protected-resource metadata from `/.well-known/oauth-protected-resource/mcp/playwright`.
+Clients that support OAuth-protected MCP servers discover the proxy's OAuth endpoints automatically using the protected-resource metadata at `/.well-known/oauth-protected-resource/mcp/{name}`. They then fetch RFC 8414 authorisation-server metadata from the advertised issuer.
 
-If a client reports:
+- **Codex:** configure the MCP server URL as `http://localhost:8008/mcp/my-server`, then run `codex mcp login my-server`
+- **OpenCode:** configure a remote MCP server with URL `http://localhost:8008/mcp/my-server`, then run `opencode mcp auth my-server`
 
-```text
-Policy 'Trusted Hosts' rejected request to client-registration service. Details: Host not trusted.
+### Troubleshooting
+
+```
+Policy 'Trusted Hosts' rejected request to client-registration service.
 ```
 
-then Keycloak is rejecting dynamic client registration. If you already started the Compose stack before the local realm included DCR settings, recreate the Keycloak container and volume so the updated realm is imported.
-
-If a client reports:
-
-```text
-Policy 'Allowed Client Scopes' rejected request to client-registration service. Details: Not permitted to use specified clientScope
-```
-
-then Keycloak is rejecting the scopes requested during dynamic client registration. The local development realm should not include the anonymous `Allowed Client Scopes` DCR policy; remove that policy from the running realm or recreate the Keycloak container and volume so the updated realm is imported.
-
-## Smoke Test
-
-After an MCP client completes OAuth, send the issued bearer token to the proxy:
+Recreate the Keycloak container and volume so the updated realm is imported:
 
 ```bash
-TOKEN="<access-token>"
-
-curl \
-  -X POST http://localhost:8008/mcp/playwright \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Accept: application/json, text/event-stream' \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke-test","version":"0.1.0"}}}'
+docker compose down -v && just compose
 ```
 
-## Checks
+---
+
+## Testing
 
 ```bash
+# Lint
 just lint
+
+# Type check
+just typecheck
+
+# Run all tests (unit + integration)
 just test
-```
 
-### Integration Tests
-
-Docker-backed integration tests exercise the proxy against real Postgres, Keycloak, and Playwright MCP containers using Testcontainers:
-
-```bash
-# Full integration suite (requires Docker)
+# Integration tests only (requires Docker)
 just test-integration
 
-# Or run specific test groups
+# Specific test groups
 uv run pytest tests/integration/test_metadata.py -q
 uv run pytest tests/integration/test_auth.py -q
 uv run pytest tests/integration/test_mcp_proxy.py -q
-
-# Run the entire project test suite (unit + integration)
-just test
-just test -- tests/integration
 ```
+
+---
+
+## Commands
+
+```bash
+# Print current configuration as JSON
+uv run proxy config
+
+# Write JSON Schema for configuration
+uv run proxy config-schema ./resources/config.schema.json
+
+# Run the application (uvicorn)
+uv run proxy run --host 127.0.0.1 --port 8008
+
+# Generate config schema
+just config-schema
+
+# Start MCP Inspector
+just inspector
+```
+
+---
+
+## Project Scripts (`just`)
+
+| Command | Description |
+|---------|-------------|
+| `just install` | Install dependencies and pre-commit hooks |
+| `just lint` | Run linter |
+| `just typecheck` | Run type checker |
+| `just test` | Run all tests |
+| `just test-integration` | Run Docker-backed integration tests |
+| `just compose` | Start Docker services |
+| `just stop` | Stop Docker services |
+| `just dev` | Start services + proxy |
+| `just config-schema` | Generate configuration JSON Schema |
+| `just publish` | Build and publish to PyPI |
+| `just inspector` | Launch MCP Inspector |
