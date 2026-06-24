@@ -18,8 +18,7 @@ def config_schema(output_path: Path) -> None:
     import json
     from proxy.settings import CONFIG
 
-    with open(output_path, "w") as f:
-        f.write(json.dumps(CONFIG.model_json_schema()))
+    output_path.write_text(json.dumps(CONFIG.model_json_schema()) + "\n")
 
 
 @cli.command(name="run", help="Run the FastAPI application")

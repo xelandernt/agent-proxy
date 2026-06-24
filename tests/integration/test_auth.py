@@ -1,19 +1,19 @@
 import niquests
 import pytest
 
-from proxy.app.auth import OidcAuthProvider, TokenValidationError
+from proxy.auth.models import TokenValidationError
+from proxy.auth.oidc import OidcAuthProvider
 from proxy.app.main import create_app
-from proxy.app.mcp import sessions as _sessions_module
 from proxy.settings import (
-    Config,
-    ConfigHost,
-    ConfigLogfire,
-    ConfigMcp,
-    ConfigMcpGroup,
-    ConfigMcpServer,
-    ConfigDatabase,
-    ConfigMiddleware,
-    ConfigOidcAuthProvider,
+    DatabaseConfig,
+    HostConfig,
+    LogfireConfig,
+    McpConfig,
+    McpGroupConfig,
+    McpServerConfig,
+    MiddlewareConfig,
+    OidcAuthProviderConfig,
+    ProxyConfig,
 )
 
 
@@ -23,7 +23,9 @@ def test_missing_bearer_token_returns_401(client):
         "/mcp/playwright", json={"jsonrpc": "2.0", "id": 1, "method": "initialize"}
     )
     assert resp.status_code == 401
-    assert "WWW-Authenticate" in resp.headers
+    www_auth = resp.headers.get("WWW-Authenticate", "")
+    assert www_auth
+    assert 'resource_metadata="http' in www_auth
 
 
 @pytest.mark.integration
@@ -35,7 +37,9 @@ def test_invalid_bearer_token_returns_401(client):
         headers=headers,
     )
     assert resp.status_code == 401
-    assert "WWW-Authenticate" in resp.headers
+    www_auth = resp.headers.get("WWW-Authenticate", "")
+    assert www_auth
+    assert 'resource_metadata="http' in www_auth
 
 
 @pytest.mark.integration
@@ -47,6 +51,9 @@ def test_malformed_auth_header_returns_401(client):
         headers=headers,
     )
     assert resp.status_code == 401
+    www_auth = resp.headers.get("WWW-Authenticate", "")
+    assert www_auth
+    assert 'resource_metadata="http' in www_auth
 
 
 @pytest.mark.integration
@@ -89,8 +96,8 @@ def test_delete_with_valid_token(client, auth_header):
 @pytest.mark.integration
 def test_wrong_audience_token_returns_401(bearer_token, keycloak_details):
     issuer = keycloak_details.auth_server_url
-    provider = OidcAuthProvider(ConfigOidcAuthProvider(issuer=issuer))
-    server = ConfigMcpServer(
+    provider = OidcAuthProvider(OidcAuthProviderConfig(issuer=issuer))
+    server = McpServerConfig(
         name="test-server",
         resource="http://unrecognized-resource/mcp",
         endpoint="http://localhost:1/mcp",
@@ -104,11 +111,11 @@ def test_wrong_audience_token_returns_401(bearer_token, keycloak_details):
 
 @pytest.mark.integration
 def test_missing_scope_returns_403_through_proxy(auth_header, test_config):
-    config = Config(
-        host=ConfigHost(address="127.0.0.1", port=0),
-        logfire=ConfigLogfire(token=None),
-        middleware=ConfigMiddleware(),
-        database=ConfigDatabase(
+    config = ProxyConfig(
+        host=HostConfig(address="127.0.0.1", port=0),
+        logfire=LogfireConfig(token=None),
+        middleware=MiddlewareConfig(),
+        database=DatabaseConfig(
             driver="postgresql+asyncpg",
             address=test_config.database.address,
             port=test_config.database.port,
@@ -117,16 +124,16 @@ def test_missing_scope_returns_403_through_proxy(auth_header, test_config):
             database=test_config.database.database,
             sslmode=None,
         ),
-        mcp=ConfigMcp(
+        mcp=McpConfig(
             groups=[
-                ConfigMcpGroup(
+                McpGroupConfig(
                     name="playwright",
-                    auth=ConfigOidcAuthProvider(
+                    auth=OidcAuthProviderConfig(
                         issuer=test_config.mcp.groups[0].auth.issuer,
                     ),
                     default_required_scopes=["nonexistent.scope"],
                     servers=[
-                        ConfigMcpServer(
+                        McpServerConfig(
                             name="playwright",
                             resource="http://localhost:8008/mcp/playwright",
                             endpoint=str(test_config.mcp.groups[0].servers[0].endpoint),
@@ -136,7 +143,6 @@ def test_missing_scope_returns_403_through_proxy(auth_header, test_config):
             ],
         ),
     )
-    _sessions_module._DATABASE_CACHE = None
     app = create_app(config=config)
     with niquests.Session(app=app, base_url="asgi://default", timeout=30.0) as sess:
         resp = sess.post(

@@ -4,10 +4,6 @@ import pytest
 
 @pytest.mark.integration
 def test_protected_request_to_unreachable_upstream(auth_header, test_config):
-    import proxy.app.mcp.sessions as _sessions
-
-    _sessions._DATABASE_CACHE = None
-
     bad_config = test_config.model_copy(deep=True)
     bad_config.mcp.groups[0].servers[0].endpoint = "http://localhost:1/mcp"
     from proxy.app.main import create_app

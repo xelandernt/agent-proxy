@@ -1,4 +1,3 @@
-import socket
 import threading
 import time
 from collections.abc import Iterator
@@ -10,15 +9,15 @@ from fastapi import FastAPI
 
 from proxy.app.main import create_app
 from proxy.settings import (
-    Config,
-    ConfigHost,
-    ConfigLogfire,
-    ConfigMcp,
-    ConfigMcpGroup,
-    ConfigMcpServer,
-    ConfigDatabase,
-    ConfigMiddleware,
-    ConfigOidcAuthProvider,
+    DatabaseConfig,
+    HostConfig,
+    LogfireConfig,
+    McpConfig,
+    McpGroupConfig,
+    McpServerConfig,
+    MiddlewareConfig,
+    OidcAuthProviderConfig,
+    ProxyConfig,
 )
 from tests.integration.containers import (
     KeycloakContainerWrapper,
@@ -28,12 +27,7 @@ from tests.integration.containers import (
     PostgresContainerWrapper,
     PostgresDetails,
 )
-
-
-def _find_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
+from tests.integration.helpers import find_free_port
 
 
 class UvicornServerThread(threading.Thread):
@@ -91,7 +85,7 @@ def playwright_mcp_details() -> Iterator[PlaywrightMcpDetails]:
 
 @pytest.fixture(scope="session")
 def proxy_port() -> int:
-    return _find_free_port()
+    return find_free_port()
 
 
 @pytest.fixture(scope="session")
@@ -100,11 +94,11 @@ def test_config(
     keycloak_details: KeycloakDetails,
     playwright_mcp_details: PlaywrightMcpDetails,
     proxy_port: int,
-) -> Config:
-    return Config(
-        host=ConfigHost(address="127.0.0.1", port=proxy_port),
-        logfire=ConfigLogfire(token=None),
-        middleware=ConfigMiddleware(),
+) -> ProxyConfig:
+    return ProxyConfig(
+        host=HostConfig(address="127.0.0.1", port=proxy_port),
+        logfire=LogfireConfig(token=None),
+        middleware=MiddlewareConfig(),
         strip_headers={
             "connection",
             "keep-alive",
@@ -115,7 +109,7 @@ def test_config(
             "transfer-encoding",
             "upgrade",
         },
-        database=ConfigDatabase(
+        database=DatabaseConfig(
             driver="postgresql+asyncpg",
             address=postgres_details.host,
             port=postgres_details.port,
@@ -124,16 +118,16 @@ def test_config(
             database=postgres_details.dbname,
             sslmode=None,
         ),
-        mcp=ConfigMcp(
+        mcp=McpConfig(
             groups=[
-                ConfigMcpGroup(
+                McpGroupConfig(
                     name="playwright",
-                    auth=ConfigOidcAuthProvider(
+                    auth=OidcAuthProviderConfig(
                         issuer=f"{keycloak_details.auth_server_url}",
                     ),
                     default_required_scopes=["mcp.access"],
                     servers=[
-                        ConfigMcpServer(
+                        McpServerConfig(
                             name="playwright",
                             resource="http://localhost:8008/mcp/playwright",
                             endpoint=f"{playwright_mcp_details.endpoint_url}/mcp",
@@ -146,14 +140,14 @@ def test_config(
 
 
 @pytest.fixture(scope="session")
-def app(test_config: Config) -> FastAPI:
+def app(test_config: ProxyConfig) -> FastAPI:
     return create_app(config=test_config)
 
 
 @pytest.fixture(scope="session")
 def proxy_url(
     app: FastAPI,
-    test_config: Config,
+    test_config: ProxyConfig,
     proxy_port: int,
 ) -> Iterator[str]:
     host = test_config.host.address
@@ -169,11 +163,11 @@ def client(proxy_url: str) -> niquests.Session:
 
 
 @pytest.fixture
-def anonymous_config(postgres_details: PostgresDetails) -> Config:
-    return Config(
-        host=ConfigHost(address="0.0.0.0", port=0),
-        logfire=ConfigLogfire(token=None),
-        database=ConfigDatabase(
+def anonymous_config(postgres_details: PostgresDetails) -> ProxyConfig:
+    return ProxyConfig(
+        host=HostConfig(address="0.0.0.0", port=0),
+        logfire=LogfireConfig(token=None),
+        database=DatabaseConfig(
             driver="postgresql+asyncpg",
             address=postgres_details.host,
             port=postgres_details.port,
@@ -182,12 +176,12 @@ def anonymous_config(postgres_details: PostgresDetails) -> Config:
             database=postgres_details.dbname,
             sslmode=None,
         ),
-        mcp=ConfigMcp(
+        mcp=McpConfig(
             groups=[
-                ConfigMcpGroup(
+                McpGroupConfig(
                     name="anonymous",
                     servers=[
-                        ConfigMcpServer(
+                        McpServerConfig(
                             name="anonymous-server",
                             endpoint="http://localhost:1/mcp",
                         ),
@@ -199,13 +193,13 @@ def anonymous_config(postgres_details: PostgresDetails) -> Config:
 
 
 @pytest.fixture
-def anonymous_app(anonymous_config: Config) -> FastAPI:
+def anonymous_app(anonymous_config: ProxyConfig) -> FastAPI:
     return create_app(config=anonymous_config)
 
 
 @pytest.fixture
 def anonymous_client(anonymous_app: FastAPI) -> Iterator[niquests.Session]:
-    port = _find_free_port()
+    port = find_free_port()
     host = "127.0.0.1"
     thread = UvicornServerThread(anonymous_app, host=host, port=port)
     thread.start()

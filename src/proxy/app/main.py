@@ -1,32 +1,35 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 import logfire
 from loguru import logger
+from starlette.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
-from proxy.app.mcp.dependencies import get_config
 from proxy.app.mcp.endpoints import router as mcp_router
-from proxy.app.mcp.sessions import shutdown_session_registry, startup_session_registry
-from proxy.settings import CONFIG, Config
+from proxy.app.mcp.service import UpstreamConnectionError
+from proxy.app.runtime import build_app_runtime
+from proxy.sessions.types import SessionOwnershipConflictError
+from proxy.settings import CONFIG, ProxyConfig
 
 _OBSERVABILITY_CONFIGURED = False
 
 
-def create_app(config: Config | None = None) -> FastAPI:
+def create_app(config: ProxyConfig | None = None) -> FastAPI:
     settings = config or CONFIG
+    runtime = build_app_runtime(settings)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI):
-        await startup_session_registry(settings.database)
+    async def lifespan(app: FastAPI):
+        app.state.runtime = runtime
+        await runtime.session_database.startup()
         try:
             yield
         finally:
-            await shutdown_session_registry(settings.database)
+            await runtime.session_database.shutdown()
 
     app = FastAPI(title="Agent Proxy", lifespan=lifespan)
-    if config is not None:
-        app.dependency_overrides[get_config] = lambda: config
+    app.state.runtime = runtime
 
     app.add_middleware(
         CORSMiddleware,
@@ -36,11 +39,34 @@ def create_app(config: Config | None = None) -> FastAPI:
         allow_credentials=settings.middleware.cors.allow_credentials,
     )
     configure_observability(app, settings)
+    add_exception_handlers(app)
     app.include_router(mcp_router)
     return app
 
 
-def configure_observability(app: FastAPI, settings: Config) -> None:
+def add_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(UpstreamConnectionError)
+    async def upstream_connection_error_handler(
+        _: Request, exc: UpstreamConnectionError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={"detail": str(exc)},
+        )
+
+    @app.exception_handler(SessionOwnershipConflictError)
+    async def session_ownership_conflict_handler(
+        _: Request, __: SessionOwnershipConflictError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "detail": "Protected session is already bound to another principal."
+            },
+        )
+
+
+def configure_observability(app: FastAPI, settings: ProxyConfig) -> None:
     global _OBSERVABILITY_CONFIGURED
     if _OBSERVABILITY_CONFIGURED:
         return

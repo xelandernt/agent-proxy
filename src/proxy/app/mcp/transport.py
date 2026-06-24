@@ -5,7 +5,6 @@ from urllib.parse import SplitResult, parse_qsl, urlencode, urlsplit, urlunsplit
 
 import niquests
 from fastapi import status
-from starlette.types import ASGIApp
 
 PROXY_ONLY_REQUEST_HEADERS = {
     "authorization",
@@ -54,18 +53,9 @@ def send_upstream_request(
     body: bytes,
     headers: dict[str, str],
     query: str,
-    upstream_app: ASGIApp | None,
 ) -> UpstreamResponseHandle:
-    target_url = build_target_url(url, query, use_asgi_app=upstream_app is not None)
-
-    if upstream_app is not None:
-        session = niquests.Session(
-            app=upstream_app,
-            base_url="asgi://default",
-            timeout=(10.0, 3600.0),
-        )
-    else:
-        session = niquests.Session(timeout=(10.0, 3600.0))
+    target_url = build_target_url(url, query)
+    session = niquests.Session(timeout=(10.0, 3600.0))
 
     try:
         response = session.request(
@@ -74,7 +64,7 @@ def send_upstream_request(
             data=body,
             headers=headers,
             allow_redirects=False,
-            stream=upstream_app is None,
+            stream=True,
         )
     except niquests.exceptions.RequestException:
         session.close()
@@ -83,17 +73,13 @@ def send_upstream_request(
     return UpstreamResponseHandle(session=session, response=response)
 
 
-def build_target_url(url: str, query: str, *, use_asgi_app: bool) -> str:
+def build_target_url(url: str, query: str) -> str:
     parsed = urlsplit(url)
     merged_query = urlencode(
         parse_qsl(parsed.query, keep_blank_values=True), doseq=True
     )
     request_query = urlencode(parse_qsl(query, keep_blank_values=True), doseq=True)
     combined_query = "&".join(part for part in [merged_query, request_query] if part)
-
-    if use_asgi_app:
-        path = parsed.path or "/"
-        return path if not combined_query else f"{path}?{combined_query}"
 
     rebuilt = SplitResult(
         scheme=parsed.scheme,

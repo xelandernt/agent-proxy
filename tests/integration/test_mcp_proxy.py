@@ -1,14 +1,6 @@
-import json
-
 import pytest
 
-
-def _parse_sse_data(text: str) -> list[dict]:
-    results = []
-    for line in text.split("\n"):
-        if line.startswith("data: "):
-            results.append(json.loads(line[6:]))
-    return results
+from tests.integration.helpers import parse_sse_data
 
 
 @pytest.mark.integration
@@ -28,7 +20,7 @@ def test_initialize_returns_server_info(client, auth_header):
         headers=auth_header,
     )
     assert resp.status_code in (200, 201)
-    events = _parse_sse_data(resp.text)
+    events = parse_sse_data(resp.text)
     assert len(events) >= 1
     assert events[0].get("jsonrpc") == "2.0"
     assert "result" in events[0]
@@ -89,7 +81,7 @@ def test_tools_list_after_initialize(client, auth_header):
         headers=tools_headers,
     )
     assert tools_resp.status_code in (200, 201)
-    tools_events = _parse_sse_data(tools_resp.text)
+    tools_events = parse_sse_data(tools_resp.text)
     assert len(tools_events) >= 1
     assert "result" in tools_events[0]
     assert "tools" in tools_events[0]["result"]

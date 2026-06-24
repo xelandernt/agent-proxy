@@ -18,9 +18,7 @@ DEFAULT_CONFIG_FILE = Path(CONFIG_DIRECTORY) / "config.yaml"
 NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 
 
-class ProxySettings(BaseSettings):
-    """Base settings class for all project settings."""
-
+class ProxyBaseSettings(BaseSettings):
     @classmethod
     def settings_customise_sources(
         cls,
@@ -40,16 +38,12 @@ class ProxySettings(BaseSettings):
         )
 
 
-class ConfigHost(BaseModel):
-    """Configuration for a host."""
-
+class HostConfig(BaseModel):
     address: str = "127.0.0.1"
     port: int = 8008
 
 
-class ConfigCors(BaseModel):
-    """Cors configuration."""
-
+class CorsConfig(BaseModel):
     origins: list[str] = Field(default_factory=lambda: ["*"])
     allow_credentials: bool = Field(
         default=False,
@@ -59,29 +53,21 @@ class ConfigCors(BaseModel):
     allow_headers: list[str] = Field(default_factory=lambda: ["*"])
 
 
-class ConfigLogfire(BaseModel):
-    """Configuration for observability."""
-
+class LogfireConfig(BaseModel):
     token: SecretStr | None = None
     environment: str = "dev"
     service_name: str = "proxy"
 
 
-class ConfigMiddleware(BaseModel):
-    """Middleware configuration."""
-
-    cors: ConfigCors = Field(default_factory=ConfigCors)
+class MiddlewareConfig(BaseModel):
+    cors: CorsConfig = Field(default_factory=CorsConfig)
 
 
-class ConfigDisabledAuthProvider(BaseModel):
-    """Anonymous passthrough for a group of MCP servers."""
-
+class DisabledAuthProviderConfig(BaseModel):
     provider: Literal["disabled"] = "disabled"
 
 
-class ConfigOidcAuthProvider(BaseModel):
-    """Generic OIDC bearer-token validation settings."""
-
+class OidcAuthProviderConfig(BaseModel):
     provider: Literal["oidc"] = "oidc"
     issuer: str
     allowed_algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
@@ -93,9 +79,7 @@ class ConfigOidcAuthProvider(BaseModel):
         return self.issuer.rstrip("/")
 
 
-class ConfigEntraIdAuthProvider(BaseModel):
-    """Azure Entra ID bearer-token validation settings."""
-
+class EntraIdAuthProviderConfig(BaseModel):
     provider: Literal["entra_id"] = "entra_id"
     authority: str = "https://login.microsoftonline.com"
     tenant_id: str | None = None
@@ -115,20 +99,18 @@ class ConfigEntraIdAuthProvider(BaseModel):
         return f"{self.authority.rstrip('/')}/{self.tenant_id}/v2.0"
 
     @model_validator(mode="after")
-    def validate_configuration(self) -> "ConfigEntraIdAuthProvider":
+    def validate_configuration(self) -> "EntraIdAuthProviderConfig":
         _ = self.issuer_url
         return self
 
 
-ConfigAuthProvider = Annotated[
-    ConfigDisabledAuthProvider | ConfigOidcAuthProvider | ConfigEntraIdAuthProvider,
+AuthProviderConfig = Annotated[
+    DisabledAuthProviderConfig | OidcAuthProviderConfig | EntraIdAuthProviderConfig,
     Field(discriminator="provider"),
 ]
 
 
-class ConfigMcpServer(BaseModel):
-    """Configuration for an upstream MCP HTTP endpoint."""
-
+class McpServerConfig(BaseModel):
     name: str = Field(pattern=NAME_PATTERN)
     endpoint: AnyHttpUrl
     resource: str | None = None
@@ -138,17 +120,15 @@ class ConfigMcpServer(BaseModel):
     required_scopes: list[str] | None = None
 
 
-class ConfigMcpGroup(BaseModel):
-    """A group of MCP servers sharing one auth provider."""
-
+class McpGroupConfig(BaseModel):
     name: str = Field(pattern=NAME_PATTERN)
-    auth: ConfigAuthProvider = Field(default_factory=ConfigDisabledAuthProvider)
+    auth: AuthProviderConfig = Field(default_factory=DisabledAuthProviderConfig)
     default_authorization_scopes: list[str] | None = None
     default_required_scopes: list[str] = Field(default_factory=list)
-    servers: list[ConfigMcpServer] = Field(min_length=1)
+    servers: list[McpServerConfig] = Field(min_length=1)
 
     def authorization_scopes_for_server(
-        self, server: ConfigMcpServer
+        self, server: McpServerConfig
     ) -> tuple[str, ...]:
         if server.authorization_scopes is not None:
             configured_scopes = server.authorization_scopes
@@ -158,7 +138,7 @@ class ConfigMcpGroup(BaseModel):
             configured_scopes = self.required_scopes_for_server(server)
         return tuple(sorted(set(configured_scopes)))
 
-    def required_scopes_for_server(self, server: ConfigMcpServer) -> tuple[str, ...]:
+    def required_scopes_for_server(self, server: McpServerConfig) -> tuple[str, ...]:
         configured_scopes = (
             self.default_required_scopes
             if server.required_scopes is None
@@ -167,8 +147,8 @@ class ConfigMcpGroup(BaseModel):
         return tuple(sorted(set(configured_scopes)))
 
     @model_validator(mode="after")
-    def validate_protected_server_resources(self) -> "ConfigMcpGroup":
-        if isinstance(self.auth, ConfigDisabledAuthProvider):
+    def validate_protected_server_resources(self) -> "McpGroupConfig":
+        if isinstance(self.auth, DisabledAuthProviderConfig):
             return self
 
         missing_resources = [
@@ -183,9 +163,7 @@ class ConfigMcpGroup(BaseModel):
         return self
 
 
-class ConfigDatabase(BaseModel):
-    """Configuration for protected MCP session ownership storage."""
-
+class DatabaseConfig(BaseModel):
     driver: str = "postgresql+asyncpg"
     address: str = "127.0.0.1"
     port: int = 5432
@@ -213,17 +191,15 @@ class ConfigDatabase(BaseModel):
 
 @dataclass(frozen=True)
 class ResolvedMcpServer:
-    group: ConfigMcpGroup
-    server: ConfigMcpServer
+    group: McpGroupConfig
+    server: McpServerConfig
 
 
-class ConfigMcp(BaseModel):
-    """Grouped MCP backend registry."""
-
-    groups: list[ConfigMcpGroup] = Field(default_factory=list)
+class McpConfig(BaseModel):
+    groups: list[McpGroupConfig] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_unique_names(self) -> "ConfigMcp":
+    def validate_unique_names(self) -> "McpConfig":
         group_names: set[str] = set()
         server_names: set[str] = set()
 
@@ -249,7 +225,7 @@ class ConfigMcp(BaseModel):
         return None
 
 
-class Config(ProxySettings):
+class ProxyConfig(ProxyBaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="PROXY__",
         env_nested_delimiter="__",
@@ -257,9 +233,9 @@ class Config(ProxySettings):
         yaml_file=f"{CONFIG_DIRECTORY}/config.yaml",
         arbitrary_types_allowed=False,
     )
-    host: ConfigHost = Field(default_factory=ConfigHost)
-    logfire: ConfigLogfire = Field(default_factory=ConfigLogfire)
-    middleware: ConfigMiddleware = Field(default_factory=ConfigMiddleware)
+    host: HostConfig = Field(default_factory=HostConfig)
+    logfire: LogfireConfig = Field(default_factory=LogfireConfig)
+    middleware: MiddlewareConfig = Field(default_factory=MiddlewareConfig)
     strip_headers: set[str] = Field(
         description="Set of HTTP headers to remove from proxied requests and responses.",
         default_factory=lambda: {
@@ -273,11 +249,11 @@ class Config(ProxySettings):
             "upgrade",
         },
     )
-    database: ConfigDatabase = Field(default_factory=ConfigDatabase)
-    mcp: ConfigMcp = Field(default_factory=ConfigMcp)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    mcp: McpConfig = Field(default_factory=McpConfig)
 
     def get_server(self, name: str) -> ResolvedMcpServer | None:
         return self.mcp.get_server(name)
 
 
-CONFIG: Final[Config] = Config()
+CONFIG: Final[ProxyConfig] = ProxyConfig()

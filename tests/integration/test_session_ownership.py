@@ -1,5 +1,4 @@
 import json
-import socket
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -8,22 +7,8 @@ import niquests
 import pytest
 
 from proxy.app.main import create_app
-from proxy.app.mcp import sessions as _sessions_module
 from tests.integration.containers import KeycloakDetails
-
-
-def _find_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return int(s.getsockname()[1])
-
-
-def _parse_sse_data(text: str) -> list[dict]:
-    results = []
-    for line in text.split("\n"):
-        if line.startswith("data: "):
-            results.append(json.loads(line[6:]))
-    return results
+from tests.integration.helpers import find_free_port
 
 
 async def _count_bindings(postgres_details) -> int:
@@ -272,7 +257,7 @@ async def test_different_principal_rejected(
         },
         headers=other_headers,
     )
-    assert rejected.status_code == 404
+    assert rejected.status_code == 409
 
     binding = await _get_binding(postgres_details, "playwright", session_id)
     assert binding is not None
@@ -314,14 +299,13 @@ async def test_delete_removes_session_binding(
         def log_message(self, *args):
             pass
 
-    mock_port = _find_free_port()
+    mock_port = find_free_port()
     server = HTTPServer(("127.0.0.1", mock_port), MockMcpHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
     config = test_config.model_copy(deep=True)
     config.mcp.groups[0].servers[0].endpoint = f"http://127.0.0.1:{mock_port}/mcp"
-    _sessions_module._DATABASE_CACHE = None
     mock_app = create_app(config=config)
     with niquests.Session(
         app=mock_app, base_url="asgi://default", timeout=10.0
