@@ -27,6 +27,15 @@ from proxy.settings import (
 
 
 class OidcAuthProvider(OAuthBearerAuthProvider):
+    """OIDC-based authentication provider.
+
+    Validates Bearer tokens against an OIDC-compliant issuer by fetching
+    OpenID Discovery metadata and JWKS, caching both with configurable TTL.
+
+    Args:
+        config: OIDC or Entra ID auth provider configuration.
+    """
+
     def __init__(
         self, config: OidcAuthProviderConfig | EntraIdAuthProviderConfig
     ) -> None:
@@ -38,11 +47,34 @@ class OidcAuthProvider(OAuthBearerAuthProvider):
         self._jwks_cache_expires_at = 0.0
 
     def authorization_servers(self) -> tuple[str, ...]:
+        """Return the issuer URL as the sole authorization server.
+
+        Returns:
+            A tuple containing the issuer URL.
+        """
         return (self._config.issuer_url,)
 
     def authenticate_token(
         self, token: str, *, server: McpServerConfig
     ) -> AuthenticatedPrincipal:
+        """Validate an access token and extract the principal.
+
+        Fetches OIDC discovery metadata and the signing key, decodes and
+        verifies the JWT, checks the audience matches the MCP server, and
+        returns the authenticated principal with granted scopes.
+
+        Args:
+            token: The raw bearer token string.
+            server: The MCP server configuration for audience validation.
+
+        Returns:
+            The authenticated principal.
+
+        Raises:
+            TokenValidationError: If the token is invalid, the issuer is
+                unknown, the audience does not match, or signing key
+                retrieval fails.
+        """
         metadata = self.discovery_metadata()
         signing_key = self.signing_key(token, str(metadata["jwks_uri"]))
 
@@ -83,6 +115,18 @@ class OidcAuthProvider(OAuthBearerAuthProvider):
         )
 
     def discovery_metadata(self) -> dict[str, Any]:
+        """Fetch and cache the OIDC discovery metadata.
+
+        Uses a thread-safe cache with configurable TTL to avoid fetching
+        the metadata on every request.
+
+        Returns:
+            The OIDC discovery metadata as a dictionary.
+
+        Raises:
+            TokenValidationError: If the metadata is missing required fields
+                (issuer, jwks_uri) or cannot be fetched.
+        """
         with self._lock:
             if (
                 self._metadata_cache is not None
@@ -109,6 +153,23 @@ class OidcAuthProvider(OAuthBearerAuthProvider):
             return metadata
 
     def signing_key(self, token: str, jwks_uri: str) -> Any:
+        """Find and return the RSA signing key for a token.
+
+        Extracts the key ID (kid) from the unverified JWT header, fetches
+        the JWKS (with a retry + force refresh on first miss), and converts
+        the matching JWK to an RSA key.
+
+        Args:
+            token: The raw JWT access token.
+            jwks_uri: URL to fetch the JWKS from.
+
+        Returns:
+            An RSA signing key usable for JWT verification.
+
+        Raises:
+            TokenValidationError: If the header is malformed, algorithm is
+                unsupported, key ID is missing, or no matching key is found.
+        """
         try:
             unverified_header = jwt.get_unverified_header(token)
         except jwt.PyJWTError as exc:
@@ -140,6 +201,22 @@ class OidcAuthProvider(OAuthBearerAuthProvider):
             raise TokenValidationError("Signing key is invalid.") from exc
 
     def jwks(self, jwks_uri: str, *, force_refresh: bool = False) -> dict[str, Any]:
+        """Fetch and cache the JWKS from the provider.
+
+        Uses a thread-safe cache with configurable TTL. Pass
+        ``force_refresh=True`` to bypass the cache.
+
+        Args:
+            jwks_uri: URL to fetch the JWKS from.
+            force_refresh: If True, ignore the cache and fetch fresh keys.
+
+        Returns:
+            The JWKS dictionary containing signing keys.
+
+        Raises:
+            TokenValidationError: If the JWKS payload has no ``keys`` array
+                or cannot be fetched.
+        """
         with self._lock:
             if (
                 not force_refresh
@@ -162,6 +239,18 @@ class OidcAuthProvider(OAuthBearerAuthProvider):
             return jwks
 
     def fetch_json(self, url: str) -> dict[str, Any]:
+        """Fetch a JSON payload from a URL.
+
+        Args:
+            url: The URL to fetch.
+
+        Returns:
+            The parsed JSON response as a dictionary.
+
+        Raises:
+            TokenValidationError: If the request fails or the response is
+                not valid JSON or is not a dict.
+        """
         try:
             with niquests.Session(timeout=10.0) as session:
                 response = session.get(url, allow_redirects=False)

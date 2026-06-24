@@ -8,6 +8,7 @@ cli = App(name="proxy")
 
 @cli.command()
 def config() -> None:
+    """Print the current proxy configuration as pretty-printed JSON."""
     from proxy.settings import CONFIG
 
     print(CONFIG.model_dump_json(indent=4))
@@ -15,6 +16,11 @@ def config() -> None:
 
 @cli.command()
 def config_schema(output_path: Path) -> None:
+    """Write the JSON Schema for the proxy configuration to a file.
+
+    Args:
+        output_path: Path to the output file.
+    """
     import json
     from proxy.settings import CONFIG
 
@@ -28,6 +34,14 @@ def run(
     reload: bool = True,
     root_path: str = "/",
 ) -> None:
+    """Start the Agent Proxy FastAPI application via uvicorn.
+
+    Args:
+        host: Host address to bind to.
+        port: Port to listen on.
+        reload: Whether to enable auto-reload on code changes.
+        root_path: ASGI root path for reverse proxy mounting.
+    """
     import uvicorn
 
     uvicorn.run(

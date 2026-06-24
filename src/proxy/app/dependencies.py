@@ -22,6 +22,14 @@ from proxy.settings import ProxyConfig, ResolvedMcpServer
 
 
 def get_config(runtime: RuntimeDep) -> ProxyConfig:
+    """Extract ProxyConfig from the app runtime.
+
+    Args:
+        runtime: The application runtime.
+
+    Returns:
+        The proxy configuration.
+    """
     return runtime.config
 
 
@@ -33,6 +41,18 @@ ConfigDep = Annotated[ProxyConfig, Depends(get_config)]
 
 
 async def get_server(name: str, config: ConfigDep) -> ResolvedMcpServer:
+    """Resolve an MCP server by name from the configuration.
+
+    Args:
+        name: The server name from the URL path parameter.
+        config: The proxy configuration.
+
+    Returns:
+        The resolved MCP server with its group context.
+
+    Raises:
+        HTTPException 404: If no server with the given name is configured.
+    """
     resolved_server = config.get_server(name)
     if resolved_server is None:
         raise HTTPException(
@@ -50,6 +70,17 @@ ServerDep = Annotated[ResolvedMcpServer, Depends(get_server)]
 
 
 async def get_auth_provider(server: ServerDep, runtime: RuntimeDep) -> AuthProvider:
+    """Get the auth provider for a given server's group.
+
+    Falls back to DisabledAuthProvider if the group has no configured auth.
+
+    Args:
+        server: The resolved MCP server.
+        runtime: The application runtime containing auth provider registry.
+
+    Returns:
+        The auth provider for the server's group.
+    """
     return runtime.auth_providers.get(server.group.name, DisabledAuthProvider())
 
 
@@ -62,6 +93,24 @@ async def require_authenticated_principal(
     auth_provider: AuthProviderDep,
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
 ) -> AuthenticatedPrincipal:
+    """Authenticate and authorize the incoming request.
+
+    Validates the bearer token against the server's auth provider, checks
+    required scopes, and returns the authenticated principal.
+
+    Args:
+        request: The incoming HTTP request (used to build challenge URLs).
+        server: The resolved MCP server being accessed.
+        auth_provider: The auth provider for the server's group.
+        authorization: The raw Authorization header value.
+
+    Returns:
+        The authenticated principal extracted from the bearer token.
+
+    Raises:
+        HTTPException 401: If the token is missing or invalid.
+        HTTPException 403: If the token lacks required scopes.
+    """
     authorization_scopes = server.group.authorization_scopes_for_server(server.server)
     resource_metadata_url = str(
         request.url_for("get_protected_resource_metadata", name=server.server.name)

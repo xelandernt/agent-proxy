@@ -19,6 +19,8 @@ NAME_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 
 
 class ProxyBaseSettings(BaseSettings):
+    """Base settings class with custom YAML config source support."""
+
     @classmethod
     def settings_customise_sources(
         cls,
@@ -39,11 +41,15 @@ class ProxyBaseSettings(BaseSettings):
 
 
 class HostConfig(BaseModel):
+    """Configuration for the HTTP server binding address and port."""
+
     address: str = "127.0.0.1"
     port: int = 8008
 
 
 class CorsConfig(BaseModel):
+    """CORS middleware configuration."""
+
     origins: list[str] = Field(default_factory=lambda: ["*"])
     allow_credentials: bool = Field(
         default=False,
@@ -54,20 +60,28 @@ class CorsConfig(BaseModel):
 
 
 class LogfireConfig(BaseModel):
+    """Logfire observability configuration."""
+
     token: SecretStr | None = None
     environment: str = "dev"
     service_name: str = "proxy"
 
 
 class MiddlewareConfig(BaseModel):
+    """Middleware stack configuration."""
+
     cors: CorsConfig = Field(default_factory=CorsConfig)
 
 
 class DisabledAuthProviderConfig(BaseModel):
+    """Auth provider configuration that disables authentication."""
+
     provider: Literal["disabled"] = "disabled"
 
 
 class OidcAuthProviderConfig(BaseModel):
+    """OIDC-compliant authentication provider configuration."""
+
     provider: Literal["oidc"] = "oidc"
     issuer: str
     allowed_algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
@@ -76,10 +90,13 @@ class OidcAuthProviderConfig(BaseModel):
 
     @property
     def issuer_url(self) -> str:
+        """The OIDC issuer URL, with trailing slash stripped."""
         return self.issuer.rstrip("/")
 
 
 class EntraIdAuthProviderConfig(BaseModel):
+    """Microsoft Entra ID (Azure AD) authentication provider configuration."""
+
     provider: Literal["entra_id"] = "entra_id"
     authority: str = "https://login.microsoftonline.com"
     tenant_id: str | None = None
@@ -90,6 +107,17 @@ class EntraIdAuthProviderConfig(BaseModel):
 
     @property
     def issuer_url(self) -> str:
+        """Resolve the effective issuer URL.
+
+        Uses the explicitly configured ``issuer`` if set, otherwise
+        constructs the URL from ``authority`` + ``tenant_id`` + ``v2.0``.
+
+        Returns:
+            The issuer URL with trailing slash stripped.
+
+        Raises:
+            ValueError: If neither ``issuer`` nor ``tenant_id`` is set.
+        """
         if self.issuer:
             return self.issuer.rstrip("/")
         if self.tenant_id is None:
@@ -100,6 +128,7 @@ class EntraIdAuthProviderConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_configuration(self) -> "EntraIdAuthProviderConfig":
+        """Validate that a usable issuer URL can be resolved."""
         _ = self.issuer_url
         return self
 
@@ -111,6 +140,8 @@ AuthProviderConfig = Annotated[
 
 
 class McpServerConfig(BaseModel):
+    """Configuration for a single upstream MCP server."""
+
     name: str = Field(pattern=NAME_PATTERN)
     endpoint: AnyHttpUrl
     resource: str | None = None
@@ -121,6 +152,8 @@ class McpServerConfig(BaseModel):
 
 
 class McpGroupConfig(BaseModel):
+    """Configuration for a group of MCP servers sharing an auth provider."""
+
     name: str = Field(pattern=NAME_PATTERN)
     auth: AuthProviderConfig = Field(default_factory=DisabledAuthProviderConfig)
     default_authorization_scopes: list[str] | None = None
@@ -130,6 +163,16 @@ class McpGroupConfig(BaseModel):
     def authorization_scopes_for_server(
         self, server: McpServerConfig
     ) -> tuple[str, ...]:
+        """Return the scopes advertised for a server in resource metadata.
+
+        Falls back from server-specific to group default to required scopes.
+
+        Args:
+            server: The MCP server configuration.
+
+        Returns:
+            A sorted tuple of unique scope strings.
+        """
         if server.authorization_scopes is not None:
             configured_scopes = server.authorization_scopes
         elif self.default_authorization_scopes is not None:
@@ -139,6 +182,16 @@ class McpGroupConfig(BaseModel):
         return tuple(sorted(set(configured_scopes)))
 
     def required_scopes_for_server(self, server: McpServerConfig) -> tuple[str, ...]:
+        """Return the scopes required to access a server.
+
+        Falls back from server-specific to group default.
+
+        Args:
+            server: The MCP server configuration.
+
+        Returns:
+            A sorted tuple of unique scope strings.
+        """
         configured_scopes = (
             self.default_required_scopes
             if server.required_scopes is None
@@ -148,6 +201,7 @@ class McpGroupConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_protected_server_resources(self) -> "McpGroupConfig":
+        """Ensure all servers in a protected group have a resource URL configured."""
         if isinstance(self.auth, DisabledAuthProviderConfig):
             return self
 
@@ -164,6 +218,8 @@ class McpGroupConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
+    """Database connection configuration."""
+
     driver: str = "postgresql+asyncpg"
     address: str = "127.0.0.1"
     port: int = 5432
@@ -175,6 +231,11 @@ class DatabaseConfig(BaseModel):
 
     @property
     def url(self) -> str:
+        """Build the full SQLAlchemy database URL from the individual fields.
+
+        Returns:
+            The database URL as a string, with the password rendered inline.
+        """
         query = self.options.copy()
         if self.sslmode is not None:
             query["sslmode"] = self.sslmode
@@ -191,15 +252,25 @@ class DatabaseConfig(BaseModel):
 
 @dataclass(frozen=True)
 class ResolvedMcpServer:
+    """A resolved MCP server with its group context.
+
+    Attributes:
+        group: The MCP group configuration the server belongs to.
+        server: The individual MCP server configuration.
+    """
+
     group: McpGroupConfig
     server: McpServerConfig
 
 
 class McpConfig(BaseModel):
+    """Top-level MCP configuration containing all server groups."""
+
     groups: list[McpGroupConfig] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_unique_names(self) -> "McpConfig":
+        """Validate that group and server names are unique across the config."""
         group_names: set[str] = set()
         server_names: set[str] = set()
 
@@ -218,6 +289,14 @@ class McpConfig(BaseModel):
         return self
 
     def get_server(self, name: str) -> ResolvedMcpServer | None:
+        """Look up a server by name across all groups.
+
+        Args:
+            name: The server name to find.
+
+        Returns:
+            A resolved server with its group context, or None if not found.
+        """
         for group in self.groups:
             for server in group.servers:
                 if server.name == name:
@@ -226,6 +305,13 @@ class McpConfig(BaseModel):
 
 
 class ProxyConfig(ProxyBaseSettings):
+    """Root configuration model for the Agent Proxy application.
+
+    Reads from YAML, environment variables, and defaults. Environment
+    variables are prefixed with ``PROXY__`` and use ``__`` as the nested
+    delimiter.
+    """
+
     model_config = SettingsConfigDict(
         env_prefix="PROXY__",
         env_nested_delimiter="__",
@@ -253,6 +339,16 @@ class ProxyConfig(ProxyBaseSettings):
     mcp: McpConfig = Field(default_factory=McpConfig)
 
     def get_server(self, name: str) -> ResolvedMcpServer | None:
+        """Look up a server by name.
+
+        Delegates to ``McpConfig.get_server``.
+
+        Args:
+            name: The server name to find.
+
+        Returns:
+            A resolved server with its group context, or None.
+        """
         return self.mcp.get_server(name)
 
 

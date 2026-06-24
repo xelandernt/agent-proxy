@@ -16,6 +16,18 @@ _OBSERVABILITY_CONFIGURED = False
 
 
 def create_app(config: ProxyConfig | None = None) -> FastAPI:
+    """Create and configure the FastAPI application.
+
+    Builds the app runtime, sets up the lifespan handler (which manages the
+    database lifecycle), configures CORS middleware, observability (logfire),
+    exception handlers, and registers the MCP proxy router.
+
+    Args:
+        config: Optional ProxyConfig override. Defaults to the global CONFIG.
+
+    Returns:
+        A fully configured FastAPI application instance.
+    """
     settings = config or CONFIG
     runtime = build_app_runtime(settings)
 
@@ -45,10 +57,21 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
 
 
 def add_exception_handlers(app: FastAPI) -> None:
+    """Register custom exception handlers on the FastAPI application.
+
+    Handlers:
+        - UpstreamConnectionError -> 502 Bad Gateway
+        - SessionOwnershipConflictError -> 409 Conflict
+
+    Args:
+        app: The FastAPI application instance.
+    """
+
     @app.exception_handler(UpstreamConnectionError)
     async def upstream_connection_error_handler(
         _: Request, exc: UpstreamConnectionError
     ) -> JSONResponse:
+        """Handle upstream connection failures."""
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
             content={"detail": str(exc)},
@@ -58,6 +81,7 @@ def add_exception_handlers(app: FastAPI) -> None:
     async def session_ownership_conflict_handler(
         _: Request, __: SessionOwnershipConflictError
     ) -> JSONResponse:
+        """Handle protected session ownership conflicts."""
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={
@@ -67,6 +91,15 @@ def add_exception_handlers(app: FastAPI) -> None:
 
 
 def configure_observability(app: FastAPI, settings: ProxyConfig) -> None:
+    """Configure logfire observability for the application.
+
+    Sets up logfire with FastAPI instrumentation, system metrics, and a
+    loguru handler. Only runs once; subsequent calls are no-ops.
+
+    Args:
+        app: The FastAPI application to instrument.
+        settings: The proxy configuration (provides logfire token, etc.).
+    """
     global _OBSERVABILITY_CONFIGURED
     if _OBSERVABILITY_CONFIGURED:
         return

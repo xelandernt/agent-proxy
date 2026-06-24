@@ -25,17 +25,31 @@ from proxy.settings import ProxyConfig, ResolvedMcpServer
 
 
 class UpstreamConnectionError(Exception):
-    pass
+    """Raised when the proxy cannot reach the upstream MCP server."""
 
 
 @dataclass
 class ForwardResult:
+    """Result of forwarding a request to an upstream MCP server.
+
+    Attributes:
+        status_code: HTTP status code from the upstream response.
+        headers: Filtered HTTP headers from the upstream response.
+        body: Complete response payload (for non-streaming responses).
+        stream: Chunked response payload generator (for SSE responses).
+    """
+
     status_code: int
     headers: dict[str, str]
     body: bytes | None = None
     stream: Iterable[bytes] | None = None
 
     def to_response(self) -> Response:
+        """Convert this forward result into a Starlette Response.
+
+        Returns a StreamingResponse if the result contains a stream,
+        otherwise a regular Response with the full body.
+        """
         if self.stream is not None:
             return StreamingResponse(
                 content=self.stream,
@@ -50,6 +64,16 @@ class ForwardResult:
 
 
 class McpProxyService:
+    """Service that proxies HTTP requests to upstream MCP servers.
+
+    Handles forwarding requests, session ownership synchronisation, header
+    filtering, and conversion of streamed vs. buffered upstream responses.
+
+    Args:
+        config: The proxy application configuration.
+        sessions: Service for managing MCP session ownership bindings.
+    """
+
     def __init__(self, config: ProxyConfig, sessions: SessionService) -> None:
         self._config = config
         self._sessions = sessions
@@ -63,6 +87,18 @@ class McpProxyService:
         server: ResolvedMcpServer,
         principal: AuthenticatedPrincipal,
     ) -> ForwardResult:
+        """Forward a POST request to the upstream MCP server.
+
+        Args:
+            body: Raw request body bytes.
+            query: Raw query string from the request URL.
+            request_headers: Mapping of incoming HTTP headers.
+            server: The resolved MCP server to proxy to.
+            principal: The authenticated principal making the request.
+
+        Returns:
+            Forwarded response from the upstream server.
+        """
         return await self._forward(
             body=body,
             query=query,
@@ -81,6 +117,18 @@ class McpProxyService:
         server: ResolvedMcpServer,
         principal: AuthenticatedPrincipal,
     ) -> ForwardResult:
+        """Forward a GET request to the upstream MCP server.
+
+        Args:
+            body: Raw request body bytes.
+            query: Raw query string from the request URL.
+            request_headers: Mapping of incoming HTTP headers.
+            server: The resolved MCP server to proxy to.
+            principal: The authenticated principal making the request.
+
+        Returns:
+            Forwarded response from the upstream server.
+        """
         return await self._forward(
             body=body,
             query=query,
@@ -99,6 +147,18 @@ class McpProxyService:
         server: ResolvedMcpServer,
         principal: AuthenticatedPrincipal,
     ) -> ForwardResult:
+        """Forward a DELETE request to the upstream MCP server.
+
+        Args:
+            body: Raw request body bytes.
+            query: Raw query string from the request URL.
+            request_headers: Mapping of incoming HTTP headers.
+            server: The resolved MCP server to proxy to.
+            principal: The authenticated principal making the request.
+
+        Returns:
+            Forwarded response from the upstream server.
+        """
         return await self._forward(
             body=body,
             query=query,
@@ -118,6 +178,26 @@ class McpProxyService:
         principal: AuthenticatedPrincipal,
         http_method: str,
     ) -> ForwardResult:
+        """Core forwarding logic shared by all HTTP method handlers.
+
+        Filters request headers, resolves session ownership, sends the
+        request to the upstream server, synchronises session bindings, and
+        filters response headers before returning.
+
+        Args:
+            body: Raw request body bytes.
+            query: Raw query string from the request URL.
+            request_headers: Mapping of incoming HTTP headers.
+            server: The resolved MCP server to proxy to.
+            principal: The authenticated principal making the request.
+            http_method: The HTTP method for the upstream request.
+
+        Returns:
+            Forwarded response from the upstream server.
+
+        Raises:
+            UpstreamConnectionError: If the upstream server is unreachable.
+        """
         forwarded_headers = filter_request_headers(
             request_headers, self._config.strip_headers
         )
@@ -196,6 +276,15 @@ class McpProxyService:
 async def get_mcp_service(
     config: ConfigDep, sessions: SessionServiceDep
 ) -> McpProxyService:
+    """Dependency factory for McpProxyService.
+
+    Args:
+        config: The proxy application configuration.
+        sessions: The session service for ownership management.
+
+    Returns:
+        A new McpProxyService instance.
+    """
     return McpProxyService(config=config, sessions=sessions)
 
 

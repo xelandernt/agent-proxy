@@ -12,6 +12,8 @@ from proxy.sessions.types import SessionOwner, SessionOwnershipConflictError
 
 
 class SessionRegistry(Protocol):
+    """Protocol for session ownership persistence."""
+
     async def bind(
         self,
         *,
@@ -29,6 +31,12 @@ class SessionRegistry(Protocol):
 
 
 class SessionRepository(SessionRegistry):
+    """SQLAlchemy-backed repository for MCP session ownership bindings.
+
+    Args:
+        session: An async SQLAlchemy session for database access.
+    """
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -40,6 +48,22 @@ class SessionRepository(SessionRegistry):
         owner: SessionOwner,
         client_id: str | None,
     ) -> None:
+        """Bind a session to an owner in the database.
+
+        If a binding already exists, verifies the owner matches. If the
+        owner matches but the client_id differs, updates the client_id.
+
+        Args:
+            server_name: The MCP server name.
+            session_id: The session ID to bind.
+            owner: The session owner identity.
+            client_id: Optional OAuth client ID to associate.
+
+        Raises:
+            SessionOwnershipConflictError: If the session is already bound
+                to a different principal.
+            IntegrityError: If an unexpected database constraint is hit.
+        """
         self._session.add(
             SessionBinding(
                 server_name=server_name,
@@ -89,6 +113,15 @@ class SessionRepository(SessionRegistry):
             await self._session.commit()
 
     async def get(self, *, server_name: str, session_id: str) -> SessionOwner | None:
+        """Get the owner of a session binding, if one exists.
+
+        Args:
+            server_name: The MCP server name.
+            session_id: The session ID to look up.
+
+        Returns:
+            The session owner, or None if no binding exists.
+        """
         binding = await self._session.get(
             SessionBinding,
             {"server_name": server_name, "session_id": session_id},
@@ -101,6 +134,12 @@ class SessionRepository(SessionRegistry):
         )
 
     async def remove(self, *, server_name: str, session_id: str) -> None:
+        """Remove a session binding from the database.
+
+        Args:
+            server_name: The MCP server name.
+            session_id: The session ID to remove.
+        """
         await self._session.execute(
             delete(SessionBinding).where(
                 SessionBinding.server_name == server_name,
@@ -111,6 +150,14 @@ class SessionRepository(SessionRegistry):
 
 
 async def get_session_repository(session: AsyncSessionDep) -> SessionRegistry:
+    """Dependency factory for SessionRepository.
+
+    Args:
+        session: An async SQLAlchemy session.
+
+    Returns:
+        A new SessionRepository instance.
+    """
     return SessionRepository(session)
 
 

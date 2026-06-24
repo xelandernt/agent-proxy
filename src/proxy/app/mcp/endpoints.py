@@ -19,6 +19,24 @@ async def get_protected_resource_metadata(
     server: ServerDep,
     auth_provider: AuthProviderDep,
 ) -> OAuthProtectedResourceMetadata:
+    """Get OAuth protected resource metadata for an MCP server.
+
+    Returns the resource metadata (resource URI, authorization servers, and
+    supported scopes) for the named MCP server. Used by OAuth clients to
+    discover how to obtain tokens for this protected resource.
+
+    Args:
+        server: The resolved MCP server configuration from the path parameter.
+        auth_provider: The auth provider for the server's group.
+
+    Returns:
+        OAuth protected resource metadata including resource URI,
+        authorization server URLs, and supported scopes.
+
+    Raises:
+        HTTPException 404: If the server is not configured as a protected
+            resource.
+    """
     metadata = auth_provider.describe_resource(
         group=server.group,
         server=server.server,
@@ -43,6 +61,23 @@ async def post_mcp_backend(
     principal: PrincipalDep,
     mcp_service: McpServiceDep,
 ) -> Response:
+    """Proxy a POST request to the upstream MCP server.
+
+    Forwards the incoming POST request (including body, query parameters, and
+    headers) to the configured MCP server endpoint and returns the upstream
+    response to the client. Supports both regular and streaming (SSE)
+    responses.
+
+    Args:
+        request: The incoming HTTP request.
+        server: The resolved MCP server configuration from the path parameter.
+        principal: The authenticated principal extracted from the request.
+        mcp_service: The MCP proxy service handling forwarding logic.
+
+    Returns:
+        Response from the upstream MCP server, with headers filtered per
+        configuration.
+    """
     result = await mcp_service.post(
         body=await request.body(),
         query=request.url.query,
@@ -60,6 +95,20 @@ async def get_mcp_backend(
     principal: PrincipalDep,
     mcp_service: McpServiceDep,
 ) -> Response:
+    """Proxy a GET request to the upstream MCP server.
+
+    Forwards the incoming GET request to the configured MCP server endpoint
+    and returns the upstream response.
+
+    Args:
+        request: The incoming HTTP request.
+        server: The resolved MCP server configuration from the path parameter.
+        principal: The authenticated principal extracted from the request.
+        mcp_service: The MCP proxy service handling forwarding logic.
+
+    Returns:
+        Response from the upstream MCP server.
+    """
     result = await mcp_service.get(
         body=await request.body(),
         query=request.url.query,
@@ -77,6 +126,20 @@ async def delete_mcp_backend(
     principal: PrincipalDep,
     mcp_service: McpServiceDep,
 ) -> Response:
+    """Proxy a DELETE request to the upstream MCP server.
+
+    Forwards the incoming DELETE request to the configured MCP server endpoint
+    and returns the upstream response.
+
+    Args:
+        request: The incoming HTTP request.
+        server: The resolved MCP server configuration from the path parameter.
+        principal: The authenticated principal extracted from the request.
+        mcp_service: The MCP proxy service handling forwarding logic.
+
+    Returns:
+        Response from the upstream MCP server.
+    """
     result = await mcp_service.delete(
         body=await request.body(),
         query=request.url.query,
