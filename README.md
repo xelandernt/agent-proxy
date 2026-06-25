@@ -29,12 +29,12 @@ The proxy listens on `http://127.0.0.1:8008` by default. See [Configuration](#co
 
 ### Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/mcp/{name}` | Proxy a JSON-RPC request to the named MCP server |
-| `GET` | `/mcp/{name}` | Proxy a GET request (e.g. SSE stream) |
-| `DELETE` | `/mcp/{name}` | Proxy a DELETE request (e.g. session teardown) |
-| `GET` | `/.well-known/oauth-protected-resource/mcp/{name}` | OAuth protected-resource metadata (RFC 8414) |
+| Method   | Path                                               | Description                                      |
+|----------|----------------------------------------------------|--------------------------------------------------|
+| `POST`   | `/mcp/{name}`                                      | Proxy a JSON-RPC request to the named MCP server |
+| `GET`    | `/mcp/{name}`                                      | Proxy a GET request (e.g. SSE stream)            |
+| `DELETE` | `/mcp/{name}`                                      | Proxy a DELETE request (e.g. session teardown)   |
+| `GET`    | `/.well-known/oauth-protected-resource/mcp/{name}` | OAuth protected-resource metadata (RFC 8414)     |
 
 ### Smoke Test
 
@@ -128,10 +128,10 @@ mcp:
 
 **Auth providers** are selected via the `provider` discriminator:
 
-| Provider | Type | Notes |
-|----------|------|-------|
-| `disabled` | No authentication | Requests accepted as `anonymous` principal |
-| `oidc` | Generic OIDC | Validates JWT against issuer's JWKS |
+| Provider   | Type               | Notes                                                               |
+|------------|--------------------|---------------------------------------------------------------------|
+| `disabled` | No authentication  | Requests accepted as `anonymous` principal                          |
+| `oidc`     | Generic OIDC       | Validates JWT against issuer's JWKS                                 |
 | `entra_id` | Microsoft Entra ID | Convenience wrapper around OIDC; can derive issuer from `tenant_id` |
 
 **Server-level scope inheritance:**
@@ -344,16 +344,16 @@ just inspector
 
 ## Project Scripts (`just`)
 
-| Command | Description |
-|---------|-------------|
-| `just install` | Install dependencies and pre-commit hooks |
-| `just lint` | Run linter |
-| `just typecheck` | Run type checker |
-| `just test` | Run all tests |
-| `just test-integration` | Run Docker-backed integration tests |
-| `just compose` | Start Docker services |
-| `just stop` | Stop Docker services |
-| `just dev` | Start services + proxy |
-| `just config-schema` | Generate configuration JSON Schema |
-| `just publish` | Build and publish to PyPI |
-| `just inspector` | Launch MCP Inspector |
+| Command                 | Description                               |
+|-------------------------|-------------------------------------------|
+| `just install`          | Install dependencies and pre-commit hooks |
+| `just lint`             | Run linter                                |
+| `just typecheck`        | Run type checker                          |
+| `just test`             | Run all tests                             |
+| `just test-integration` | Run Docker-backed integration tests       |
+| `just compose`          | Start Docker services                     |
+| `just stop`             | Stop Docker services                      |
+| `just dev`              | Start services + proxy                    |
+| `just config-schema`    | Generate configuration JSON Schema        |
+| `just publish`          | Build and publish to PyPI                 |
+| `just inspector`        | Launch MCP Inspector                      |
