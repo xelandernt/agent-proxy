@@ -224,7 +224,7 @@ class DatabaseConfig(BaseModel):
     address: str = "127.0.0.1"
     port: int = 5432
     username: str = "postgres"
-    password: SecretStr = SecretStr("password")
+    password: SecretStr = SecretStr("postgres")
     database: str = "agent_proxy"
     sslmode: str | None = None
     options: dict[str, str] = Field(default_factory=dict)
