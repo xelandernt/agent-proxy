@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from typing import Final
 
 import httpx2
@@ -18,6 +19,7 @@ def create_credential_free_http_client(
     follow_redirects: bool = True,
     verify: bool = True,
     transport: httpx2.AsyncBaseTransport | None = None,
+    **_: object,
 ) -> httpx2.AsyncClient:
     """Create the upstream client without caller or ambient credentials.
 
@@ -51,25 +53,11 @@ def create_upstream_transport(
 ) -> StreamableHttpTransport:
     """Create a modern HTTP transport with the credential firewall installed."""
 
-    def client_factory(
-        headers: dict[str, str] | None = None,
-        timeout: httpx2.Timeout | None = None,
-        auth: httpx2.Auth | None = None,
-        **options: object,
-    ) -> httpx2.AsyncClient:
-        follow_redirects = options.get("follow_redirects", True)
-        if not isinstance(follow_redirects, bool):
-            raise TypeError("follow_redirects must be a boolean")
-        return create_credential_free_http_client(
-            headers=headers,
-            timeout=timeout,
-            auth=auth,
-            follow_redirects=follow_redirects,
-            verify=verify_tls,
-            transport=http_transport,
-        )
-
     return StreamableHttpTransport(
         upstream_url,
-        httpx_client_factory=client_factory,
+        httpx_client_factory=partial(
+            create_credential_free_http_client,
+            verify=verify_tls,
+            transport=http_transport,
+        ),
     )

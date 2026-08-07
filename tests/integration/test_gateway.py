@@ -4,8 +4,6 @@ from typing import TypedDict
 
 import httpx2
 import pytest
-from fastapi import FastAPI
-from fastapi.openapi.models import HTTPBearer, OpenAPI, Parameter, PathItem
 from fastapi.testclient import TestClient
 from pydantic import TypeAdapter
 
@@ -151,62 +149,6 @@ def test_gateway_mounts_named_server_and_fastmcp_enforces_auth() -> None:
     assert response.status_code == 401
     assert response.headers["www-authenticate"].startswith("Bearer")
     assert unknown.status_code == 404
-
-
-def test_gateway_publishes_swagger_scalar_and_typed_openapi() -> None:
-    app = create_app(gateway_config())
-
-    with TestClient(app) as client:
-        openapi_response = client.get("/openapi.json")
-        swagger_response = client.get("/docs")
-        scalar_response = client.get("/scalar")
-        redoc_response = client.get("/redoc")
-
-    assert isinstance(app, FastAPI)
-    assert openapi_response.status_code == 200
-    document = OpenAPI.model_validate(openapi_response.json())
-    assert document.info.title == "agent-proxy"
-    assert document.servers is not None
-    assert [server.url for server in document.servers] == ["https://gateway.example/"]
-
-    assert document.paths is not None
-    assert set(document.paths) == {"/calendar/mcp"}
-    path_item = PathItem.model_validate(document.paths["/calendar/mcp"])
-    assert path_item.post is not None
-    assert path_item.post.operationId == "calendar_mcp"
-    assert path_item.post.security == [{"BearerAuth": []}]
-    assert path_item.post.responses is not None
-    assert set(path_item.post.responses) == {"200", "401", "403"}
-    assert path_item.post.parameters is not None
-    parameters = [
-        parameter
-        for parameter in path_item.post.parameters
-        if isinstance(parameter, Parameter)
-    ]
-    assert {parameter.name for parameter in parameters} == {
-        "MCP-Method",
-        "MCP-Protocol-Version",
-    }
-
-    assert document.components is not None
-    assert document.components.schemas is not None
-    assert "HTTPValidationError" not in document.components.schemas
-    assert "ValidationError" not in document.components.schemas
-    assert document.components.securitySchemes is not None
-    raw_security_scheme = document.components.securitySchemes["BearerAuth"]
-    security_scheme = HTTPBearer.model_validate(
-        raw_security_scheme.model_dump(mode="json", by_alias=True)
-    )
-    assert security_scheme.scheme == "bearer"
-
-    serialized_document = openapi_response.text
-    assert "127.0.0.1:9" not in serialized_document
-    assert "identity.example" not in serialized_document
-    assert swagger_response.status_code == 200
-    assert "/openapi.json" in swagger_response.text
-    assert scalar_response.status_code == 200
-    assert "/openapi.json" in scalar_response.text
-    assert redoc_response.status_code == 404
 
 
 def test_authenticated_modern_response_has_no_legacy_session_header() -> None:

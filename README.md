@@ -182,26 +182,6 @@ For local reload:
 just dev
 ```
 
-## API documentation
-
-The FastAPI gateway generates documentation from the validated server
-configuration:
-
-| URL | Purpose |
-| --- | --- |
-| `/openapi.json` | OpenAPI 3.1 document |
-| `/docs` | Swagger UI |
-| `/scalar` | Scalar API reference |
-
-The OpenAPI document contains one authenticated `POST /{name}/mcp` operation
-for each configured server. It documents the modern MCP headers, typed JSON-RPC
-envelopes, and bearer authentication without exposing upstream URLs, provider
-configuration, or observability secrets.
-
-Swagger and Scalar describe the HTTP transport contract. MCP tools, resources,
-and prompts remain runtime capabilities and should be explored through an MCP
-client or `just inspector`.
-
 FastMCP mounts each provider's operational OAuth routes beneath the server
 prefix, alongside `/{name}/mcp`. Standards-defined discovery routes remain at
 the root, for example
