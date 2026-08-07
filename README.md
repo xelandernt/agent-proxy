@@ -11,6 +11,18 @@ The gateway contract is MCP `2026-07-28` only:
 - clients and upstream servers are expected to follow the `2026-07-28`
   contract.
 
+## Compatibility
+
+This gateway accepts only the stateless MCP `2026-07-28` protocol. Compatibility
+was checked on 7 August 2026:
+
+| Client                | Earliest compatible version | Status and evidence                                                                                                                                                                                                                                                                                       |
+|-----------------------|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Codex CLI and Desktop | `0.147.0`                   | Supported with `features.mcp_2026_07_28 = true`. [Codex 0.147.0](https://github.com/openai/codex/releases/tag/rust-v0.147.0) adds discovery, multi-round requests, and non-blocking startup; its [implementation](https://github.com/openai/codex/pull/35725) covers the complete client protocol.        |
+| OpenCode              | `1.18.8`                    | Supported for modern MCP servers. The [1.18.8 release](https://github.com/anomalyco/opencode/releases/tag/v1.18.8) upgraded compatibility, and its [protocol regression report](https://github.com/anomalyco/opencode/issues/39354) captures the client sending a `2026-07-28` `server/discover` request. |
+| GitHub Copilot CLI    | `1.0.79-1` (pre-release)    | Modern discovery is present, but only in the pre-release channel. [Issue #4370](https://github.com/github/copilot-cli/issues/4370) tracks a regression when a legacy server rejects the discovery probe; this gateway implements discovery, so that specific fallback bug does not apply.                 |
+| Claude Code           | Not yet announced           | Anthropic says support is still [rolling out](https://claude.com/blog/bringing-mcp-2026-07-28-to-claude); no released Claude Code version has been announced. [Issue #81965](https://github.com/anthropics/claude-code/issues/81965) tracks the missing timeline and per-request behavior.                |
+
 ## How it works
 
 Each configured server becomes an isolated FastMCP proxy application. The
