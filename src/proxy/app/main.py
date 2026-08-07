@@ -1,121 +1,139 @@
-from contextlib import asynccontextmanager
+from __future__ import annotations
 
-from fastapi import FastAPI, Request, status
-import logfire
-from loguru import logger
-from starlette.responses import JSONResponse
-from starlette.middleware.cors import CORSMiddleware
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
+from typing import Final, Protocol, cast
 
-from proxy.app.mcp.endpoints import router as mcp_router
-from proxy.app.mcp.service import UpstreamConnectionError
-from proxy.app.runtime import build_app_runtime
-from proxy.sessions.types import SessionOwnershipConflictError
-from proxy.settings import CONFIG, ProxyConfig
+from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.routing import ASGIApp, BaseRoute
+from fastmcp.server import create_proxy
+from scalar_fastapi import AgentScalarConfig, get_scalar_api_reference
 
-_OBSERVABILITY_CONFIGURED = False
+from proxy.app.openapi import (
+    MCP_PROTOCOL_VERSION,
+    OpenApiDocument,
+    create_openapi_document,
+)
+from proxy.observability import configure_observability
+from proxy.providers import load_auth_provider
+from proxy.settings import GatewayConfig, McpServerConfig, load_config
+from proxy.transport import create_upstream_transport
+
+SCALAR_JAVASCRIPT_URL: Final = (
+    "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.64.0"
+)
 
 
-def create_app(config: ProxyConfig | None = None) -> FastAPI:
-    """Create and configure the FastAPI application.
+class FastMcpRouter(Protocol):
+    """Lifespan surface used from FastMCP's internal HTTP application."""
 
-    Builds the app runtime, sets up the lifespan handler (which manages the
-    database lifecycle), configures CORS middleware, observability (logfire),
-    exception handlers, and registers the MCP proxy router.
+    def lifespan_context(
+        self,
+        app: FastMcpApplication,
+    ) -> AbstractAsyncContextManager[object]: ...
 
-    Args:
-        config: Optional ProxyConfig override. Defaults to the global CONFIG.
 
-    Returns:
-        A fully configured FastAPI application instance.
-    """
-    settings = config or CONFIG
-    runtime = build_app_runtime(settings)
+class FastMcpApplication(Protocol):
+    """ASGI application features required by the FastAPI gateway."""
+
+    routes: list[BaseRoute]
+    router: FastMcpRouter
+
+
+def create_server_app(
+    config: GatewayConfig,
+    server: McpServerConfig,
+) -> FastMcpApplication:
+    """Build one isolated FastMCP auth proxy application."""
+
+    auth = load_auth_provider(
+        server.auth,
+        base_url=config.server_base_url(server),
+    )
+    transport = create_upstream_transport(
+        str(server.upstream_url),
+        verify_tls=server.verify_upstream_tls,
+    )
+    proxy = create_proxy(
+        transport,
+        mode=MCP_PROTOCOL_VERSION,
+        name=server.name,
+        auth=auth,
+        provider_error_strategy="raise",
+    )
+    return cast(
+        FastMcpApplication,
+        proxy.http_app(path="/mcp", stateless_http=True),
+    )
+
+
+def create_app(config: GatewayConfig | None = None) -> FastAPI:
+    """Create the multi-server MCP authentication gateway."""
+
+    settings = config or load_config()
+    child_apps = {
+        server.name: create_server_app(settings, server) for server in settings.servers
+    }
+    well_known_routes: list[BaseRoute] = []
+    for child_app in child_apps.values():
+        child_well_known_routes = [
+            route
+            for route in child_app.routes
+            if getattr(route, "path", "").startswith("/.well-known/")
+        ]
+        well_known_routes.extend(child_well_known_routes)
+        child_app.routes[:] = [
+            route for route in child_app.routes if route not in child_well_known_routes
+        ]
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        app.state.runtime = runtime
-        await runtime.session_database.startup()
-        try:
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        async with AsyncExitStack() as stack:
+            for child_app in child_apps.values():
+                await stack.enter_async_context(
+                    child_app.router.lifespan_context(child_app)
+                )
             yield
-        finally:
-            await runtime.session_database.shutdown()
 
-    app = FastAPI(title="Agent Proxy", lifespan=lifespan)
-    app.state.runtime = runtime
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.middleware.cors.origins,
-        allow_methods=settings.middleware.cors.allow_methods,
-        allow_headers=settings.middleware.cors.allow_headers,
-        allow_credentials=settings.middleware.cors.allow_credentials,
+    gateway = FastAPI(
+        title="agent-proxy",
+        summary="Authenticated access to modern MCP servers.",
+        description=(
+            f"Authentication gateway for MCP {MCP_PROTOCOL_VERSION}. MCP tools, "
+            "resources, and prompts are discovered through the protocol at runtime."
+        ),
+        redoc_url=None,
+        lifespan=lifespan,
     )
-    configure_observability(app, settings)
-    add_exception_handlers(app)
-    app.include_router(mcp_router)
-    return app
 
-
-def add_exception_handlers(app: FastAPI) -> None:
-    """Register custom exception handlers on the FastAPI application.
-
-    Handlers:
-        - UpstreamConnectionError -> 502 Bad Gateway
-        - SessionOwnershipConflictError -> 409 Conflict
-
-    Args:
-        app: The FastAPI application instance.
-    """
-
-    @app.exception_handler(UpstreamConnectionError)
-    async def upstream_connection_error_handler(
-        _: Request, exc: UpstreamConnectionError
-    ) -> JSONResponse:
-        """Handle upstream connection failures."""
-        return JSONResponse(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            content={"detail": str(exc)},
+    async def scalar_reference() -> HTMLResponse:
+        return get_scalar_api_reference(
+            openapi_url=gateway.openapi_url,
+            title="agent-proxy API reference",
+            scalar_js_url=SCALAR_JAVASCRIPT_URL,
+            telemetry=False,
+            agent=AgentScalarConfig(disabled=True),
         )
 
-    @app.exception_handler(SessionOwnershipConflictError)
-    async def session_ownership_conflict_handler(
-        _: Request, __: SessionOwnershipConflictError
-    ) -> JSONResponse:
-        """Handle protected session ownership conflicts."""
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={
-                "detail": "Protected session is already bound to another principal."
-            },
-        )
-
-
-def configure_observability(app: FastAPI, settings: ProxyConfig) -> None:
-    """Configure logfire observability for the application.
-
-    Sets up logfire with FastAPI instrumentation, system metrics, and a
-    loguru handler. Only runs once; subsequent calls are no-ops.
-
-    Args:
-        app: The FastAPI application to instrument.
-        settings: The proxy configuration (provides logfire token, etc.).
-    """
-    global _OBSERVABILITY_CONFIGURED
-    if _OBSERVABILITY_CONFIGURED:
-        return
-
-    logfire.configure(
-        send_to_logfire="if-token-present",
-        environment=settings.logfire.environment,
-        service_name=settings.logfire.service_name,
-        token=settings.logfire.token.get_secret_value()
-        if settings.logfire.token
-        else None,
+    gateway.add_api_route(
+        "/scalar",
+        scalar_reference,
+        methods=["GET"],
+        include_in_schema=False,
+        name="scalar",
     )
-    logfire.instrument_fastapi(app)
-    logfire.instrument_system_metrics(base="basic")
-    logger.configure(handlers=[logfire.loguru_handler()])
-    _OBSERVABILITY_CONFIGURED = True
+    gateway.router.routes.extend(well_known_routes)
+    for name, child_app in child_apps.items():
+        gateway.mount(f"/{name}", cast(ASGIApp, child_app), name=name)
 
+    openapi_document = create_openapi_document(settings)
 
-app = create_app()
+    def openapi() -> OpenApiDocument:
+        return openapi_document
+
+    gateway.openapi = openapi
+    gateway.state.config = settings
+    gateway.state.server_apps = child_apps
+    configure_observability(gateway, settings.logfire)
+    return gateway

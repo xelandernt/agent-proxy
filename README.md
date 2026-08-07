@@ -1,359 +1,259 @@
 # agent-proxy
 
-A FastAPI reverse proxy that secures and exposes upstream MCP (Model Context Protocol) HTTP servers behind authenticated endpoints. Clients authenticate to the proxy; the proxy strips auth headers and forwards requests upstream.
+An authentication gateway for unauthenticated MCP servers. FastMCP owns MCP
+and OAuth; the gateway supplies routing, provider configuration, and a strict
+credential boundary in front of each upstream.
 
-## Features
+The gateway contract is MCP `2026-07-28` only:
 
-- Expose multiple upstream MCP servers at `/mcp/{name}`
-- Group servers behind shared authentication providers (OIDC, Entra ID, or disabled/anonymous)
-- Publish OAuth protected-resource metadata at `/.well-known/oauth-protected-resource/mcp/{name}`
-- Bind MCP sessions to the authenticated principal that initialised them — one user cannot reuse another's session
-- Filter proxy-only and hop-by-hop headers from forwarded requests and responses
-- Support both buffered and streaming (SSE) upstream responses
+- each server is exposed at `/{name}/mcp`;
+- there is no `initialize`, `MCP-Session-Id`, GET stream, or DELETE teardown;
+- clients and upstream servers are expected to follow the `2026-07-28`
+  contract.
 
-## Quick Start
+## How it works
 
-```bash
-# Start Postgres, Keycloak, and the example MCP server
-just compose
+Each configured server becomes an isolated FastMCP proxy application. The
+configured FastMCP `AuthProvider` validates the client and publishes its OAuth
+routes. FastMCP then forwards the MCP request to the configured upstream.
 
-# Start the proxy
-uv run proxy run
-```
+The upstream HTTP client removes `Authorization`, `Cookie`, and
+`Proxy-Authorization`, ignores FastMCP's forwarded auth object, and disables
+ambient proxy credentials. Modern MCP routing headers and request bodies are
+preserved.
 
-The proxy listens on `http://127.0.0.1:8008` by default. See [Configuration](#configuration) to customise.
-
----
-
-## Usage
-
-### Endpoints
-
-| Method   | Path                                               | Description                                      |
-|----------|----------------------------------------------------|--------------------------------------------------|
-| `POST`   | `/mcp/{name}`                                      | Proxy a JSON-RPC request to the named MCP server |
-| `GET`    | `/mcp/{name}`                                      | Proxy a GET request (e.g. SSE stream)            |
-| `DELETE` | `/mcp/{name}`                                      | Proxy a DELETE request (e.g. session teardown)   |
-| `GET`    | `/.well-known/oauth-protected-resource/mcp/{name}` | OAuth protected-resource metadata (RFC 8414)     |
-
-### Smoke Test
-
-```bash
-TOKEN="<access-token>"
-
-curl \
-  -X POST http://localhost:8008/mcp/my-server \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Accept: application/json, text/event-stream' \
-  -H 'Content-Type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke-test","version":"0.1.0"}}}'
-```
-
-
-## Configuration
-
-Configuration is loaded from environment variables (prefix `PROXY__`, nested delimiter `__`) and from `.proxy/config.yaml`. Set `PROXY_CONFIG_FILE` to use a different YAML path.
-
-### Minimal Example
-
-```yaml
-mcp:
-  groups:
-    - name: my-group
-      auth:
-        provider: oidc
-        issuer: "http://localhost:8080/realms/agent-proxy"
-      default_required_scopes:
-        - mcp.access
-      servers:
-        - name: my-server
-          resource: "http://localhost:8008/mcp/my-server"
-          endpoint: "http://upstream:8931/mcp"
-```
-
-### Full Reference
-
-```yaml
-host:
-  address: 127.0.0.1
-  port: 8008
-
-middleware:
-  cors:
-    origins:
-      - "*"
-    allow_credentials: false
-
-database:
-  address: 127.0.0.1
-  port: 5432
-  username: postgres
-  password: postgres
-  database: agent_proxy
-  sslmode: disable
-  options: {}
-
-strip_headers:
-  - connection
-  - keep-alive
-  - proxy-authenticate
-  - proxy-authorization
-  - te
-  - trailer
-  - transfer-encoding
-  - upgrade
-
-mcp:
-  groups:
-    - name: my-group
-      auth:
-        provider: oidc
-        issuer: "http://localhost:8080/realms/agent-proxy"
-      default_authorization_scopes:
-        - openid
-        - profile
-        - mcp.access
-      default_required_scopes:
-        - mcp.access
-      servers:
-        - name: my-server
-          description: "My upstream MCP server"
-          resource: "http://localhost:8008/mcp/my-server"
-          endpoint: "http://localhost:8931/mcp"
-          accepted_audiences:
-            - "api://<additional-audience>"
-```
-
-### Config Details
-
-**Auth providers** are selected via the `provider` discriminator:
-
-| Provider   | Type               | Notes                                                               |
-|------------|--------------------|---------------------------------------------------------------------|
-| `disabled` | No authentication  | Requests accepted as `anonymous` principal                          |
-| `oidc`     | Generic OIDC       | Validates JWT against issuer's JWKS                                 |
-| `entra_id` | Microsoft Entra ID | Convenience wrapper around OIDC; can derive issuer from `tenant_id` |
-
-**Server-level scope inheritance:**
-
-- `authorization_scopes` — advertised to OAuth clients in resource metadata. Falls back to `default_authorization_scopes`, then to `required_scopes`.
-- `required_scopes` — enforced on incoming access tokens. Falls back to `default_required_scopes`.
-- Server-level values always override group defaults.
-
-**Protected groups** (non-`disabled`) require every server to set a `resource` URL. This is the OAuth protected-resource identifier that access-token audiences are matched against.
-
----
-
-## Authentication & Authorisation
-
-```
-            ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-  Client ──▶│  Proxy      │────▶│  Auth        │────▶│  Upstream   │
-            │  /mcp/{name}│     │  Provider    │     │  MCP Server │
-            └─────────────┘     └──────────────┘     └─────────────┘
-                  │                                       │
-                  │  /.well-known/oauth-protected-        │  mcp-session-id
-                  │  resource/mcp/{name}                  │
-                  ▼                                       ▼
-            MCP Client                             MCP Session
-            discovers                               bound to
-            auth server                             principal
-```
-
-1. An MCP client requests the protected-resource metadata endpoint to learn the authorisation server URL and required scopes.
-2. The client obtains an access token from the authorisation server.
-3. The client sends the token as `Authorization: Bearer <token>` to the proxy.
-4. The proxy validates the token (signature, issuer, audience, scopes) against the server's auth provider.
-5. Missing or malformed tokens → `401` with `WWW-Authenticate`.
-6. Tokens lacking required scopes → `403`.
-7. Valid requests are forwarded upstream; the `Authorization` header is **not** sent upstream.
-
-### Token Validation
-
-For OIDC-backed groups, the proxy fetches:
-
-- `/.well-known/openid-configuration` from the configured issuer
-- JWKS from the URI advertised in discovery metadata
-
-Validation steps:
-
-- JWT signature verification using the matching JWK (by `kid`)
-- Allowed signing algorithm (default: `RS256`)
-- Issuer match
-- `exp` and `iat` with configurable clock skew (default: 30s)
-- Required claims: `sub`, `aud`, `iss`, `exp`, `iat`
-- Audience matched against server `resource` + `accepted_audiences`
-- Required scopes from `scp`, `scope`, or `roles` claims
-
-### Entra ID Setup
-
-```yaml
-auth:
-  provider: entra_id
-  issuer: "https://login.microsoftonline.com/<tenant-id>/v2.0"
-```
-
-Or derive from tenant:
-
-```yaml
-auth:
-  provider: entra_id
-  tenant_id: "<tenant-id>"
-```
-
-**Proxy API registration:**
-
-1. Create an app registration for the proxy (e.g. `agent-proxy-api`)
-2. Set an Application ID URI (e.g. `api://<client-id>`)
-3. Add a delegated scope (`mcp.access`) and/or an app role (`mcp.access`)
-4. Configure the MCP server's `resource` as the URL clients connect to
-5. Add the Application ID URI to `accepted_audiences`
-
-**Client registration:**
-
-- Public clients (desktop, VS Code, Copilot): authorisation-code flow with redirect URIs
-- Confidential clients (services): client-credentials flow with secret or certificate
-- Grant API permissions for the proxy API and admin consent if required
-
-The proxy checks `scp` (delegated), `roles` (app roles), and `scope` claims, so the same scope requirement works for both user tokens and service principals.
-
----
-
-## Session Handling
-
-The proxy keeps a protected-session ownership registry in Postgres so one principal cannot reuse another's MCP session.
-
-- On `initialize`, if the upstream responds with `MCP-Session-Id`, the proxy stores `(server, session_id, issuer, subject, client_id)`
-- Subsequent requests with `MCP-Session-Id` must authenticate as the same `(issuer, subject)` pair
-- If a different principal attempts reuse → `409 Conflict`
-- On `DELETE` with `2xx` response → session binding is removed
-- On upstream `404` → stale session binding is removed
-- If the proxy loses its binding (e.g. restart) but the upstream still accepts the session, the session is re-bound on the next successful request
-
----
-
-## Local Development
-
-### Prerequisites
+## Prerequisites
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/)
-- [just](https://just.systems/)
-- Docker
+- [just](https://just.systems/) for the convenience commands
+- [jq](https://jqlang.org/) for the documented token smoke request
+- Docker for the Compose example and Keycloak integration suite
 
-### Setup
+## Install
 
 ```bash
-# Install dependencies
-uv sync --all-extras
-
-# Install pre-commit hooks
-just hook
-
-# Start dependent services (Postgres, Keycloak, example MCP server)
-just compose
+uv sync --all-extras --frozen
 ```
 
-### Run
+FastMCP 4 is beta software. Both `fastmcp` and `fastmcp-slim` are pinned to
+`4.0.0b1` so their protocol implementations cannot drift independently.
+
+## Local development example
+
+Start Keycloak and the example MCP server in Docker, then run the gateway
+locally with reload enabled:
 
 ```bash
-# Start the proxy in dev mode (compose + run)
 just dev
+```
 
-# Or separately:
+The resulting development stack is:
+
+| Process | Address | Runtime |
+| --- | --- | --- |
+| Gateway | `http://localhost:8008/example/mcp` | Local Python process started by `just dev` |
+| Keycloak | `http://keycloak.localhost:8080` | Docker container |
+| MCP server | `http://127.0.0.1:8000/mcp` | Docker container with a host-local port |
+
+The example backend in [examples/mcp_server.py](examples/mcp_server.py)
+provides typed `echo` and `add` tools. The local gateway uses
+`.proxy/config.yaml`; [resources/config.dev.yaml](resources/config.dev.yaml)
+is the non-secret reference configuration. Both Compose and the integration
+tests import the same
+[resources/keycloak/realm.json](resources/keycloak/realm.json).
+
+To start only the two Docker dependencies, run `just compose`, then start the
+gateway separately with `uv run proxy run --reload`. Stopping `just dev` stops
+the local gateway process but leaves its dependencies available for the next
+run.
+
+The deterministic smoke-test user is `example` / `example`; the Keycloak admin
+login is `admin` / `admin`. These credentials and Keycloak's development mode
+are for local use only.
+
+Native MCP clients use Keycloak Dynamic Client Registration automatically.
+Browser-based MCP Inspector cannot use open DCR because Keycloak does not add
+the required CORS headers. In Inspector's OAuth 2.0 settings, use Client ID
+`mcp-inspector` and leave Client Secret empty. The shared realm registers its
+localhost callback URLs, web origin, and required PKCE S256 policy.
+
+Stop and remove the two dependency containers with:
+
+```bash
+just stop
+```
+
+## Configure
+
+Copy [resources/config.example.yaml](resources/config.example.yaml) to
+`.proxy/config.yaml`, then edit it for your provider and upstream:
+
+```yaml
+public_base_url: https://mcp.example.com
+
+servers:
+  - name: calendar
+    upstream_url: http://calendar.internal:8000/mcp
+    auth:
+      provider: keycloak
+      realm_url: https://identity.example.com/realms/agents
+      audience: https://mcp.example.com/calendar/mcp
+      required_scopes:
+        - openid
+```
+
+The public endpoint in this example is
+`https://mcp.example.com/calendar/mcp`. The gateway supplies
+`https://mcp.example.com/calendar` as the provider's `base_url`; it is not a
+configurable authentication field.
+
+`auth` is a discriminated union of fully typed provider configurations.
+Provider-specific required fields and secrets are validated while loading the
+gateway configuration, before any application is constructed. Supported
+provider discriminators are:
+
+| Integration | `provider` |
+| --- | --- |
+| Auth0 | `auth0` |
+| WorkOS AuthKit | `authkit` |
+| AWS Cognito | `aws-cognito` |
+| Microsoft Entra ID | `azure` |
+| Descope | `descope` |
+| Discord | `discord` |
+| GitHub | `github` |
+| Google | `google` |
+| Hugging Face | `huggingface` |
+| JWT/JWKS verification | `jwt` |
+| Keycloak | `keycloak` |
+| OCI IAM | `oci` |
+| PropelAuth | `propelauth` |
+| Scalekit | `scalekit` |
+| Supabase | `supabase` |
+| WorkOS | `workos` |
+
+See the [FastMCP Keycloak integration](https://gofastmcp.com/integrations/keycloak)
+and the corresponding FastMCP integration guide for any other provider's
+fields and OAuth behavior. Keycloak 26.6.0 or newer supports the remote OAuth
+pattern with Dynamic Client Registration, so native interactive clients can
+register without manual client configuration. Other providers may require a
+gateway OAuth client as documented by FastMCP.
+
+Configuration is loaded from `.proxy/config.yaml`. Set `PROXY_CONFIG_FILE` to
+use another file. Environment variables use the `PROXY__` prefix and `__` as
+the nested delimiter. Treat configuration files and environment variables as
+sensitive because provider credentials and Logfire tokens may be stored there.
+
+Logfire request tracing and basic system metrics remain integrated through
+FastAPI. Telemetry is sent only when a write token is present:
+
+```yaml
+logfire:
+  token: your-logfire-write-token
+  environment: production
+  service_name: agent-proxy
+```
+
+The token can instead be supplied as `PROXY__LOGFIRE__TOKEN`. Without a token,
+Logfire remains local and does not export telemetry.
+
+Generate the current JSON Schema with:
+
+```bash
+just config-schema
+```
+
+## Run
+
+```bash
 uv run proxy run
 ```
 
-### Local Keycloak Details
-
-| Item                     | Value                                  |
-|--------------------------|----------------------------------------|
-| Realm                    | `agent-proxy`                          |
-| Admin console            | `admin` / `admin`                      |
-| Static local client      | `local-mcp-client`                     |
-| VS Code / Copilot client | `aebc6443-996d-45c2-90f0-388ff96faa56` |
-| Test user                | `admin` / `admin`                      |
-| Keycloak version         | 26.4                                   |
-
-The `mcp.access` client scope includes an audience mapper that emits the proxy's resource URL. Anonymous dynamic client registration is enabled for `localhost`, `127.0.0.1`, and `opencode.ai`.
-
-### Client Integration
-
-Clients that support OAuth-protected MCP servers discover the proxy's OAuth endpoints automatically using the protected-resource metadata at `/.well-known/oauth-protected-resource/mcp/{name}`. They then fetch RFC 8414 authorisation-server metadata from the advertised issuer.
-
-- **Codex:** configure the MCP server URL as `http://localhost:8008/mcp/my-server`, then run `codex mcp login my-server`
-- **OpenCode:** configure a remote MCP server with URL `http://localhost:8008/mcp/my-server`, then run `opencode mcp auth my-server`
-
-### Troubleshooting
-
-```
-Policy 'Trusted Hosts' rejected request to client-registration service.
-```
-
-Recreate the Keycloak container and volume so the updated realm is imported:
+The listener defaults to `127.0.0.1:8008`. Override it in the config or with
+CLI flags:
 
 ```bash
-docker compose down -v && just compose
+uv run proxy run --host 0.0.0.0 --port 8008
 ```
 
----
-
-## Testing
+For local reload:
 
 ```bash
-# Lint
-just lint
+just dev
+```
 
-# Type check
-just typecheck
+## API documentation
 
-# Run all tests (unit + integration)
+The FastAPI gateway generates documentation from the validated server
+configuration:
+
+| URL | Purpose |
+| --- | --- |
+| `/openapi.json` | OpenAPI 3.1 document |
+| `/docs` | Swagger UI |
+| `/scalar` | Scalar API reference |
+
+The OpenAPI document contains one authenticated `POST /{name}/mcp` operation
+for each configured server. It documents the modern MCP headers, typed JSON-RPC
+envelopes, and bearer authentication without exposing upstream URLs, provider
+configuration, or observability secrets.
+
+Swagger and Scalar describe the HTTP transport contract. MCP tools, resources,
+and prompts remain runtime capabilities and should be explored through an MCP
+client or `just inspector`.
+
+FastMCP mounts each provider's operational OAuth routes beneath the server
+prefix, alongside `/{name}/mcp`. Standards-defined discovery routes remain at
+the root, for example
+`/.well-known/oauth-protected-resource/{name}/mcp`. Connect clients to the MCP
+URL and let the provider's protected-resource challenge drive authentication.
+
+## Modern protocol smoke request
+
+```bash
+AGENT_PROXY_TOKEN="$(curl --fail --silent \
+  http://keycloak.localhost:8080/realms/agent-proxy/protocol/openid-connect/token \
+  --data-urlencode grant_type=password \
+  --data-urlencode client_id=example-client \
+  --data-urlencode username=example \
+  --data-urlencode password=example \
+  --data-urlencode scope=openid \
+  | jq -r .access_token)"
+
+curl http://localhost:8008/example/mcp \
+  -H "Authorization: Bearer ${AGENT_PROXY_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'MCP-Method: tools/list' \
+  --data '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/list",
+    "params": {
+      "_meta": {
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {},
+        "io.modelcontextprotocol/clientInfo": {
+          "name": "smoke-test",
+          "version": "1"
+        }
+      }
+    }
+  }'
+```
+
+## Test
+
+```bash
 just test
-
-# Integration tests only (requires Docker)
-just test-integration
-
-# Specific test groups
-uv run pytest tests/integration/test_metadata.py -q
-uv run pytest tests/integration/test_auth.py -q
-uv run pytest tests/integration/test_mcp_proxy.py -q
+just typecheck
+just lint
 ```
 
----
+The integration suite exercises FastMCP auth, named routing, lifecycle
+composition, the credential firewall, and a real Keycloak 26.6 instance.
 
-## Commands
+## License
 
-```bash
-# Print current configuration as JSON
-uv run proxy config
-
-# Write JSON Schema for configuration
-uv run proxy config-schema ./resources/config.schema.json
-
-# Run the application (uvicorn)
-uv run proxy run --host 127.0.0.1 --port 8008
-
-# Generate config schema
-just config-schema
-
-# Start MCP Inspector
-just inspector
-```
-
----
-
-## Project Scripts (`just`)
-
-| Command                 | Description                               |
-|-------------------------|-------------------------------------------|
-| `just install`          | Install dependencies and pre-commit hooks |
-| `just lint`             | Run linter                                |
-| `just typecheck`        | Run type checker                          |
-| `just test`             | Run all tests                             |
-| `just test-integration` | Run Docker-backed integration tests       |
-| `just compose`          | Start Docker services                     |
-| `just stop`             | Stop Docker services                      |
-| `just dev`              | Start services + proxy                    |
-| `just config-schema`    | Generate configuration JSON Schema        |
-| `just publish`          | Build and publish to PyPI                 |
-| `just inspector`        | Launch MCP Inspector                      |
+See [LICENSE](LICENSE).

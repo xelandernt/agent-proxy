@@ -6,20 +6,18 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-proxy"
-description = "Add your description here"
+description = "A modern MCP authentication gateway powered by FastMCP"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "asyncpg>=0.30.0",
     "cyclopts>=4.16.1",
-    "fastapi>=0.136.3",
-    "greenlet>=3.2.4",
+    "fastapi>=0.139.2",
+    "fastmcp==4.0.0b1",
+    "httpx2>=2.9.1",
     "logfire[fastapi,system-metrics]>=4.34.0",
-    "loguru>=0.7.3",
-    "niquests>=3.18.8",
+    "pydantic>=2.12.0",
     "pydantic-settings[yaml]>=2.14.1",
-    "pyjwt[crypto]>=2.10.1",
-    "sqlalchemy>=2.0.43",
+    "scalar-fastapi>=1.8.2",
     "uvicorn>=0.48.0",
 ]
 dynamic = ["version"]
@@ -37,8 +35,11 @@ dev = [
     "pytest>=9.0.3",
     "pytest-asyncio>=1.4.0",
     "ruff>=0.15.14",
-    "testcontainers>=4.13.2",
+    "testcontainers>=4.14.2",
 ]
+
+[tool.uv]
+constraint-dependencies = ["fastmcp-slim==4.0.0b1"]
 
 
 [tool.pyrefly]
@@ -57,12 +58,9 @@ addopts = [
 ]
 asyncio_mode = "auto"
 markers = [
-    "integration: Docker-backed integration tests that require a running Docker daemon.",
+    "integration: Docker-backed end-to-end gateway tests.",
 ]
 pythonpath=["src", "tests"]
-
-[tool.fastapi]
-entrypoint = "proxy.app.main:app"
 
 [tool.hatch.version]
 source = "vcs"

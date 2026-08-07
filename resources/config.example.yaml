@@ -1,0 +1,22 @@
+host:
+  address: 127.0.0.1
+  port: 8008
+
+public_base_url: https://mcp.example.com
+
+logfire:
+  # Telemetry is exported only when a token is configured.
+  # token: your-logfire-write-token
+  environment: production
+  service_name: agent-proxy
+
+servers:
+  - name: calendar
+    upstream_url: http://calendar.internal:8000/mcp
+    verify_upstream_tls: true
+    auth:
+      provider: keycloak
+      realm_url: https://identity.example.com/realms/agents
+      audience: https://mcp.example.com/calendar/mcp
+      required_scopes:
+        - openid

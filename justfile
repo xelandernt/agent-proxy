@@ -51,15 +51,19 @@ config-schema:
 inspector:
     npx -y @modelcontextprotocol/inspector
 
-# start docker containers
-compose:
-    docker compose up -d --wait
-
-# stop docker containers
-stop:
-    docker compose --profile "*" down
-
-# start application in development mode
+# start Docker dependencies, then run the gateway locally with reload
 dev:
-    @just compose
-    uv run --env-file ".env" proxy run
+    docker compose up --build --wait -d
+    uv run proxy run --reload
+
+# build and start the Keycloak and example MCP server dependencies
+compose:
+    docker compose up --build --wait -d
+
+# follow logs from the local Compose stack
+compose-logs:
+    docker compose logs --follow
+
+# stop and remove the local Compose stack
+stop:
+    docker compose down --remove-orphans

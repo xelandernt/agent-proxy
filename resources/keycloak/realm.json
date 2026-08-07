@@ -1,24 +1,20 @@
 {
   "realm": "agent-proxy",
-  "enabled": true,
   "displayName": "Agent Proxy",
+  "enabled": true,
+  "keycloakVersion": "26.6.0",
+  "registrationAllowed": true,
   "sslRequired": "none",
-  "registrationAllowed": false,
-  "loginWithEmailAllowed": true,
-  "duplicateEmailsAllowed": false,
-  "resetPasswordAllowed": false,
-  "editUsernameAllowed": false,
-  "internationalizationEnabled": false,
-  "clientPolicies": {
-    "policies": []
-  },
-  "clientProfiles": {
-    "profiles": []
-  },
+  "defaultDefaultClientScopes": [
+    "openid",
+    "mcp-audience"
+  ],
+  "defaultOptionalClientScopes": [
+    "offline_access"
+  ],
   "components": {
     "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
       {
-        "id": "0f1d299e-8e22-4cd7-a97a-b9e4a628d7eb",
         "name": "Trusted Hosts",
         "providerId": "trusted-hosts",
         "subType": "anonymous",
@@ -27,98 +23,58 @@
           "host-sending-registration-request-must-match": [
             "false"
           ],
-          "client-uris-must-match": [
-            "true"
-          ],
           "trusted-hosts": [
             "localhost",
             "127.0.0.1",
-            "opencode.ai"
-          ]
-        }
-      },
-      {
-        "id": "caa5cfe4-27eb-4f7c-9ad6-2840adbb9dd9",
-        "name": "Allowed Protocol Mapper Types",
-        "providerId": "allowed-protocol-mappers",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {
-          "allowed-protocol-mapper-types": [
-            "oidc-address-mapper",
-            "oidc-full-name-mapper",
-            "oidc-sha256-pairwise-sub-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "oidc-usermodel-property-mapper",
-            "saml-role-list-mapper",
-            "saml-user-attribute-mapper",
-            "saml-user-property-mapper"
-          ]
-        }
-      },
-      {
-        "id": "9016b438-0d09-4df0-a226-bdf0424788ac",
-        "name": "Full Scope Disabled",
-        "providerId": "scope",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {}
-      },
-      {
-        "id": "ad7f249d-5d46-4fc7-837e-7c8d03c09e3a",
-        "name": "Max Clients Limit",
-        "providerId": "max-clients",
-        "subType": "anonymous",
-        "subComponents": {},
-        "config": {
-          "max-clients": [
-            "200"
+            "keycloak.localhost"
+          ],
+          "client-uris-must-match": [
+            "true"
           ]
         }
       }
     ]
   },
-  "defaultDefaultClientScopes": [
-    "mcp.access"
-  ],
-  "defaultOptionalClientScopes": [
-    "offline_access"
-  ],
   "clientScopes": [
     {
-      "name": "mcp.access",
-      "description": "Access the protected MCP proxy",
+      "name": "openid",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "true",
-        "display.on.consent.screen": "true",
-        "consent.screen.text": "Access the protected MCP proxy"
+        "display.on.consent.screen": "false"
       },
       "protocolMappers": [
         {
           "name": "subject",
           "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-property-mapper",
+          "protocolMapper": "oidc-sub-mapper",
           "consentRequired": false,
           "config": {
-            "user.attribute": "id",
-            "claim.name": "sub",
-            "jsonType.label": "String",
             "id.token.claim": "true",
             "access.token.claim": "true",
-            "userinfo.token.claim": "true"
+            "introspection.token.claim": "true"
           }
-        },
+        }
+      ]
+    },
+    {
+      "name": "mcp-audience",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
         {
-          "name": "mcp-proxy-audience",
+          "name": "example-mcp-audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.custom.audience": "http://localhost:8008/mcp/playwright",
+            "included.custom.audience": "http://localhost:8008/example/mcp",
             "access.token.claim": "true",
             "id.token.claim": "false",
-            "userinfo.token.claim": "false"
+            "introspection.token.claim": "true"
           }
         }
       ]
@@ -126,73 +82,119 @@
   ],
   "clients": [
     {
-      "clientId": "local-mcp-client",
-      "name": "Local MCP Client",
-      "description": "Pre-created public client for local MCP client development. Use this client_id when a client needs a known static client registration.",
+      "clientId": "gateway-integration-test",
+      "name": "Gateway Integration Test",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
+      "standardFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": true,
-      "redirectUris": [
-        "*"
-      ],
-      "webOrigins": [
-        "*"
-      ],
       "defaultClientScopes": [
-        "mcp.access"
+        "openid",
+        "mcp-audience"
       ],
       "optionalClientScopes": [
-        "offline_access",
-        "mcp.access"
+        "offline_access"
+      ],
+      "protocolMappers": [
+        {
+          "name": "gateway-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "https://gateway.example/calendar/mcp",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
       ]
     },
     {
-      "clientId": "aebc6443-996d-45c2-90f0-388ff96faa56",
-      "name": "Visual Studio Code",
-      "description": "VS Code and GitHub Copilot client used for MCP OAuth flows",
+      "clientId": "example-client",
+      "name": "Compose Example Client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "openid",
+        "mcp-audience"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "mcp-inspector",
+      "name": "MCP Inspector",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
       "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": true,
       "redirectUris": [
-        "*"
+        "http://localhost:6274/oauth/callback",
+        "http://localhost:6274/oauth/callback/debug"
       ],
       "webOrigins": [
-        "*"
+        "http://localhost:6274"
       ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
       "defaultClientScopes": [
-        "mcp.access"
+        "openid",
+        "mcp-audience"
       ],
       "optionalClientScopes": [
-        "offline_access",
-        "mcp.access"
+        "offline_access"
       ]
     }
   ],
   "users": [
     {
-      "username": "admin",
+      "username": "testuser",
+      "email": "testuser@example.com",
+      "firstName": "Test",
+      "lastName": "User",
       "enabled": true,
       "emailVerified": true,
-      "firstName": "Admin",
-      "lastName": "Agent",
-      "email": "admin@example.com",
+      "requiredActions": [],
       "realmRoles": [
         "offline_access"
       ],
       "credentials": [
         {
           "type": "password",
-          "value": "admin",
+          "value": "password123",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "example",
+      "email": "example@example.com",
+      "firstName": "Example",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "requiredActions": [],
+      "realmRoles": [
+        "offline_access"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "example",
           "temporary": false
         }
       ]

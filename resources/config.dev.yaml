@@ -1,0 +1,20 @@
+host:
+  address: 127.0.0.1
+  port: 8008
+
+public_base_url: http://localhost:8008
+
+logfire:
+  environment: development
+  service_name: agent-proxy-dev
+
+servers:
+  - name: example
+    upstream_url: http://127.0.0.1:8000/mcp
+    verify_upstream_tls: true
+    auth:
+      provider: keycloak
+      realm_url: http://keycloak.localhost:8080/realms/agent-proxy
+      audience: http://localhost:8008/example/mcp
+      required_scopes:
+        - openid
