@@ -6,6 +6,8 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from proxy.app.admin.auth import admin_provider_routes, build_admin_provider
+from proxy.app.admin.endpoints import router as admin_router
 from proxy.app.usage.endpoints import router as usage_router
 from proxy.app.well_known import router as well_known_router
 from proxy.database import Base, create_engine, create_session_factory
@@ -57,6 +59,15 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         )
     gateway.include_router(well_known_router)
     gateway.include_router(usage_router)
+    gateway.include_router(admin_router)
+
+    admin_provider = build_admin_provider(
+        settings.admin,
+        str(settings.public_base_url),
+    )
+    if admin_provider is not None:
+        gateway.router.routes.extend(admin_provider_routes(admin_provider))
+    gateway.state.admin_provider = admin_provider
 
     gateway.state.config = settings
     gateway.state.usage_engine = usage_engine
