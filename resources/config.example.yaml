@@ -10,6 +10,10 @@ logfire:
   environment: production
   service_name: agent-proxy
 
+# Uncomment to enable per-server usage tracing in the UI (PostgreSQL required).
+# database:
+#   url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
+
 servers:
   - name: calendar
     description: Manage meetings, availability, and event invitations.

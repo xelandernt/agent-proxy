@@ -46,6 +46,16 @@ class LogfireConfig(BaseModel):
     service_name: str = "proxy"
 
 
+class DatabaseConfig(BaseModel):
+    """PostgreSQL persistence for gateway usage tracing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(
+        description="Async PostgreSQL DSN (for example postgresql+asyncpg://...)."
+    )
+
+
 class McpServerConfig(BaseModel):
     """One protected modern MCP endpoint and its unauthenticated backend."""
 
@@ -65,6 +75,7 @@ class GatewayConfig(BaseModel):
 
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
+    database: DatabaseConfig | None = None
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
     cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
     servers: list[McpServerConfig] = Field(min_length=1)
@@ -96,6 +107,7 @@ class _GatewaySettings(BaseSettings):
 
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
+    database: DatabaseConfig | None = None
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
     cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
     servers: list[McpServerConfig] = Field(min_length=1)

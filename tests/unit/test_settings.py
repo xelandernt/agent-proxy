@@ -81,6 +81,50 @@ def test_server_names_must_be_unique() -> None:
         GatewayConfig.model_validate({"servers": [server, server]})
 
 
+def test_database_defaults_to_disabled() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "servers": [
+                {
+                    "name": "calendar",
+                    "upstream_url": "http://calendar.internal/mcp",
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                    },
+                }
+            ]
+        }
+    )
+
+    assert config.database is None
+
+
+def test_database_url_round_trips() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "database": {
+                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+            },
+            "servers": [
+                {
+                    "name": "calendar",
+                    "upstream_url": "http://calendar.internal/mcp",
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                    },
+                }
+            ],
+        }
+    )
+
+    assert config.database is not None
+    assert (
+        config.database.url == "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy"
+    )
+
+
 def test_server_description_defaults_to_empty() -> None:
     config = GatewayConfig.model_validate(
         {

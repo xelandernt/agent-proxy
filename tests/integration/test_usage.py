@@ -1,0 +1,282 @@
+from __future__ import annotations
+
+import json
+import time
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from typing import TypedDict
+
+import httpx2
+import pytest
+from fastapi.testclient import TestClient
+from testcontainers.community.postgres import PostgresContainer
+
+import proxy.app.main as main_module
+from proxy.app.main import MCP_PROTOCOL_VERSION, create_app
+from proxy.providers import AuthProviderConfig
+from proxy.settings import GatewayConfig
+from proxy.transport import create_upstream_transport
+from tests.support import StaticAuthProvider
+
+POSTGRES_IMAGE = "postgres:17-alpine"
+
+
+class ClientInfo(TypedDict):
+    name: str
+    version: str
+
+
+class ClientCapabilities(TypedDict):
+    pass
+
+
+ClientMetadata = TypedDict(
+    "ClientMetadata",
+    {
+        "io.modelcontextprotocol/protocolVersion": str,
+        "io.modelcontextprotocol/clientCapabilities": ClientCapabilities,
+        "io.modelcontextprotocol/clientInfo": ClientInfo,
+    },
+)
+
+
+def usage_request(method: str, **params: object) -> dict[str, object]:
+    return {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": method,
+        "params": {
+            **params,
+            "_meta": {
+                "io.modelcontextprotocol/protocolVersion": MCP_PROTOCOL_VERSION,
+                "io.modelcontextprotocol/clientCapabilities": {},
+                "io.modelcontextprotocol/clientInfo": {
+                    "name": "gateway-test",
+                    "version": "1",
+                },
+            },
+        },
+    }
+
+
+def usage_headers(method: str, **extra: str) -> dict[str, str]:
+    return {
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": MCP_PROTOCOL_VERSION,
+        "MCP-Method": method,
+        "Authorization": "Bearer valid-token",
+        **extra,
+    }
+
+
+class FakeUpstream:
+    """In-process upstream answering the discover handshake and method calls."""
+
+    async def handle_request(self, request: httpx2.Request) -> httpx2.Response:
+        body = json.loads(request.content)
+        method = body["method"]
+        result: dict[str, object]
+        if method == "server/discover":
+            result = {
+                "cacheScope": "private",
+                "resultType": "complete",
+                "supportedVersions": [MCP_PROTOCOL_VERSION],
+                "capabilities": {"tools": {"listChanged": False}},
+            }
+        elif method == "tools/list":
+            result = {"cacheScope": "private", "resultType": "complete", "tools": []}
+        elif method == "tools/call":
+            result = {
+                "cacheScope": "private",
+                "resultType": "complete",
+                "content": [{"type": "text", "text": "ok"}],
+                "isError": False,
+            }
+        elif method == "resources/list":
+            result = {
+                "cacheScope": "private",
+                "resultType": "complete",
+                "resources": [],
+            }
+        else:
+            result = {"cacheScope": "private", "resultType": "complete"}
+        result["ttlMs"] = 0
+        result["_meta"] = {
+            "io.modelcontextprotocol/serverInfo": {
+                "name": "fake-upstream",
+                "version": "1",
+            }
+        }
+        return httpx2.Response(
+            status_code=200,
+            json={"jsonrpc": "2.0", "id": body["id"], "result": result},
+        )
+
+
+@pytest.fixture(scope="session")
+def postgres_url() -> Iterator[str]:
+    with PostgresContainer(POSTGRES_IMAGE) as postgres:
+        yield postgres.get_connection_url(driver="asyncpg")
+
+
+@pytest.fixture(autouse=True)
+def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    def load_static_provider(
+        _config: AuthProviderConfig,
+        *,
+        base_url: str,
+    ) -> StaticAuthProvider:
+        return StaticAuthProvider(base_url=base_url, required_scopes=["mcp"])
+
+    monkeypatch.setattr(main_module, "load_auth_provider", load_static_provider)
+
+
+@pytest.fixture()
+def usage_client(
+    postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[TestClient]:
+    def in_process_transport(
+        upstream_url: str,
+        *,
+        verify_tls: bool = True,
+    ) -> object:
+        return create_upstream_transport(
+            upstream_url,
+            verify_tls=verify_tls,
+            http_transport=httpx2.MockTransport(FakeUpstream().handle_request),
+        )
+
+    monkeypatch.setattr(main_module, "create_upstream_transport", in_process_transport)
+    config = GatewayConfig.model_validate(
+        {
+            "public_base_url": "https://gateway.example",
+            "database": {"url": postgres_url},
+            "servers": [
+                {
+                    "name": "calendar",
+                    "upstream_url": "http://127.0.0.1:9/mcp",
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                    },
+                }
+            ],
+        }
+    )
+    app = create_app(config)
+    with TestClient(app) as client:
+        yield client
+
+
+def _report_window() -> dict[str, str]:
+    end = datetime.now(UTC) + timedelta(minutes=1)
+    start = end - timedelta(hours=1)
+    return {
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+    }
+
+
+def _fetch_report(
+    client: TestClient,
+    expected_total: int | None = None,
+) -> dict[str, object]:
+    deadline = time.monotonic() + 5.0
+    last: dict[str, object] = {}
+    while time.monotonic() < deadline:
+        response = client.get("/api/servers/calendar/usage", params=_report_window())
+        assert response.status_code == 200
+        last = response.json()
+        if expected_total is None or last["total"] >= expected_total:
+            return last
+        time.sleep(0.05)
+    return last
+
+
+def test_usage_tracks_and_queries_requests(usage_client: TestClient) -> None:
+    client = usage_client
+    for _ in range(2):
+        response = client.post(
+            "/calendar/mcp",
+            headers=usage_headers("tools/list"),
+            json=usage_request("tools/list"),
+        )
+        assert response.status_code == 200
+    response = client.post(
+        "/calendar/mcp",
+        headers=usage_headers("tools/call", **{"MCP-Name": "get_weather"}),
+        json=usage_request("tools/call", name="get_weather"),
+    )
+    assert response.status_code == 200
+
+    report = _fetch_report(client, expected_total=3)
+
+    assert report["server"] == "calendar"
+    assert report["total"] == 3
+    assert report["tools"] == [{"name": "get_weather", "count": 1}]
+    assert {"name": "tools/list", "count": 2} in report["methods"]
+    assert {"name": "tools/call", "count": 1} in report["methods"]
+    assert report["clients"] == [{"name": "gateway-test", "count": 3}]
+
+
+def test_usage_window_filters_events(usage_client: TestClient) -> None:
+    client = usage_client
+    response = client.post(
+        "/calendar/mcp",
+        headers=usage_headers("resources/list"),
+        json=usage_request("resources/list"),
+    )
+    assert response.status_code == 200
+    _fetch_report(client, expected_total=1)
+
+    end = datetime.now(UTC) + timedelta(minutes=1)
+    past = (end - timedelta(hours=2)).isoformat()
+    response = client.get(
+        "/api/servers/calendar/usage",
+        params={"from": past, "to": (end - timedelta(hours=1, minutes=-1)).isoformat()},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+
+
+def test_usage_unknown_server_returns_404(usage_client: TestClient) -> None:
+    response = usage_client.get("/api/servers/unknown/usage", params=_report_window())
+
+    assert response.status_code == 404
+
+
+def test_usage_rejects_inverted_window(usage_client: TestClient) -> None:
+    end = datetime.now(UTC).isoformat()
+    start = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    response = usage_client.get(
+        "/api/servers/calendar/usage",
+        params={"from": start, "to": end},
+    )
+
+    assert response.status_code == 422
+
+
+def test_usage_disabled_without_database() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "public_base_url": "https://gateway.example",
+            "servers": [
+                {
+                    "name": "calendar",
+                    "upstream_url": "http://127.0.0.1:9/mcp",
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                    },
+                }
+            ],
+        }
+    )
+    app = create_app(config)
+
+    with TestClient(app) as client:
+        response = client.get("/api/servers/calendar/usage", params=_report_window())
+
+    assert response.status_code == 503

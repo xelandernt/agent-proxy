@@ -51,3 +51,20 @@ services:
       timeout: 3s
       retries: 20
       start_period: 5s
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: proxy
+      POSTGRES_USER: proxy
+      POSTGRES_PASSWORD: proxy
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U proxy -d proxy
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s

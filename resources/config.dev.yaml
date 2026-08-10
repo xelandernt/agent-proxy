@@ -7,6 +7,9 @@ public_base_url: http://localhost:8008
 cors_origins:
   - http://localhost:3000
 
+database:
+  url: postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy
+
 logfire:
   environment: development
   service_name: agent-proxy-dev
