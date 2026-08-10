@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ExternalLinkIcon, ServerIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-
+import { ServerIcon } from "lucide-react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { HarnessPanel } from "#/components/harness-panel";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import {
@@ -19,17 +19,14 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "#/components/ui/empty";
-import {
-	Select,
-	SelectContent,
-	SelectGroup,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "#/components/ui/select";
 import { Skeleton } from "#/components/ui/skeleton";
-import { CopyButton, CopySnippet, useCopy } from "#/lib/copy";
-import { HARNESSES } from "#/lib/harnesses";
+import { CopyButton, useCopy } from "#/lib/copy";
+import {
+	HARNESSES,
+	selectedHarnessId,
+	setSelectedHarnessId,
+	subscribeHarnessSelection,
+} from "#/lib/harnesses";
 import { fetchMcpServers, type McpServerListing } from "#/lib/mcp";
 import { cn } from "#/lib/utils";
 
@@ -42,7 +39,11 @@ type LoadState =
 
 function Home() {
 	const [state, setState] = useState<LoadState>({ status: "loading" });
-	const [harnessId, setHarnessId] = useState(HARNESSES[0].id);
+	const harnessId = useSyncExternalStore(
+		subscribeHarnessSelection,
+		selectedHarnessId,
+		() => HARNESSES[0].id,
+	);
 
 	const load = useCallback(() => {
 		const controller = new AbortController();
@@ -122,7 +123,7 @@ function Home() {
 							key={server.name}
 							server={server}
 							harnessId={harnessId}
-							onHarnessIdChange={setHarnessId}
+							onHarnessIdChange={setSelectedHarnessId}
 						/>
 					))}
 				</div>
@@ -203,65 +204,6 @@ function CopyUrlRow({ server }: { server: McpServerListing }) {
 				{server.url}
 			</span>
 			<CopyButton copied={copied} onClick={copy} label="Copy URL" iconOnly />
-		</div>
-	);
-}
-
-function HarnessPanel({
-	server,
-	harnessId,
-	onHarnessIdChange,
-}: {
-	server: McpServerListing;
-	harnessId: string;
-	onHarnessIdChange: (harnessId: string) => void;
-}) {
-	const harness =
-		HARNESSES.find((candidate) => candidate.id === harnessId) ?? HARNESSES[0];
-	const command = harness.command?.(server.name, server.url);
-	const config = harness.config(server.name, server.url);
-
-	return (
-		<div className="flex flex-col gap-2">
-			<div className="flex items-center justify-between gap-2">
-				<Select value={harnessId} onValueChange={onHarnessIdChange}>
-					<SelectTrigger size="sm" aria-label="Connect with">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectGroup>
-							{HARNESSES.map((candidate) => (
-								<SelectItem key={candidate.id} value={candidate.id}>
-									{candidate.label}
-								</SelectItem>
-							))}
-						</SelectGroup>
-					</SelectContent>
-				</Select>
-				<a
-					href={harness.docsUrl}
-					target="_blank"
-					rel="noreferrer"
-					className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-				>
-					docs
-					<ExternalLinkIcon className="size-3" />
-				</a>
-			</div>
-			{command && (
-				<CopySnippet
-					caption="command"
-					content={command}
-					label="Copy command"
-					successMessage="Command copied"
-				/>
-			)}
-			<CopySnippet
-				caption={harness.configFile}
-				content={config}
-				label="Copy config"
-				successMessage={`Config copied for "${server.name}"`}
-			/>
 		</div>
 	);
 }

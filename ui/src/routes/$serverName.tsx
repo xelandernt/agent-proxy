@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ServerIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { HarnessPanel } from "#/components/harness-panel";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
@@ -16,6 +16,12 @@ import {
 import { Skeleton } from "#/components/ui/skeleton";
 import { UsagePanel } from "#/components/usage-panel";
 import { CopyButton, useCopy } from "#/lib/copy";
+import {
+	HARNESSES,
+	selectedHarnessId,
+	setSelectedHarnessId,
+	subscribeHarnessSelection,
+} from "#/lib/harnesses";
 import { fetchMcpServers, type McpServerListing } from "#/lib/mcp";
 import { cn } from "#/lib/utils";
 
@@ -29,6 +35,11 @@ type LoadState =
 function ServerPage() {
 	const { serverName } = Route.useParams();
 	const [state, setState] = useState<LoadState>({ status: "loading" });
+	const harnessId = useSyncExternalStore(
+		subscribeHarnessSelection,
+		selectedHarnessId,
+		() => HARNESSES[0].id,
+	);
 
 	const load = useCallback(() => {
 		const controller = new AbortController();
@@ -112,6 +123,20 @@ function ServerPage() {
 						<ServerUrlRow url={state.server.url} />
 					</header>
 					<UsagePanel serverName={state.server.name} />
+					<Card>
+						<CardHeader>
+							<CardTitle className="font-sans text-base font-semibold">
+								Connect
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<HarnessPanel
+								server={state.server}
+								harnessId={harnessId}
+								onHarnessIdChange={setSelectedHarnessId}
+							/>
+						</CardContent>
+					</Card>
 				</>
 			)}
 		</div>
@@ -122,7 +147,7 @@ function ServerUrlRow({ url }: { url: string }) {
 	const { copied, copy } = useCopy(url, "URL copied", url);
 
 	return (
-		<div className="flex w-full max-w-2xl items-center justify-between gap-3 rounded-lg border bg-muted/40 py-2 pl-3 pr-2">
+		<div className="flex w-full items-center justify-between gap-3 rounded-lg border bg-muted/40 py-2 pl-3 pr-2">
 			<span
 				className={cn(
 					"min-w-0 truncate font-mono text-sm text-muted-foreground transition-shadow duration-300",

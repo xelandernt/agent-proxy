@@ -54,7 +54,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			<body suppressHydrationWarning>
 				<BackgroundDither />
 				<ThemeProvider>
-					<header className="relative z-40 flex items-center justify-center gap-1 px-8 pt-6">
+					<header className="relative z-40 flex items-center justify-end gap-1 px-8 pt-6">
 						<DitherToggle />
 						<ThemeToggle />
 					</header>
