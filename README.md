@@ -39,7 +39,6 @@ preserved.
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/)
 - [just](https://just.systems/) for the convenience commands
-- [jq](https://jqlang.org/) for the documented token smoke request
 - Docker for the Compose example and Keycloak integration suite
 
 ## Install
@@ -49,7 +48,7 @@ uv sync --all-extras --frozen
 ```
 
 FastMCP 4 is beta software. Both `fastmcp` and `fastmcp-slim` are pinned to
-`4.0.0b1` so their protocol implementations cannot drift independently.
+`4.0.0b2` so their protocol implementations cannot drift independently.
 
 ## Local development example
 
@@ -62,11 +61,11 @@ just dev
 
 The resulting development stack is:
 
-| Process | Address | Runtime |
-| --- | --- | --- |
-| Gateway | `http://localhost:8008/example/mcp` | Local Python process started by `just dev` |
-| Keycloak | `http://keycloak.localhost:8080` | Docker container |
-| MCP server | `http://127.0.0.1:8000/mcp` | Docker container with a host-local port |
+| Process    | Address                             | Runtime                                    |
+|------------|-------------------------------------|--------------------------------------------|
+| Gateway    | `http://localhost:8008/example/mcp` | Local Python process started by `just dev` |
+| Keycloak   | `http://keycloak.localhost:8080`    | Docker container                           |
+| MCP server | `http://127.0.0.1:8000/mcp`         | Docker container with a host-local port    |
 
 The example backend in [examples/mcp_server.py](examples/mcp_server.py)
 provides typed `echo` and `add` tools. The local gateway uses
@@ -125,24 +124,24 @@ Provider-specific required fields and secrets are validated while loading the
 gateway configuration, before any application is constructed. Supported
 provider discriminators are:
 
-| Integration | `provider` |
-| --- | --- |
-| Auth0 | `auth0` |
-| WorkOS AuthKit | `authkit` |
-| AWS Cognito | `aws-cognito` |
-| Microsoft Entra ID | `azure` |
-| Descope | `descope` |
-| Discord | `discord` |
-| GitHub | `github` |
-| Google | `google` |
-| Hugging Face | `huggingface` |
-| JWT/JWKS verification | `jwt` |
-| Keycloak | `keycloak` |
-| OCI IAM | `oci` |
-| PropelAuth | `propelauth` |
-| Scalekit | `scalekit` |
-| Supabase | `supabase` |
-| WorkOS | `workos` |
+| Integration           | `provider`    |
+|-----------------------|---------------|
+| Auth0                 | `auth0`       |
+| WorkOS AuthKit        | `authkit`     |
+| AWS Cognito           | `aws-cognito` |
+| Microsoft Entra ID    | `azure`       |
+| Descope               | `descope`     |
+| Discord               | `discord`     |
+| GitHub                | `github`      |
+| Google                | `google`      |
+| Hugging Face          | `huggingface` |
+| JWT/JWKS verification | `jwt`         |
+| Keycloak              | `keycloak`    |
+| OCI IAM               | `oci`         |
+| PropelAuth            | `propelauth`  |
+| Scalekit              | `scalekit`    |
+| Supabase              | `supabase`    |
+| WorkOS                | `workos`      |
 
 See the [FastMCP Keycloak integration](https://gofastmcp.com/integrations/keycloak)
 and the corresponding FastMCP integration guide for any other provider's
@@ -199,41 +198,6 @@ prefix, alongside `/{name}/mcp`. Standards-defined discovery routes remain at
 the root, for example
 `/.well-known/oauth-protected-resource/{name}/mcp`. Connect clients to the MCP
 URL and let the provider's protected-resource challenge drive authentication.
-
-## Modern protocol smoke request
-
-```bash
-AGENT_PROXY_TOKEN="$(curl --fail --silent \
-  http://keycloak.localhost:8080/realms/agent-proxy/protocol/openid-connect/token \
-  --data-urlencode grant_type=password \
-  --data-urlencode client_id=example-client \
-  --data-urlencode username=example \
-  --data-urlencode password=example \
-  --data-urlencode scope=openid \
-  | jq -r .access_token)"
-
-curl http://localhost:8008/example/mcp \
-  -H "Authorization: Bearer ${AGENT_PROXY_TOKEN}" \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -H 'MCP-Protocol-Version: 2026-07-28' \
-  -H 'MCP-Method: tools/list' \
-  --data '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "tools/list",
-    "params": {
-      "_meta": {
-        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-        "io.modelcontextprotocol/clientCapabilities": {},
-        "io.modelcontextprotocol/clientInfo": {
-          "name": "smoke-test",
-          "version": "1"
-        }
-      }
-    }
-  }'
-```
 
 ## Test
 
