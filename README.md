@@ -168,6 +168,20 @@ logfire:
 The token can instead be supplied as `PROXY__LOGFIRE__TOKEN`. Without a token,
 Logfire remains local and does not export telemetry.
 
+### Usage tracing
+
+The gateway can record request volumes per MCP server, tool, and client app,
+and expose them in the UI (server detail page, filterable by time window).
+Tracing is disabled unless a PostgreSQL database is configured:
+
+```yaml
+database:
+  url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
+```
+
+Tables are created automatically on startup; only request counts and client
+identifiers are stored, never request payloads.
+
 Generate the current JSON Schema with:
 
 ```bash
