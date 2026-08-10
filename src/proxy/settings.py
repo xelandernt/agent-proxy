@@ -10,7 +10,6 @@ from pydantic import (
     ConfigDict,
     Field,
     SecretStr,
-    model_validator,
 )
 from pydantic_settings import (
     BaseSettings,
@@ -24,7 +23,6 @@ from proxy.providers import AuthProviderConfig
 CONFIG_DIRECTORY: Final = ".proxy"
 CONFIG_FILE_ENV: Final = "PROXY_CONFIG_FILE"
 DEFAULT_CONFIG_FILE: Final = Path(CONFIG_DIRECTORY) / "config.yaml"
-NAME_PATTERN: Final = r"^[a-z0-9][a-z0-9-]*$"
 
 
 class HostConfig(BaseModel):
@@ -47,7 +45,7 @@ class LogfireConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
-    """PostgreSQL persistence for gateway usage tracing."""
+    """PostgreSQL persistence for server configuration and usage tracing."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -56,16 +54,12 @@ class DatabaseConfig(BaseModel):
     )
 
 
-class McpServerConfig(BaseModel):
-    """One protected modern MCP endpoint and its unauthenticated backend."""
+class AdminConfig(BaseModel):
+    """Runtime administration identity provider."""
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(pattern=NAME_PATTERN)
-    description: str = ""
-    upstream_url: AnyHttpUrl
     auth: AuthProviderConfig
-    verify_upstream_tls: bool = True
 
 
 class GatewayConfig(BaseModel):
@@ -75,24 +69,10 @@ class GatewayConfig(BaseModel):
 
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
-    database: DatabaseConfig | None = None
+    database: DatabaseConfig
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
     cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
-    servers: list[McpServerConfig] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def validate_unique_server_names(self) -> GatewayConfig:
-        seen: set[str] = set()
-        for server in self.servers:
-            if server.name in seen:
-                raise ValueError(f"MCP server name '{server.name}' must be unique.")
-            seen.add(server.name)
-        return self
-
-    def server_base_url(self, server: McpServerConfig) -> str:
-        """Return the public base URL for a mounted FastMCP server."""
-
-        return f"{str(self.public_base_url).rstrip('/')}/{server.name}"
+    admin: AdminConfig | None = None
 
 
 class _GatewaySettings(BaseSettings):
@@ -107,10 +87,10 @@ class _GatewaySettings(BaseSettings):
 
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
-    database: DatabaseConfig | None = None
+    database: DatabaseConfig
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
     cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
-    servers: list[McpServerConfig] = Field(min_length=1)
+    admin: AdminConfig | None = None
 
     @classmethod
     def settings_customise_sources(

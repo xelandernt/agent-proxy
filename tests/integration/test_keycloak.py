@@ -6,10 +6,12 @@ from fastapi.testclient import TestClient
 from fastmcp.client.transports import StreamableHttpTransport
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, TypeAdapter
 
-import proxy.app.main as main_module
+import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
+from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from proxy.transport import create_upstream_transport
+from tests.integration.helpers import seed_servers
 from tests.integration.test_gateway import (
     FakeModernUpstream,
     modern_headers,
@@ -72,24 +74,33 @@ def keycloak_access_token(realm_url: str) -> str:
     return token.access_token
 
 
-def keycloak_gateway_config(realm_url: str) -> GatewayConfig:
-    return GatewayConfig.model_validate(
+def keycloak_server_config(realm_url: str) -> McpServerConfig:
+    return McpServerConfig.model_validate(
         {
-            "public_base_url": "https://gateway.example",
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://upstream.internal/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": realm_url,
-                        "audience": RESOURCE_AUDIENCE,
-                        "required_scopes": ["openid"],
-                    },
-                }
-            ],
+            "name": "calendar",
+            "upstream_url": "http://upstream.internal/mcp",
+            "auth": {
+                "provider": "keycloak",
+                "realm_url": realm_url,
+                "audience": RESOURCE_AUDIENCE,
+                "required_scopes": ["openid"],
+            },
         }
     )
+
+
+def boot_keycloak_gateway(
+    keycloak_realm_url: str,
+    postgres_url: str,
+) -> TestClient:
+    seed_servers(postgres_url, [keycloak_server_config(keycloak_realm_url)])
+    config = GatewayConfig.model_validate(
+        {
+            "public_base_url": "https://gateway.example",
+            "database": {"url": postgres_url},
+        }
+    )
+    return TestClient(create_app(config))
 
 
 def test_keycloak_dcr_is_available(keycloak_realm_url: str) -> None:
@@ -192,6 +203,7 @@ def test_keycloak_has_browser_compatible_mcp_inspector_client(
 
 def test_keycloak_token_authenticates_without_reaching_upstream(
     keycloak_realm_url: str,
+    postgres_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     upstream_requests: list[dict[str, str]] = []
@@ -208,11 +220,12 @@ def test_keycloak_token_authenticates_without_reaching_upstream(
             http_transport=httpx2.MockTransport(upstream.handle_request),
         )
 
-    monkeypatch.setattr(main_module, "create_upstream_transport", in_process_transport)
-    app = create_app(keycloak_gateway_config(keycloak_realm_url))
+    monkeypatch.setattr(
+        servers_app_module, "create_upstream_transport", in_process_transport
+    )
     token = keycloak_access_token(keycloak_realm_url)
 
-    with TestClient(app) as client:
+    with boot_keycloak_gateway(keycloak_realm_url, postgres_url) as client:
         invalid_response = client.post(
             "/calendar/mcp",
             headers=modern_headers("tools/list")
@@ -234,10 +247,9 @@ def test_keycloak_token_authenticates_without_reaching_upstream(
 
 def test_keycloak_is_advertised_by_protected_resource_metadata(
     keycloak_realm_url: str,
+    postgres_url: str,
 ) -> None:
-    app = create_app(keycloak_gateway_config(keycloak_realm_url))
-
-    with TestClient(app) as client:
+    with boot_keycloak_gateway(keycloak_realm_url, postgres_url) as client:
         response = client.get("/.well-known/oauth-protected-resource/calendar/mcp")
 
     assert response.status_code == 200

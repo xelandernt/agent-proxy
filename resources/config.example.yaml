@@ -10,18 +10,15 @@ logfire:
   environment: production
   service_name: agent-proxy
 
-# Uncomment to enable per-server usage tracing in the UI (PostgreSQL required).
-# database:
-#   url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
+# MCP servers now live in PostgreSQL and are managed at runtime through the
+# admin API and UI, not through this file.
+database:
+  url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
 
-servers:
-  - name: calendar
-    description: Manage meetings, availability, and event invitations.
-    upstream_url: http://calendar.internal:8000/mcp
-    verify_upstream_tls: true
-    auth:
-      provider: keycloak
-      realm_url: https://identity.example.com/realms/agents
-      audience: https://mcp.example.com/calendar/mcp
-      required_scopes:
-        - openid
+# Optional: the identity provider that may log in to the admin API and UI.
+# Any user authenticated against this provider is an administrator. When
+# omitted, the admin interface returns HTTP 503.
+admin:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example.com/realms/agents

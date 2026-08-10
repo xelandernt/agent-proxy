@@ -10,16 +10,16 @@ from typing import TypedDict
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
-from testcontainers.community.postgres import PostgresContainer
+from sqlalchemy import text
 
-import proxy.app.main as main_module
+import proxy.servers.app as servers_app_module
 from proxy.app.main import MCP_PROTOCOL_VERSION, create_app
-from proxy.providers import AuthProviderConfig
+from proxy.database import create_engine
+from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from proxy.transport import create_upstream_transport
+from tests.integration.helpers import seed_servers
 from tests.support import StaticAuthProvider
-
-POSTGRES_IMAGE = "postgres:17-alpine"
 
 
 class ClientInfo(TypedDict):
@@ -114,22 +114,16 @@ class FakeUpstream:
         )
 
 
-@pytest.fixture(scope="session")
-def postgres_url() -> Iterator[str]:
-    with PostgresContainer(POSTGRES_IMAGE) as postgres:
-        yield postgres.get_connection_url(driver="asyncpg")
-
-
 @pytest.fixture(autouse=True)
 def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: AuthProviderConfig,
+        _config: object,
         *,
         base_url: str,
     ) -> StaticAuthProvider:
         return StaticAuthProvider(base_url=base_url, required_scopes=["mcp"])
 
-    monkeypatch.setattr(main_module, "load_auth_provider", load_static_provider)
+    monkeypatch.setattr(servers_app_module, "load_auth_provider", load_static_provider)
 
 
 @pytest.fixture()
@@ -148,21 +142,24 @@ def usage_client(
             http_transport=httpx2.MockTransport(FakeUpstream().handle_request),
         )
 
-    monkeypatch.setattr(main_module, "create_upstream_transport", in_process_transport)
+    monkeypatch.setattr(
+        servers_app_module, "create_upstream_transport", in_process_transport
+    )
+    server = McpServerConfig.model_validate(
+        {
+            "name": "calendar",
+            "upstream_url": "http://127.0.0.1:9/mcp",
+            "auth": {
+                "provider": "keycloak",
+                "realm_url": "https://identity.example/realms/test",
+            },
+        }
+    )
+    seed_servers(postgres_url, [server])
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
             "database": {"url": postgres_url},
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://127.0.0.1:9/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                    },
-                }
-            ],
         }
     )
     app = create_app(config)
@@ -172,10 +169,6 @@ def usage_client(
 
 
 async def _truncate_usage_events(postgres_url: str) -> None:
-    from sqlalchemy import text
-
-    from proxy.database import create_engine
-
     engine = create_engine(postgres_url)
     try:
         async with engine.begin() as connection:
@@ -326,27 +319,3 @@ def test_usage_rejects_inverted_window(usage_client: TestClient) -> None:
     )
 
     assert response.status_code == 422
-
-
-def test_usage_disabled_without_database() -> None:
-    config = GatewayConfig.model_validate(
-        {
-            "public_base_url": "https://gateway.example",
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://127.0.0.1:9/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                    },
-                }
-            ],
-        }
-    )
-    app = create_app(config)
-
-    with TestClient(app) as client:
-        response = client.get("/api/servers/calendar/usage", params=_report_window())
-
-    assert response.status_code == 503

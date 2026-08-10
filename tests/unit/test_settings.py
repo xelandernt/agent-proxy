@@ -13,51 +13,97 @@ from proxy.settings import (
 )
 
 
-def test_gateway_requires_at_least_one_server() -> None:
-    with pytest.raises(ValidationError, match="servers"):
+def test_gateway_requires_database() -> None:
+    with pytest.raises(ValidationError, match="database"):
         GatewayConfig.model_validate({})
 
 
-def test_gateway_derives_server_base_url() -> None:
+def test_gateway_rejects_servers_key() -> None:
+    with pytest.raises(ValidationError, match="servers"):
+        GatewayConfig.model_validate(
+            {
+                "database": {
+                    "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+                },
+                "servers": [],
+            }
+        )
+
+
+def test_database_round_trips() -> None:
     config = GatewayConfig.model_validate(
         {
-            "public_base_url": "https://gateway.example/root/",
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://calendar.internal/mcp",
+            "database": {
+                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+            },
+        }
+    )
+
+    assert (
+        config.database.url == "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy"
+    )
+
+
+def test_admin_accepts_auth_provider() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "database": {
+                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+            },
+            "admin": {
+                "auth": {
+                    "provider": "keycloak",
+                    "realm_url": "https://identity.example/realms/test",
+                }
+            },
+        }
+    )
+
+    assert config.admin is not None
+    assert config.admin.auth.provider == "keycloak"
+
+
+def test_admin_defaults_to_absent() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "database": {
+                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+            },
+        }
+    )
+
+    assert config.admin is None
+
+
+def test_admin_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError, match="settings"):
+        GatewayConfig.model_validate(
+            {
+                "database": {
+                    "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+                },
+                "admin": {
                     "auth": {
                         "provider": "keycloak",
                         "realm_url": "https://identity.example/realms/test",
                     },
-                }
-            ],
-        }
-    )
-
-    assert config.server_base_url(config.servers[0]) == (
-        "https://gateway.example/root/calendar"
-    )
+                    "settings": {},
+                },
+            }
+        )
 
 
 def test_gateway_accepts_logfire_configuration() -> None:
     config = GatewayConfig.model_validate(
         {
+            "database": {
+                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+            },
             "logfire": {
                 "token": "secret-token",
                 "environment": "production",
                 "service_name": "mcp-gateway",
             },
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://calendar.internal/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                    },
-                }
-            ],
         }
     )
 
@@ -65,122 +111,6 @@ def test_gateway_accepts_logfire_configuration() -> None:
     assert config.logfire.token.get_secret_value() == "secret-token"
     assert config.logfire.environment == "production"
     assert config.logfire.service_name == "mcp-gateway"
-
-
-def test_server_names_must_be_unique() -> None:
-    server = {
-        "name": "calendar",
-        "upstream_url": "http://calendar.internal/mcp",
-        "auth": {
-            "provider": "keycloak",
-            "realm_url": "https://identity.example/realms/test",
-        },
-    }
-
-    with pytest.raises(ValidationError, match="must be unique"):
-        GatewayConfig.model_validate({"servers": [server, server]})
-
-
-def test_database_defaults_to_disabled() -> None:
-    config = GatewayConfig.model_validate(
-        {
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://calendar.internal/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                    },
-                }
-            ]
-        }
-    )
-
-    assert config.database is None
-
-
-def test_database_url_round_trips() -> None:
-    config = GatewayConfig.model_validate(
-        {
-            "database": {
-                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
-            },
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://calendar.internal/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                    },
-                }
-            ],
-        }
-    )
-
-    assert config.database is not None
-    assert (
-        config.database.url == "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy"
-    )
-
-
-def test_server_description_defaults_to_empty() -> None:
-    config = GatewayConfig.model_validate(
-        {
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": "http://calendar.internal/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                    },
-                }
-            ]
-        }
-    )
-
-    assert config.servers[0].description == ""
-
-
-def test_server_description_round_trips() -> None:
-    config = GatewayConfig.model_validate(
-        {
-            "servers": [
-                {
-                    "name": "calendar",
-                    "description": "Manage meetings and availability.",
-                    "upstream_url": "http://calendar.internal/mcp",
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                    },
-                }
-            ]
-        }
-    )
-
-    assert config.servers[0].description == "Manage meetings and availability."
-
-
-def test_provider_rejects_unknown_constructor_fields() -> None:
-    with pytest.raises(ValidationError, match="public_base_url"):
-        GatewayConfig.model_validate(
-            {
-                "servers": [
-                    {
-                        "name": "calendar",
-                        "upstream_url": "http://calendar.internal/mcp",
-                        "auth": {
-                            "provider": "keycloak",
-                            "realm_url": "https://identity.example/realms/test",
-                            "public_base_url": "https://wrong.example",
-                        },
-                    }
-                ]
-            }
-        )
 
 
 def test_load_config_from_selected_yaml(
@@ -194,16 +124,17 @@ def test_load_config_from_selected_yaml(
     config_file.write_text(
         """
 public_base_url: https://gateway.example
-servers:
-  - name: calendar
-    upstream_url: http://calendar.internal/mcp
-    auth:
-      provider: keycloak
-      realm_url: https://identity.example/realms/test
+database:
+  url: postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy
+admin:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example/realms/test
 """.lstrip()
     )
     monkeypatch.setenv(CONFIG_FILE_ENV, str(config_file))
 
     config = load_config()
 
-    assert config.servers[0].name == "calendar"
+    assert config.admin is not None
+    assert config.admin.auth.provider == "keycloak"

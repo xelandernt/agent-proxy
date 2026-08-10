@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TypedDict
 
 import httpx2
@@ -8,11 +9,13 @@ from fastapi.testclient import TestClient
 from pydantic import AnyHttpUrl, TypeAdapter
 
 from fastmcp.client.transports import StreamableHttpTransport
-import proxy.app.main as main_module
+import proxy.servers.app as servers_app_module
 from proxy.app.main import MCP_PROTOCOL_VERSION, create_app
 from proxy.providers import AuthProviderConfig
+from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from proxy.transport import create_upstream_transport
+from tests.integration.helpers import seed_servers
 from tests.support import StaticAuthProvider
 
 
@@ -92,21 +95,16 @@ def modern_request(method: str) -> ModernRequest:
     }
 
 
-def gateway_config(upstream_url: str = "http://127.0.0.1:9/mcp") -> GatewayConfig:
-    return GatewayConfig.model_validate(
+def server_config(upstream_url: str = "http://127.0.0.1:9/mcp") -> McpServerConfig:
+    return McpServerConfig.model_validate(
         {
-            "public_base_url": "https://gateway.example",
-            "servers": [
-                {
-                    "name": "calendar",
-                    "upstream_url": upstream_url,
-                    "auth": {
-                        "provider": "keycloak",
-                        "realm_url": "https://identity.example/realms/test",
-                        "required_scopes": ["mcp"],
-                    },
-                }
-            ],
+            "name": "calendar",
+            "upstream_url": upstream_url,
+            "auth": {
+                "provider": "keycloak",
+                "realm_url": "https://identity.example/realms/test",
+                "required_scopes": ["mcp"],
+            },
         }
     )
 
@@ -120,7 +118,25 @@ def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     ) -> StaticAuthProvider:
         return StaticAuthProvider(base_url=base_url, required_scopes=["mcp"])
 
-    monkeypatch.setattr(main_module, "load_auth_provider", load_static_provider)
+    monkeypatch.setattr(servers_app_module, "load_auth_provider", load_static_provider)
+
+
+@pytest.fixture()
+def boot_gateway(
+    postgres_url: str,
+) -> Callable[[list[McpServerConfig] | None, dict[str, object]], TestClient]:
+    def build(
+        servers: list[McpServerConfig] | None = None,
+        **extra: object,
+    ) -> TestClient:
+        servers = servers or [server_config()]
+        seed_servers(postgres_url, servers)
+        config = GatewayConfig.model_validate(
+            {"database": {"url": postgres_url}, **extra}
+        )
+        return TestClient(create_app(config))
+
+    return build
 
 
 def modern_headers(method: str) -> dict[str, str]:
@@ -131,10 +147,10 @@ def modern_headers(method: str) -> dict[str, str]:
     }
 
 
-def test_gateway_mounts_named_server_and_fastmcp_enforces_auth() -> None:
-    app = create_app(gateway_config())
-
-    with TestClient(app) as client:
+def test_gateway_mounts_named_server_and_fastmcp_enforces_auth(
+    boot_gateway: Callable[..., TestClient],
+) -> None:
+    with boot_gateway() as client:
         response = client.post(
             "/calendar/mcp",
             headers=modern_headers("server/discover"),
@@ -151,13 +167,14 @@ def test_gateway_mounts_named_server_and_fastmcp_enforces_auth() -> None:
     assert unknown.status_code == 404
 
 
-def test_authenticated_modern_response_has_no_legacy_session_header() -> None:
-    app = create_app(gateway_config())
+def test_authenticated_modern_response_has_no_legacy_session_header(
+    boot_gateway: Callable[..., TestClient],
+) -> None:
     headers = modern_headers("server/discover") | {
         "Authorization": "Bearer valid-token"
     }
 
-    with TestClient(app) as client:
+    with boot_gateway() as client:
         response = client.post(
             "/calendar/mcp",
             headers=headers,
@@ -171,6 +188,7 @@ def test_authenticated_modern_response_has_no_legacy_session_header() -> None:
 
 def test_front_credentials_never_reach_upstream(
     monkeypatch: pytest.MonkeyPatch,
+    boot_gateway: Callable[..., TestClient],
 ) -> None:
     upstream_requests: list[dict[str, str]] = []
     upstream = FakeModernUpstream(upstream_requests)
@@ -186,15 +204,16 @@ def test_front_credentials_never_reach_upstream(
             http_transport=httpx2.MockTransport(upstream.handle_request),
         )
 
-    monkeypatch.setattr(main_module, "create_upstream_transport", in_process_transport)
-    app = create_app(gateway_config())
+    monkeypatch.setattr(
+        servers_app_module, "create_upstream_transport", in_process_transport
+    )
     headers = modern_headers("tools/list") | {
         "Authorization": "Bearer valid-token",
         "Cookie": "front-session=secret",
         "Proxy-Authorization": "Basic c2VjcmV0",
     }
 
-    with TestClient(app) as client:
+    with boot_gateway() as client:
         response = client.post(
             "/calendar/mcp",
             headers=headers,
@@ -210,10 +229,10 @@ def test_front_credentials_never_reach_upstream(
     assert upstream_requests[-1]["mcp-method"] == "tools/list"
 
 
-def test_well_known_mcp_servers_publishes_public_endpoints() -> None:
-    app = create_app(gateway_config())
-
-    with TestClient(app) as client:
+def test_well_known_mcp_servers_publishes_public_endpoints(
+    boot_gateway: Callable[..., TestClient],
+) -> None:
+    with boot_gateway(public_base_url="https://gateway.example") as client:
         response = client.get("/.well-known/mcp-servers")
 
     assert response.status_code == 200
@@ -229,12 +248,10 @@ def test_well_known_mcp_servers_publishes_public_endpoints() -> None:
     }
 
 
-def test_well_known_document_serves_cors_headers_for_configured_origins() -> None:
-    config = gateway_config()
-    config.cors_origins = [AnyHttpUrl("http://localhost:3000")]
-    app = create_app(config)
-
-    with TestClient(app) as client:
+def test_well_known_document_serves_cors_headers_for_configured_origins(
+    boot_gateway: Callable[..., TestClient],
+) -> None:
+    with boot_gateway(cors_origins=[AnyHttpUrl("http://localhost:3000")]) as client:
         response = client.get(
             "/.well-known/mcp-servers",
             headers={"Origin": "http://localhost:3000"},
@@ -244,10 +261,10 @@ def test_well_known_document_serves_cors_headers_for_configured_origins() -> Non
     assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
 
 
-def test_well_known_document_is_public_without_auth() -> None:
-    app = create_app(gateway_config())
-
-    with TestClient(app) as client:
+def test_well_known_document_is_public_without_auth(
+    boot_gateway: Callable[..., TestClient],
+) -> None:
+    with boot_gateway() as client:
         response = client.get("/.well-known/mcp-servers")
 
     assert response.status_code == 200

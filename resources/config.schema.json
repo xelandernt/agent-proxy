@@ -1,5 +1,90 @@
 {
   "$defs": {
+    "AdminConfig": {
+      "additionalProperties": false,
+      "description": "Runtime administration identity provider.",
+      "properties": {
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "auth0": "#/$defs/Auth0AuthProviderConfig",
+              "authkit": "#/$defs/AuthKitAuthProviderConfig",
+              "aws-cognito": "#/$defs/AwsCognitoAuthProviderConfig",
+              "azure": "#/$defs/AzureAuthProviderConfig",
+              "descope": "#/$defs/DescopeAuthProviderConfig",
+              "discord": "#/$defs/DiscordAuthProviderConfig",
+              "github": "#/$defs/GitHubAuthProviderConfig",
+              "google": "#/$defs/GoogleAuthProviderConfig",
+              "huggingface": "#/$defs/HuggingFaceAuthProviderConfig",
+              "jwt": "#/$defs/JwtAuthProviderConfig",
+              "keycloak": "#/$defs/KeycloakAuthProviderConfig",
+              "oci": "#/$defs/OciAuthProviderConfig",
+              "propelauth": "#/$defs/PropelAuthProviderConfig",
+              "scalekit": "#/$defs/ScalekitAuthProviderConfig",
+              "supabase": "#/$defs/SupabaseAuthProviderConfig",
+              "workos": "#/$defs/WorkOsAuthProviderConfig"
+            },
+            "propertyName": "provider"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Auth0AuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/AuthKitAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/AwsCognitoAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/AzureAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/DescopeAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/DiscordAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/GitHubAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/GoogleAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/HuggingFaceAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/JwtAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/KeycloakAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/OciAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/PropelAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/ScalekitAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/SupabaseAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/WorkOsAuthProviderConfig"
+            }
+          ],
+          "title": "Auth"
+        }
+      },
+      "required": [
+        "auth"
+      ],
+      "title": "AdminConfig",
+      "type": "object"
+    },
     "Auth0AuthProviderConfig": {
       "additionalProperties": false,
       "properties": {
@@ -717,7 +802,7 @@
     },
     "DatabaseConfig": {
       "additionalProperties": false,
-      "description": "PostgreSQL persistence for gateway usage tracing.",
+      "description": "PostgreSQL persistence for server configuration and usage tracing.",
       "properties": {
         "url": {
           "description": "Async PostgreSQL DSN (for example postgresql+asyncpg://...).",
@@ -1921,114 +2006,6 @@
       "title": "LogfireConfig",
       "type": "object"
     },
-    "McpServerConfig": {
-      "additionalProperties": false,
-      "description": "One protected modern MCP endpoint and its unauthenticated backend.",
-      "properties": {
-        "name": {
-          "pattern": "^[a-z0-9][a-z0-9-]*$",
-          "title": "Name",
-          "type": "string"
-        },
-        "description": {
-          "default": "",
-          "title": "Description",
-          "type": "string"
-        },
-        "upstream_url": {
-          "format": "uri",
-          "minLength": 1,
-          "title": "Upstream Url",
-          "type": "string"
-        },
-        "auth": {
-          "discriminator": {
-            "mapping": {
-              "auth0": "#/$defs/Auth0AuthProviderConfig",
-              "authkit": "#/$defs/AuthKitAuthProviderConfig",
-              "aws-cognito": "#/$defs/AwsCognitoAuthProviderConfig",
-              "azure": "#/$defs/AzureAuthProviderConfig",
-              "descope": "#/$defs/DescopeAuthProviderConfig",
-              "discord": "#/$defs/DiscordAuthProviderConfig",
-              "github": "#/$defs/GitHubAuthProviderConfig",
-              "google": "#/$defs/GoogleAuthProviderConfig",
-              "huggingface": "#/$defs/HuggingFaceAuthProviderConfig",
-              "jwt": "#/$defs/JwtAuthProviderConfig",
-              "keycloak": "#/$defs/KeycloakAuthProviderConfig",
-              "oci": "#/$defs/OciAuthProviderConfig",
-              "propelauth": "#/$defs/PropelAuthProviderConfig",
-              "scalekit": "#/$defs/ScalekitAuthProviderConfig",
-              "supabase": "#/$defs/SupabaseAuthProviderConfig",
-              "workos": "#/$defs/WorkOsAuthProviderConfig"
-            },
-            "propertyName": "provider"
-          },
-          "oneOf": [
-            {
-              "$ref": "#/$defs/Auth0AuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/AuthKitAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/AwsCognitoAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/AzureAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/DescopeAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/DiscordAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/GitHubAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/GoogleAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/HuggingFaceAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/JwtAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/KeycloakAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/OciAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/PropelAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/ScalekitAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/SupabaseAuthProviderConfig"
-            },
-            {
-              "$ref": "#/$defs/WorkOsAuthProviderConfig"
-            }
-          ],
-          "title": "Auth"
-        },
-        "verify_upstream_tls": {
-          "default": true,
-          "title": "Verify Upstream Tls",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "name",
-        "upstream_url",
-        "auth"
-      ],
-      "title": "McpServerConfig",
-      "type": "object"
-    },
     "OciAuthProviderConfig": {
       "additionalProperties": false,
       "properties": {
@@ -2808,15 +2785,7 @@
       "$ref": "#/$defs/LogfireConfig"
     },
     "database": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/DatabaseConfig"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
+      "$ref": "#/$defs/DatabaseConfig"
     },
     "public_base_url": {
       "default": "http://127.0.0.1:8008/",
@@ -2834,17 +2803,20 @@
       "title": "Cors Origins",
       "type": "array"
     },
-    "servers": {
-      "items": {
-        "$ref": "#/$defs/McpServerConfig"
-      },
-      "minItems": 1,
-      "title": "Servers",
-      "type": "array"
+    "admin": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AdminConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
-    "servers"
+    "database"
   ],
   "title": "GatewayConfig",
   "type": "object"

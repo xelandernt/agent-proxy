@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from proxy.settings import GatewayConfig, McpServerConfig
+from proxy.servers.manager import ServerManager
+from proxy.servers.models import McpServerConfig, server_base_url
 
 
 class McpServerListing(BaseModel):
@@ -23,23 +24,26 @@ class McpServersDocument(BaseModel):
     servers: list[McpServerListing]
 
 
-def get_config(request: Request) -> GatewayConfig:
-    """Return the validated gateway configuration stored on app state."""
+def get_server_manager(request: Request) -> ServerManager:
+    """Return the runtime server manager stored on app state."""
 
-    return request.app.state.config
+    return request.app.state.server_manager
 
 
-def mcp_endpoint_url(config: GatewayConfig, server: McpServerConfig) -> str:
+def mcp_endpoint_url(public_base_url: str, server: McpServerConfig) -> str:
     """Return the public URL of a server's MCP endpoint."""
 
-    return f"{config.server_base_url(server)}/mcp"
+    return f"{server_base_url(public_base_url, server.name)}/mcp"
 
 
-def _listing(config: GatewayConfig, server: McpServerConfig) -> McpServerListing:
+def _listing(
+    public_base_url: str,
+    server: McpServerConfig,
+) -> McpServerListing:
     return McpServerListing(
         name=server.name,
         description=server.description,
-        url=mcp_endpoint_url(config, server),
+        url=mcp_endpoint_url(public_base_url, server),
         auth="oauth2",
     )
 
@@ -48,9 +52,11 @@ router = APIRouter()
 
 
 @router.get("/.well-known/mcp-servers", response_model=McpServersDocument)
-def mcp_servers(config: GatewayConfig = Depends(get_config)) -> McpServersDocument:
+def mcp_servers(request: Request) -> McpServersDocument:
     """Publish the gateway's mounted MCP servers for discovery."""
 
+    manager = get_server_manager(request)
+    public_base_url = str(request.app.state.config.public_base_url)
     return McpServersDocument(
-        servers=[_listing(config, server) for server in config.servers]
+        servers=[_listing(public_base_url, server) for server in manager.snapshot()]
     )
