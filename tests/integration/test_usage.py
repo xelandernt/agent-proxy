@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections.abc import Iterator
@@ -166,7 +167,21 @@ def usage_client(
     )
     app = create_app(config)
     with TestClient(app) as client:
+        asyncio.run(_truncate_usage_events(postgres_url))
         yield client
+
+
+async def _truncate_usage_events(postgres_url: str) -> None:
+    from sqlalchemy import text
+
+    from proxy.database import create_engine
+
+    engine = create_engine(postgres_url)
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(text("TRUNCATE usage_events"))
+    finally:
+        await engine.dispose()
 
 
 def _report_window() -> dict[str, str]:
@@ -239,6 +254,37 @@ def test_usage_window_filters_events(usage_client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json()["total"] == 0
+
+
+def test_usage_skips_unauthenticated_requests(usage_client: TestClient) -> None:
+    client = usage_client
+    no_auth_headers = {
+        name: value
+        for name, value in usage_headers("tools/list").items()
+        if name != "Authorization"
+    }
+    for headers in (
+        no_auth_headers,
+        usage_headers("tools/list") | {"Authorization": "Bearer invalid-token"},
+    ):
+        response = client.post(
+            "/calendar/mcp",
+            headers=headers,
+            json=usage_request("tools/list"),
+        )
+        assert response.status_code == 401
+
+    response = client.post(
+        "/calendar/mcp",
+        headers=usage_headers("tools/list"),
+        json=usage_request("tools/list"),
+    )
+    assert response.status_code == 200
+
+    report = _fetch_report(client, expected_total=1)
+
+    assert report["total"] == 1
+    assert report["methods"] == [{"name": "tools/list", "count": 1}]
 
 
 def test_usage_unknown_server_returns_404(usage_client: TestClient) -> None:

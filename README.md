@@ -179,8 +179,9 @@ database:
   url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
 ```
 
-Tables are created automatically on startup; only request counts and client
-identifiers are stored, never request payloads.
+Tables are created automatically on startup. Only authenticated requests are
+recorded (unauthenticated attempts are skipped), and only request counts and
+client identifiers are stored — never request payloads.
 
 Generate the current JSON Schema with:
 

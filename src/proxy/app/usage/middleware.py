@@ -79,12 +79,25 @@ def _extract_client_app(params: dict[str, Any]) -> str | None:
     return name if isinstance(name, str) and name else None
 
 
+def should_record(status: int) -> bool:
+    """Return whether a gateway response represents authenticated traffic.
+
+    Unauthenticated attempts are answered with HTTP 401 by the gateway's auth
+    layer. Every other outcome — success, upstream failures, or a valid token
+    rejected for missing scope (403) — belongs to an authenticated request.
+    """
+
+    return status != 401
+
+
 class UsageTrackingMiddleware:
-    """Buffering ASGI middleware that records proxied JSON-RPC requests.
+    """Buffering ASGI middleware that records authenticated JSON-RPC requests.
 
     Reads the request body once, extracts tracking dimensions, replays the body
     to the downstream FastMCP app, and persists the event in the background so
-    tracing never adds latency to the proxied request.
+    tracing never adds latency to the proxied request. Events are recorded only
+    when the gateway authenticates the request: unauthenticated attempts are
+    answered with HTTP 401 and are skipped.
     """
 
     def __init__(self, app: ASGIApp, server_name: str, engine: AsyncEngine) -> None:
@@ -106,8 +119,13 @@ class UsageTrackingMiddleware:
                 break
 
         event = extract_usage_event(body)
-        if event is not None:
-            self._record(event)
+
+        async def send_with_tracking(message: Message) -> None:
+            if message["type"] == "http.response.start" and event is not None:
+                status = message.get("status", 200)
+                if should_record(status):
+                    self._record(event)
+            await send(message)
 
         replayed = False
 
@@ -118,7 +136,7 @@ class UsageTrackingMiddleware:
                 return {"type": "http.request", "body": body, "more_body": False}
             return await receive()
 
-        return await self._app(scope, replay_receive, send)
+        return await self._app(scope, replay_receive, send_with_tracking)
 
     def _record(self, event: UsageEventData) -> None:
         session_factory = self._session_factory

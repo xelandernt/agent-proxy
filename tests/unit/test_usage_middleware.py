@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import json
 
-from proxy.app.usage.middleware import UsageEventData, extract_usage_event
+import pytest
+
+from proxy.app.usage.middleware import (
+    UsageEventData,
+    extract_usage_event,
+    should_record,
+)
 
 
 def modern_payload(method: str, **params: object) -> bytes:
@@ -97,3 +103,12 @@ def test_extract_usage_event_ignores_missing_method() -> None:
     payload = json.dumps({"jsonrpc": "2.0", "id": 1, "params": {}}).encode()
 
     assert extract_usage_event(payload) is None
+
+
+@pytest.mark.parametrize("status", [200, 201, 400, 403, 404, 500, 503])
+def test_should_record_authenticated_outcomes(status: int) -> None:
+    assert should_record(status)
+
+
+def test_should_record_skips_unauthenticated_status() -> None:
+    assert not should_record(401)
