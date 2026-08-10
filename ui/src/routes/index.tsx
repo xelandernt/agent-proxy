@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	CheckIcon,
 	ExternalLinkIcon,
@@ -221,33 +221,41 @@ function ServerCard({
 	onHarnessIdChange: (harnessId: string) => void;
 }) {
 	return (
-		<Card className="flex flex-col transition-colors hover:border-lagoon/40">
-			<CardHeader>
-				<div className="flex items-center justify-between gap-2">
-					<CardTitle className="truncate font-sans text-base font-semibold">
-						{server.name}
-					</CardTitle>
-					{server.auth === "oauth2" && (
-						<Badge
-							variant="outline"
-							className="gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground"
-						>
-							<span className="size-1.5 rounded-full bg-lagoon" />
-							OAuth
-						</Badge>
+		<Card className="flex h-full flex-col transition-colors hover:border-lagoon/40">
+			<Link
+				to="/$serverName"
+				params={{ serverName: server.name }}
+				className="flex min-w-0 flex-col"
+			>
+				<CardHeader>
+					<div className="flex items-center justify-between gap-2">
+						<CardTitle className="truncate font-sans text-base font-semibold">
+							{server.name}
+						</CardTitle>
+						{server.auth === "oauth2" && (
+							<Badge
+								variant="outline"
+								className="gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground"
+							>
+								<span className="size-1.5 rounded-full bg-lagoon" />
+								OAuth
+							</Badge>
+						)}
+					</div>
+				</CardHeader>
+				<CardContent className="flex flex-1 flex-col gap-4">
+					{server.description ? (
+						<p className="text-sm leading-relaxed text-muted-foreground">
+							{server.description}
+						</p>
+					) : (
+						<p className="text-sm text-muted-foreground">
+							No description provided.
+						</p>
 					)}
-				</div>
-			</CardHeader>
-			<CardContent className="flex flex-1 flex-col gap-4">
-				{server.description ? (
-					<p className="text-sm leading-relaxed text-muted-foreground">
-						{server.description}
-					</p>
-				) : (
-					<p className="text-sm text-muted-foreground">
-						No description provided.
-					</p>
-				)}
+				</CardContent>
+			</Link>
+			<CardContent className="flex flex-col gap-4 pt-0">
 				<HarnessPanel
 					server={server}
 					harnessId={harnessId}

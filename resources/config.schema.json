@@ -715,6 +715,22 @@
       "title": "AzureAuthProviderConfig",
       "type": "object"
     },
+    "DatabaseConfig": {
+      "additionalProperties": false,
+      "description": "PostgreSQL persistence for gateway usage tracing.",
+      "properties": {
+        "url": {
+          "description": "Async PostgreSQL DSN (for example postgresql+asyncpg://...).",
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "DatabaseConfig",
+      "type": "object"
+    },
     "DescopeAuthProviderConfig": {
       "additionalProperties": false,
       "properties": {
@@ -2790,6 +2806,17 @@
     },
     "logfire": {
       "$ref": "#/$defs/LogfireConfig"
+    },
+    "database": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DatabaseConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "public_base_url": {
       "default": "http://127.0.0.1:8008/",
