@@ -52,6 +52,7 @@ class McpServerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(pattern=NAME_PATTERN)
+    description: str = ""
     upstream_url: AnyHttpUrl
     auth: AuthProviderConfig
     verify_upstream_tls: bool = True
@@ -65,6 +66,7 @@ class GatewayConfig(BaseModel):
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
+    cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
     servers: list[McpServerConfig] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -95,6 +97,7 @@ class _GatewaySettings(BaseSettings):
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
+    cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
     servers: list[McpServerConfig] = Field(min_length=1)
 
     @classmethod

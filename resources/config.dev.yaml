@@ -4,6 +4,9 @@ host:
 
 public_base_url: http://localhost:8008
 
+cors_origins:
+  - http://localhost:3000
+
 logfire:
   environment: development
   service_name: agent-proxy-dev

@@ -5,7 +5,7 @@ from typing import TypedDict
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import TypeAdapter
+from pydantic import AnyHttpUrl, TypeAdapter
 
 from fastmcp.client.transports import StreamableHttpTransport
 import proxy.app.main as main_module
@@ -208,3 +208,46 @@ def test_front_credentials_never_reach_upstream(
     assert all("proxy-authorization" not in request for request in upstream_requests)
     assert upstream_requests[-1]["mcp-protocol-version"] == MCP_PROTOCOL_VERSION
     assert upstream_requests[-1]["mcp-method"] == "tools/list"
+
+
+def test_well_known_mcp_servers_publishes_public_endpoints() -> None:
+    app = create_app(gateway_config())
+
+    with TestClient(app) as client:
+        response = client.get("/.well-known/mcp-servers")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "servers": [
+            {
+                "name": "calendar",
+                "description": "",
+                "url": "https://gateway.example/calendar/mcp",
+                "auth": "oauth2",
+            }
+        ]
+    }
+
+
+def test_well_known_document_serves_cors_headers_for_configured_origins() -> None:
+    config = gateway_config()
+    config.cors_origins = [AnyHttpUrl("http://localhost:3000")]
+    app = create_app(config)
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/.well-known/mcp-servers",
+            headers={"Origin": "http://localhost:3000"},
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_well_known_document_is_public_without_auth() -> None:
+    app = create_app(gateway_config())
+
+    with TestClient(app) as client:
+        response = client.get("/.well-known/mcp-servers")
+
+    assert response.status_code == 200

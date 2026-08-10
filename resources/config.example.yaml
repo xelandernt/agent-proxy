@@ -12,6 +12,7 @@ logfire:
 
 servers:
   - name: calendar
+    description: Manage meetings, availability, and event invitations.
     upstream_url: http://calendar.internal:8000/mcp
     verify_upstream_tls: true
     auth:

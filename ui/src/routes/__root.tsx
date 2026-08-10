@@ -2,10 +2,26 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
+import { Toaster } from "#/components/ui/sonner";
+import { ThemeProvider } from "#/lib/theme";
+
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
 	head: () => ({
+		scripts: [
+			{
+				children: `
+(function () {
+  var stored = localStorage.getItem("theme");
+  var dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (stored === "dark" || (!stored && dark)) {
+    document.documentElement.classList.add("dark");
+  }
+})();
+`.trim(),
+			},
+		],
 		meta: [
 			{
 				charSet: "utf-8",
@@ -15,7 +31,7 @@ export const Route = createRootRoute({
 				content: "width=device-width, initial-scale=1",
 			},
 			{
-				title: "TanStack Start Starter",
+				title: "MCP Servers",
 			},
 		],
 		links: [
@@ -30,12 +46,13 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="en">
+		<html lang="en" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
-			<body>
-				{children}
+			<body suppressHydrationWarning>
+				<ThemeProvider>{children}</ThemeProvider>
+				<Toaster />
 				<TanStackDevtools
 					config={{
 						position: "bottom-right",

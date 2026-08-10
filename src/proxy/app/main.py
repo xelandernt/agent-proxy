@@ -5,10 +5,12 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from typing import Final
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import BaseRoute
 from fastmcp.server import create_proxy
 from fastmcp.server.http import StarletteWithLifespan as FastMCPApplication
 
+from proxy.app.well_known import router as well_known_router
 from proxy.observability import configure_observability
 from proxy.providers import load_auth_provider
 from proxy.settings import GatewayConfig, McpServerConfig, load_config
@@ -72,6 +74,15 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         openapi_url=None,
         lifespan=lifespan,
     )
+    cors_origins = [str(origin).rstrip("/") for origin in settings.cors_origins]
+    if cors_origins:
+        gateway.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_methods=["GET"],
+            allow_headers=["*"],
+        )
+    gateway.include_router(well_known_router)
     for name, mcp_app in mcp_apps.items():
         gateway.router.routes.extend(_take_well_known_routes(mcp_app))
         gateway.mount(f"/{name}", mcp_app, name=name)

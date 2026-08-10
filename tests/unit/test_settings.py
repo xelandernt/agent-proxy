@@ -81,6 +81,45 @@ def test_server_names_must_be_unique() -> None:
         GatewayConfig.model_validate({"servers": [server, server]})
 
 
+def test_server_description_defaults_to_empty() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "servers": [
+                {
+                    "name": "calendar",
+                    "upstream_url": "http://calendar.internal/mcp",
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                    },
+                }
+            ]
+        }
+    )
+
+    assert config.servers[0].description == ""
+
+
+def test_server_description_round_trips() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "servers": [
+                {
+                    "name": "calendar",
+                    "description": "Manage meetings and availability.",
+                    "upstream_url": "http://calendar.internal/mcp",
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                    },
+                }
+            ]
+        }
+    )
+
+    assert config.servers[0].description == "Manage meetings and availability."
+
+
 def test_provider_rejects_unknown_constructor_fields() -> None:
     with pytest.raises(ValidationError, match="public_base_url"):
         GatewayConfig.model_validate(

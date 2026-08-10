@@ -1914,6 +1914,11 @@
           "title": "Name",
           "type": "string"
         },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
         "upstream_url": {
           "format": "uri",
           "minLength": 1,
@@ -2792,6 +2797,15 @@
       "minLength": 1,
       "title": "Public Base Url",
       "type": "string"
+    },
+    "cors_origins": {
+      "items": {
+        "format": "uri",
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Cors Origins",
+      "type": "array"
     },
     "servers": {
       "items": {
