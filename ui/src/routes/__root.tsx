@@ -2,6 +2,7 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { BackgroundDither } from "#/components/background-dither";
+import { DitherToggle, ThemeToggle } from "#/components/toggles";
 import { Toaster } from "#/components/ui/sonner";
 import { ThemeProvider } from "#/lib/theme";
 
@@ -52,7 +53,13 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			</head>
 			<body suppressHydrationWarning>
 				<BackgroundDither />
-				<ThemeProvider>{children}</ThemeProvider>
+				<ThemeProvider>
+					<header className="sticky top-0 z-40 flex items-center justify-end gap-1 bg-background/70 p-4 backdrop-blur">
+						<DitherToggle />
+						<ThemeToggle />
+					</header>
+					{children}
+				</ThemeProvider>
 				<Toaster />
 				<TanStackDevtools
 					config={{

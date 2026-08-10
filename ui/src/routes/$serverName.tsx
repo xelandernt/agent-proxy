@@ -15,7 +15,9 @@ import {
 } from "#/components/ui/empty";
 import { Skeleton } from "#/components/ui/skeleton";
 import { UsagePanel } from "#/components/usage-panel";
+import { CopyButton, useCopy } from "#/lib/copy";
 import { fetchMcpServers, type McpServerListing } from "#/lib/mcp";
+import { cn } from "#/lib/utils";
 
 export const Route = createFileRoute("/$serverName")({ component: ServerPage });
 
@@ -107,13 +109,29 @@ function ServerPage() {
 						<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
 							{state.server.description || "No description provided."}
 						</p>
-						<code className="w-fit truncate rounded px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
-							{state.server.url}
-						</code>
+						<ServerUrlRow url={state.server.url} />
 					</header>
 					<UsagePanel serverName={state.server.name} />
 				</>
 			)}
+		</div>
+	);
+}
+
+function ServerUrlRow({ url }: { url: string }) {
+	const { copied, copy } = useCopy(url, "URL copied", url);
+
+	return (
+		<div className="flex w-full max-w-2xl items-center justify-between gap-3 rounded-lg border bg-muted/40 py-2 pl-3 pr-2">
+			<span
+				className={cn(
+					"min-w-0 truncate font-mono text-sm text-muted-foreground transition-shadow duration-300",
+					copied && "copy-highlight",
+				)}
+			>
+				{url}
+			</span>
+			<CopyButton copied={copied} onClick={copy} label="Copy URL" />
 		</div>
 	);
 }

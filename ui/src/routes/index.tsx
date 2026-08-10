@@ -1,15 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-	CheckIcon,
-	ExternalLinkIcon,
-	MonitorIcon,
-	MoonIcon,
-	ServerIcon,
-	SunIcon,
-	WavesIcon,
-} from "lucide-react";
-import { useTheme } from "next-themes";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { ExternalLinkIcon, ServerIcon } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -20,13 +11,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "#/components/ui/card";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "#/components/ui/dropdown-menu";
 import {
 	Empty,
 	EmptyContent,
@@ -45,11 +29,6 @@ import {
 } from "#/components/ui/select";
 import { Skeleton } from "#/components/ui/skeleton";
 import { CopyButton, CopySnippet, useCopy } from "#/lib/copy";
-import {
-	isDitherEnabled,
-	setDitherEnabled,
-	subscribeDither,
-} from "#/lib/dither";
 import { HARNESSES } from "#/lib/harnesses";
 import { fetchMcpServers, type McpServerListing } from "#/lib/mcp";
 import { cn } from "#/lib/utils";
@@ -102,10 +81,6 @@ function Home() {
 						copy their endpoints, and connect them to your AI client.
 					</p>
 				</div>
-				<div className="flex items-center gap-1">
-					<DitherToggle />
-					<ThemeToggle />
-				</div>
 			</header>
 
 			{state.status === "loading" && <ServerGridSkeleton />}
@@ -153,61 +128,6 @@ function Home() {
 				</div>
 			)}
 		</div>
-	);
-}
-
-function DitherToggle() {
-	const enabled = useSyncExternalStore(
-		subscribeDither,
-		isDitherEnabled,
-		() => false,
-	);
-
-	return (
-		<Button
-			variant="ghost"
-			size="icon"
-			aria-label="Toggle background animation"
-			aria-pressed={enabled}
-			onClick={() => setDitherEnabled(!enabled)}
-		>
-			<WavesIcon className={cn("size-4", enabled && "text-lagoon")} />
-		</Button>
-	);
-}
-
-function ThemeToggle() {
-	const { setTheme, theme } = useTheme();
-
-	const options = [
-		{ value: "light", label: "Light", icon: SunIcon },
-		{ value: "dark", label: "Dark", icon: MoonIcon },
-		{ value: "system", label: "System", icon: MonitorIcon },
-	] as const;
-
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon" aria-label="Toggle theme">
-					<SunIcon className="hidden size-4 dark:block" />
-					<MoonIcon className="size-4 dark:hidden" />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuGroup>
-					{options.map((option) => (
-						<DropdownMenuItem
-							key={option.value}
-							onClick={() => setTheme(option.value)}
-						>
-							<option.icon />
-							{option.label}
-							{theme === option.value && <CheckIcon className="ml-auto" />}
-						</DropdownMenuItem>
-					))}
-				</DropdownMenuGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
 	);
 }
 
