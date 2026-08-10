@@ -395,6 +395,16 @@ class KeycloakAuthProviderConfig(_AuthProviderConfig):
     realm_url: AnyHttpUrl
     required_scopes: list[str] | None = None
     audience: str | list[str] | None = None
+    client_id: str | None = None
+    client_secret: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def validate_client_credentials(self) -> KeycloakAuthProviderConfig:
+        if (self.client_id is None) != (self.client_secret is None):
+            raise ValueError(
+                "Keycloak client_id and client_secret must be configured together."
+            )
+        return self
 
     def build(self, *, base_url: str) -> AuthProvider:
         return KeycloakAuthProvider(

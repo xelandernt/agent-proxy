@@ -45,6 +45,11 @@ def use_static_admin_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     ) -> StaticAuthProvider:
         return StaticAuthProvider(base_url=base_url)
 
+    monkeypatch.setattr(
+        admin_auth_module,
+        "build_keycloak_admin_provider",
+        lambda _config, *, base_url: None,
+    )
     monkeypatch.setattr(admin_auth_module, "load_auth_provider", load_static_provider)
     monkeypatch.setattr(servers_app_module, "load_auth_provider", load_static_provider)
 
@@ -96,6 +101,56 @@ def test_admin_endpoints_return_503_when_not_configured(
     assert response.status_code == 503
 
 
+def test_auth_status_describes_token_verifier_provider(
+    admin_config: GatewayConfig,
+    use_static_admin_provider: None,
+) -> None:
+    with boot(admin_config) as client:
+        response = client.get("/api/admin/auth-status")
+
+    assert response.status_code == 200
+    assert response.json() == {"provider": "keycloak", "oauth": False}
+
+
+def test_auth_status_describes_oauth_hosting_provider(
+    admin_config: GatewayConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class OAuthHostingProvider(StaticAuthProvider):
+        def get_routes(self, mcp_path: str | None = None) -> list[Route]:
+            async def authorize(request: object) -> None:
+                return None
+
+            return [
+                Route("/authorize", endpoint=authorize, methods=["GET"]),
+                Route("/token", endpoint=authorize, methods=["POST"]),
+            ]
+
+    def load_oauth_provider(
+        _config: AuthProviderConfig,
+        *,
+        base_url: str,
+    ) -> OAuthHostingProvider:
+        return OAuthHostingProvider(base_url=base_url)
+
+    monkeypatch.setattr(admin_auth_module, "load_auth_provider", load_oauth_provider)
+    monkeypatch.setattr(servers_app_module, "load_auth_provider", load_oauth_provider)
+
+    with boot(admin_config) as client:
+        response = client.get("/api/admin/auth-status")
+
+    assert response.status_code == 200
+    assert response.json() == {"provider": "keycloak", "oauth": True}
+
+
+def test_auth_status_returns_503_when_not_configured(sqlite_url: str) -> None:
+    config = GatewayConfig.model_validate({"database": {"url": sqlite_url}})
+    with boot(config) as client:
+        response = client.get("/api/admin/auth-status")
+
+    assert response.status_code == 503
+
+
 class RoutedStaticProvider(StaticAuthProvider):
     """Static provider that also advertises a well-known discovery route."""
 
@@ -126,6 +181,11 @@ def test_admin_oauth_routes_are_prefixed_and_do_not_collide(
     ) -> RoutedStaticProvider:
         return RoutedStaticProvider(base_url=base_url)
 
+    monkeypatch.setattr(
+        admin_auth_module,
+        "build_keycloak_admin_provider",
+        lambda _config, *, base_url: None,
+    )
     monkeypatch.setattr(admin_auth_module, "load_auth_provider", load_routed_provider)
     monkeypatch.setattr(servers_app_module, "load_auth_provider", load_routed_provider)
     seed_servers(

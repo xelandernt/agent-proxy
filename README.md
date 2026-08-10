@@ -196,19 +196,46 @@ Logfire remains local and does not export telemetry.
 ### Admin authentication and the browser login flow
 
 The admin identity boundary reuses the gateway's provider machinery: the
-`admin.auth` configuration designates one `AuthProviderConfig`. The gateway
-builds it with the public base URL and mounts its OAuth routes under
-`/admin/oauth`, keeping them clear of the servers' `/.well-known/*` discovery
-routes. Every `/api/admin/*` endpoint validates `Authorization: Bearer <token>`
-through the provider.
+`admin.auth` configuration designates one `AuthProviderConfig`. Every
+`/api/admin/*` endpoint validates `Authorization: Bearer <token>` through the
+provider.
 
-The admin UI at `/admin` runs a standard authorization-code flow against the
-provider when it hosts an OAuth authorization server (OAuth-proxy providers
-such as Auth0 or Google). Providers that only verify tokens (such as Keycloak
-or `jwt`) have no gateway-hosted OAuth routes; for those, obtain an access
-token from your identity provider and paste it into the admin login screen. The
-token is stored in `localStorage` and attached to admin API calls; a 401 clears
-it and returns to the login screen.
+For `keycloak` the gateway itself hosts an OAuth authorization server (RFC
+8414) under `/admin/oauth` and proxies the interactive flow to the realm, so
+the admin UI at `/admin` signs in with a normal browser flow. The access token
+handed to the UI is the realm-issued token itself, verified against the realm's
+JWKS — the same token is accepted whether it arrives via the browser flow or is
+pasted in manually.
+
+When the gateway has no Keycloak client credentials of its own
+(`client_id`/`client_secret` omitted), it registers a confidential client with
+the realm's dynamic client registration endpoint
+(`/realms/{realm}/clients-registrations/default`) at startup, using its OAuth
+callback (`{public_base_url}/admin/oauth/callback`) as the redirect URI. This
+requires dynamic client registration to be enabled in the realm. To use a
+fixed client instead, configure credentials and register the callback as a
+redirect URI on that client:
+
+```yaml
+admin:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example.com/realms/agents
+    # client_id: agent-proxy-admin
+    # client_secret: ...
+```
+
+When the provider cannot be set up for OAuth (for example the realm rejects
+dynamic registration), the gateway falls back to token verification only and
+the admin login screen asks you to paste an access token from the identity
+provider.
+
+OAuth-proxy providers such as Auth0 or Google are also supported as `admin.auth`
+providers and use the same browser flow. Providers that only verify tokens
+(such as `jwt`) have no gateway-hosted OAuth routes; for those, obtain an
+access token from your identity provider and paste it into the admin login
+screen. The token is stored in `localStorage` and attached to admin API calls;
+a 401 clears it and returns to the login screen.
 
 For the browser flow, register the UI's redirect URI —
 `{ui-origin}/admin/callback` — with the provider (for example, via

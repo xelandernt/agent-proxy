@@ -7,6 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from proxy.app.admin.auth import admin_provider_routes, build_admin_provider
+from proxy.app.admin.endpoints import (
+    public_router as admin_public_router,
+)
 from proxy.app.admin.endpoints import router as admin_router
 from proxy.app.usage.endpoints import router as usage_router
 from proxy.app.well_known import router as well_known_router
@@ -59,6 +62,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         )
     gateway.include_router(well_known_router)
     gateway.include_router(usage_router)
+    gateway.include_router(admin_public_router)
     gateway.include_router(admin_router)
 
     admin_provider = build_admin_provider(

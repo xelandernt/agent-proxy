@@ -68,6 +68,11 @@ def use_static_auth_providers(monkeypatch: pytest.MonkeyPatch) -> None:
         return StaticAuthProvider(base_url=base_url, required_scopes=["mcp"])
 
     monkeypatch.setattr(servers_app_module, "load_auth_provider", load_static_provider)
+    monkeypatch.setattr(
+        admin_auth_module,
+        "build_keycloak_admin_provider",
+        lambda _config, *, base_url: None,
+    )
     monkeypatch.setattr(admin_auth_module, "load_auth_provider", load_static_provider)
 
 

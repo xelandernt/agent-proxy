@@ -14,6 +14,7 @@ name = "agent-proxy"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
+    { name = "authlib" },
     { name = "cyclopts" },
     { name = "fastapi" },
     { name = "fastmcp" },
@@ -39,6 +40,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "authlib", specifier = ">=1.4.1" },
     { name = "cyclopts", specifier = ">=4.16.1" },
     { name = "fastapi", specifier = ">=0.139.2" },
     { name = "fastmcp", specifier = "==4.0.0b2" },

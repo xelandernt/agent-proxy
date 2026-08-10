@@ -22,3 +22,9 @@ admin:
   auth:
     provider: keycloak
     realm_url: https://identity.example.com/realms/agents
+    # Optional OAuth browser sign-in for the admin UI. When omitted, the
+    # gateway registers a confidential client with Keycloak's dynamic client
+    # registration endpoint at startup (requires DCR to be enabled in the
+    # realm) and hosts the authorization server at /admin/oauth.
+    # client_id: agent-proxy-admin
+    # client_secret: your-client-secret

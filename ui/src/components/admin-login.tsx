@@ -1,6 +1,7 @@
-import { KeyRoundIcon, LogInIcon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowLeftIcon, KeyRoundIcon, LogInIcon } from "lucide-react";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "#/components/ui/button";
 import {
@@ -10,7 +11,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "#/components/ui/card";
-import { setAdminToken, startOAuthLogin } from "#/lib/auth";
+import {
+	type AdminAuthInfo,
+	fetchAdminAuthInfo,
+	setAdminToken,
+	startOAuthLogin,
+} from "#/lib/auth";
 
 export function AdminLogin({
 	onAuthenticated,
@@ -19,11 +25,16 @@ export function AdminLogin({
 }) {
 	const [busy, setBusy] = useState<"oauth" | "token" | null>(null);
 	const [tokenInput, setTokenInput] = useState("");
+	const [authInfo, setAuthInfo] = useState<AdminAuthInfo | null>(null);
 	const [error, setError] = useState<string | null>(() => {
 		const stored = sessionStorage.getItem("admin-login-error");
 		if (stored) sessionStorage.removeItem("admin-login-error");
 		return stored;
 	});
+
+	useEffect(() => {
+		fetchAdminAuthInfo().then(setAuthInfo);
+	}, []);
 
 	const signInWithOAuth = async () => {
 		setBusy("oauth");
@@ -46,8 +57,16 @@ export function AdminLogin({
 		onAuthenticated();
 	};
 
+	const oauthUnsupported = authInfo !== null && !authInfo.oauth;
+
 	return (
 		<div className="mx-auto flex w-full max-w-md flex-col gap-6 p-8">
+			<Link to="/">
+				<Button variant="ghost" size="sm">
+					<ArrowLeftIcon className="size-4" />
+					Back to servers
+				</Button>
+			</Link>
 			<Card>
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2 font-sans text-base">
@@ -60,15 +79,26 @@ export function AdminLogin({
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
-					<Button onClick={signInWithOAuth} disabled={busy !== null}>
-						<LogInIcon className="size-4" />
-						{busy === "oauth" ? "Redirecting…" : "Sign in with provider"}
-					</Button>
-					<div className="flex items-center gap-3 text-xs text-muted-foreground">
-						<span className="h-px flex-1 bg-border" />
-						or paste an access token
-						<span className="h-px flex-1 bg-border" />
-					</div>
+					{oauthUnsupported ? (
+						<p className="text-sm leading-relaxed text-muted-foreground">
+							The admin provider{" "}
+							<code className="font-mono">{authInfo?.provider}</code> verifies
+							tokens but does not host a browser sign-in flow. Get an access
+							token from your identity provider and paste it below.
+						</p>
+					) : (
+						<Button onClick={signInWithOAuth} disabled={busy !== null}>
+							<LogInIcon className="size-4" />
+							{busy === "oauth" ? "Redirecting…" : "Sign in with provider"}
+						</Button>
+					)}
+					{!oauthUnsupported && (
+						<div className="flex items-center gap-3 text-xs text-muted-foreground">
+							<span className="h-px flex-1 bg-border" />
+							or paste an access token
+							<span className="h-px flex-1 bg-border" />
+						</div>
+					)}
 					<form onSubmit={submitToken} className="flex flex-col gap-3">
 						<input
 							type="password"

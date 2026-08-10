@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import TypeAdapter
 
-from proxy.app.admin.auth import require_admin
+from proxy.app.admin.auth import provider_hosts_oauth, require_admin
 from proxy.providers import AuthProviderConfig, AuthProviderLoadError
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
@@ -20,7 +20,31 @@ router = APIRouter(
     dependencies=[Depends(require_admin)],
 )
 
+public_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
 AUTH_SCHEMA: dict = TypeAdapter(AuthProviderConfig).json_schema()
+
+
+@public_router.get("/auth-status")
+def auth_status(request: Request) -> dict:
+    """Describe the admin identity provider for the sign-in screen.
+
+    Authentication-free so the login page can decide how to present itself:
+    providers that host an OAuth authorization server support a browser flow,
+    token-verifier providers (Keycloak, JWT, …) require a pasted token.
+    """
+
+    provider = request.app.state.admin_provider
+    if provider is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin interface is not configured.",
+        )
+    admin = request.app.state.config.admin
+    return {
+        "provider": admin.auth.provider if admin is not None else None,
+        "oauth": provider_hosts_oauth(provider),
+    }
 
 
 @router.get("/me")
