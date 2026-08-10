@@ -20,10 +20,11 @@ class UsageService:
         start: datetime,
         end: datetime,
     ) -> UsageReport:
-        tools, methods, clients = (
+        tools, methods, clients, statuses = (
             self._repository.counts_by_tool(server_name, start, end),
             self._repository.counts_by_method(server_name, start, end),
             self._repository.counts_by_client(server_name, start, end),
+            self._repository.counts_by_status(server_name, start, end),
         )
         total = await self._repository.count_total(server_name, start, end)
         return UsageReport(
@@ -41,5 +42,9 @@ class UsageService:
             clients=[
                 ItemCount(name=name or UNKNOWN_CLIENT, count=count)
                 for name, count in await clients
+            ],
+            statuses=[
+                ItemCount(name=str(status), count=count)
+                for status, count in await statuses
             ],
         )

@@ -22,3 +22,4 @@ class UsageReport(BaseModel):
     tools: list[ItemCount]
     methods: list[ItemCount]
     clients: list[ItemCount]
+    statuses: list[ItemCount]

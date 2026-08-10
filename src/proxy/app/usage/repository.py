@@ -92,6 +92,25 @@ class UsageRepository:
         )
         return await self._rows(stmt)
 
+    async def counts_by_status(
+        self,
+        server_name: str,
+        start: datetime,
+        end: datetime,
+    ) -> list[tuple[int, int]]:
+        stmt: Select[tuple[int, int]] = (
+            select(UsageEvent.status_code, func.count())
+            .where(
+                UsageEvent.server_name == server_name,
+                UsageEvent.ts >= start,
+                UsageEvent.ts < end,
+            )
+            .group_by(UsageEvent.status_code)
+            .order_by(func.count().desc(), UsageEvent.status_code.asc())
+        )
+        async with self._session_factory() as session:
+            return [(row[0], row[1]) for row in (await session.execute(stmt)).all()]
+
     async def _scalar(self, stmt: Select[tuple[int]]) -> int:
         async with self._session_factory() as session:
             return (await session.execute(stmt)).scalar_one()

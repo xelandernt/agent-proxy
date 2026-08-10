@@ -180,8 +180,9 @@ database:
 ```
 
 Tables are created automatically on startup. Only authenticated requests are
-recorded (unauthenticated attempts are skipped), and only request counts and
-client identifiers are stored — never request payloads.
+recorded (unauthenticated attempts are skipped), and only request counts,
+client identifiers, and response status codes are stored — never request
+payloads.
 
 Generate the current JSON Schema with:
 

@@ -124,7 +124,7 @@ class UsageTrackingMiddleware:
             if message["type"] == "http.response.start" and event is not None:
                 status = message.get("status", 200)
                 if should_record(status):
-                    self._record(event)
+                    self._record(event, status)
             await send(message)
 
         replayed = False
@@ -138,7 +138,7 @@ class UsageTrackingMiddleware:
 
         return await self._app(scope, replay_receive, send_with_tracking)
 
-    def _record(self, event: UsageEventData) -> None:
+    def _record(self, event: UsageEventData, status_code: int) -> None:
         session_factory = self._session_factory
         server_name = self._server_name
         ts = datetime.now(UTC)
@@ -152,6 +152,7 @@ class UsageTrackingMiddleware:
                             method=event.method,
                             item=event.item,
                             client_app=event.client_app,
+                            status_code=status_code,
                             ts=ts,
                         )
                     )

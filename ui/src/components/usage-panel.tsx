@@ -67,6 +67,7 @@ function UsageContent({
 				<CountList title="By tool" rows={report.tools} />
 				<CountList title="By method" rows={report.methods} />
 				<CountList title="By client" rows={report.clients} />
+				<CountList title="By status" rows={report.statuses} />
 			</div>
 		</div>
 	);

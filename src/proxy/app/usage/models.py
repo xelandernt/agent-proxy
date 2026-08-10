@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Identity, Index, String
+from sqlalchemy import BigInteger, DateTime, Identity, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from proxy.database import Base
@@ -18,6 +18,7 @@ class UsageEvent(Base):
     method: Mapped[str] = mapped_column(String(64))
     item: Mapped[str | None] = mapped_column(String(255))
     client_app: Mapped[str | None] = mapped_column(String(128))
+    status_code: Mapped[int] = mapped_column(Integer)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (

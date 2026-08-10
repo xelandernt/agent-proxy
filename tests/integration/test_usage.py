@@ -233,6 +233,30 @@ def test_usage_tracks_and_queries_requests(usage_client: TestClient) -> None:
     assert {"name": "tools/list", "count": 2} in report["methods"]
     assert {"name": "tools/call", "count": 1} in report["methods"]
     assert report["clients"] == [{"name": "gateway-test", "count": 3}]
+    assert report["statuses"] == [{"name": "200", "count": 3}]
+
+
+def test_usage_tracks_response_status(usage_client: TestClient) -> None:
+    client = usage_client
+    response = client.post(
+        "/calendar/mcp",
+        headers=usage_headers("tools/list"),
+        json=usage_request("tools/list"),
+    )
+    assert response.status_code == 200
+    rejected = client.post(
+        "/calendar/mcp",
+        headers=usage_headers("tools/call"),
+        json=usage_request("tools/call", name="get_weather"),
+    )
+    assert rejected.status_code == 400
+
+    report = _fetch_report(client, expected_total=2)
+
+    assert report["statuses"] == [
+        {"name": "200", "count": 1},
+        {"name": "400", "count": 1},
+    ]
 
 
 def test_usage_window_filters_events(usage_client: TestClient) -> None:
