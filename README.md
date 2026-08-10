@@ -25,9 +25,17 @@ was checked on 7 August 2026:
 
 ## How it works
 
-Each configured server becomes an isolated FastMCP proxy application. The
-configured FastMCP `AuthProvider` validates the client and publishes its OAuth
-routes. FastMCP then forwards the MCP request to the configured upstream.
+MCP servers are managed at runtime from PostgreSQL and stored in a `servers`
+table. On startup the gateway loads them, builds one isolated FastMCP proxy
+application per server, and mounts it. The configured FastMCP `AuthProvider`
+validates the client and publishes its OAuth routes. FastMCP then forwards the
+MCP request to the configured upstream.
+
+Servers can be added, updated, and deleted at runtime through the admin API
+(`/api/admin/*`) or the admin UI (`/admin`) — changes apply to the running
+gateway immediately, with no restart. A brief unmount/remount gap during an
+update may drop in-flight requests; the MCP `2026-07-28` protocol is stateless,
+so this is acceptable by design.
 
 The upstream HTTP client removes `Authorization`, `Cookie`, and
 `Proxy-Authorization`, ignores FastMCP's forwarded auth object, and disables
@@ -74,6 +82,10 @@ is the non-secret reference configuration. Both Compose and the integration
 tests import the same
 [resources/keycloak/realm.json](resources/keycloak/realm.json).
 
+The `servers` table starts empty; add your first server through the admin UI at
+`http://localhost:3000/admin` (the dev configuration enables admin
+authentication against the local Keycloak).
+
 To start only the two Docker dependencies, run `just compose`, then start the
 gateway separately with `uv run proxy run --reload`. Stopping `just dev` stops
 the local gateway process but leaves its dependencies available for the next
@@ -98,30 +110,43 @@ just stop
 ## Configure
 
 Copy [resources/config.example.yaml](resources/config.example.yaml) to
-`.proxy/config.yaml`, then edit it for your provider and upstream:
+`.proxy/config.yaml`, then edit it for your environment:
 
 ```yaml
 public_base_url: https://mcp.example.com
 
-servers:
-  - name: calendar
-    upstream_url: http://calendar.internal:8000/mcp
-    auth:
-      provider: keycloak
-      realm_url: https://identity.example.com/realms/agents
-      audience: https://mcp.example.com/calendar/mcp
-      required_scopes:
-        - openid
+# Required: server configuration and usage tracing live in PostgreSQL.
+database:
+  url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
+
+# Optional: the identity provider that may log in to the admin API and UI.
+# Any user authenticated against this provider is an administrator. When
+# omitted, the admin interface returns HTTP 503.
+admin:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example.com/realms/agents
 ```
 
-The public endpoint in this example is
+MCP servers are no longer configured in YAML. They are created at runtime
+through the admin API (`/api/admin/servers`) or the admin UI at `/admin`:
+
+- `POST /api/admin/servers` — create and live-mount a server
+- `PUT /api/admin/servers/{name}` — replace a server's definition live
+- `DELETE /api/admin/servers/{name}` — unmount and delete a server
+- `GET /api/admin/servers` — list mounted servers
+- `GET /api/admin/auth-schema` — JSON Schema for every supported auth provider
+
+A server definition carries a `name` (immutable, unique), `description`,
+`upstream_url`, `verify_upstream_tls`, and an `auth` provider configuration.
+The public endpoint for a server named `calendar` is
 `https://mcp.example.com/calendar/mcp`. The gateway supplies
 `https://mcp.example.com/calendar` as the provider's `base_url`; it is not a
 configurable authentication field.
 
 `auth` is a discriminated union of fully typed provider configurations.
-Provider-specific required fields and secrets are validated while loading the
-gateway configuration, before any application is constructed. Supported
+Provider-specific required fields and secrets are validated on every write, so
+the API cannot accept a configuration that would fail at mount time. Supported
 provider discriminators are:
 
 | Integration           | `provider`    |
@@ -168,11 +193,32 @@ logfire:
 The token can instead be supplied as `PROXY__LOGFIRE__TOKEN`. Without a token,
 Logfire remains local and does not export telemetry.
 
+### Admin authentication and the browser login flow
+
+The admin identity boundary reuses the gateway's provider machinery: the
+`admin.auth` configuration designates one `AuthProviderConfig`. The gateway
+builds it with the public base URL and mounts its OAuth routes under
+`/admin/oauth`, keeping them clear of the servers' `/.well-known/*` discovery
+routes. Every `/api/admin/*` endpoint validates `Authorization: Bearer <token>`
+through the provider.
+
+The admin UI at `/admin` runs a standard authorization-code flow against the
+provider when it hosts an OAuth authorization server (OAuth-proxy providers
+such as Auth0 or Google). Providers that only verify tokens (such as Keycloak
+or `jwt`) have no gateway-hosted OAuth routes; for those, obtain an access
+token from your identity provider and paste it into the admin login screen. The
+token is stored in `localStorage` and attached to admin API calls; a 401 clears
+it and returns to the login screen.
+
+For the browser flow, register the UI's redirect URI —
+`{ui-origin}/admin/callback` — with the provider (for example, via
+`allowed_client_redirect_uris`), and include the UI origin in `cors_origins`.
+
 ### Usage tracing
 
-The gateway can record request volumes per MCP server, tool, and client app,
-and expose them in the UI (server detail page, filterable by time window).
-Tracing is disabled unless a PostgreSQL database is configured:
+The gateway records request volumes per MCP server, tool, and client app, and
+exposes them in the UI (server detail page, filterable by time window). The
+required PostgreSQL database doubles as usage storage:
 
 ```yaml
 database:
