@@ -27,6 +27,7 @@
   --link-bg-hover: rgba(255, 255, 255, 0.9);
   --hero-a: rgba(79, 184, 178, 0.36);
   --hero-b: rgba(47, 106, 74, 0.2);
+  --dither-opacity: 0.32;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
@@ -83,6 +84,7 @@
   --link-bg-hover: rgba(24, 44, 49, 0.8);
   --hero-a: rgba(96, 215, 207, 0.18);
   --hero-b: rgba(110, 200, 154, 0.12);
+  --dither-opacity: 0.5;
 
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
@@ -208,6 +210,30 @@ body::after {
     linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   background-size: 28px 28px;
   mask-image: radial-gradient(circle at 50% 30%, black, transparent 78%);
+}
+
+.dither-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  user-select: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 5% 95%, transparent 100%);
+}
+
+.dither-field pre {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--dither-scale, 1));
+  line-height: 1.35;
+  letter-spacing: calc(1px * var(--dither-scale, 1));
+  color: var(--lagoon);
+  opacity: var(--dither-opacity);
+  flex-shrink: 0;
+  margin: 0;
 }
 
 a {

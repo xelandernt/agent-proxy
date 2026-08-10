@@ -1,7 +1,7 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-
+import { BackgroundDither } from "#/components/background-dither";
 import { Toaster } from "#/components/ui/sonner";
 import { ThemeProvider } from "#/lib/theme";
 
@@ -51,6 +51,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<HeadContent />
 			</head>
 			<body suppressHydrationWarning>
+				<BackgroundDither />
 				<ThemeProvider>{children}</ThemeProvider>
 				<Toaster />
 				<TanStackDevtools

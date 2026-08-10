@@ -6,9 +6,10 @@ import {
 	MoonIcon,
 	ServerIcon,
 	SunIcon,
+	WavesIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -44,6 +45,11 @@ import {
 } from "#/components/ui/select";
 import { Skeleton } from "#/components/ui/skeleton";
 import { CopyButton, CopySnippet, useCopy } from "#/lib/copy";
+import {
+	isDitherEnabled,
+	setDitherEnabled,
+	subscribeDither,
+} from "#/lib/dither";
 import { HARNESSES } from "#/lib/harnesses";
 import { fetchMcpServers, type McpServerListing } from "#/lib/mcp";
 import { cn } from "#/lib/utils";
@@ -96,7 +102,10 @@ function Home() {
 						copy their endpoints, and connect them to your AI client.
 					</p>
 				</div>
-				<ThemeToggle />
+				<div className="flex items-center gap-1">
+					<DitherToggle />
+					<ThemeToggle />
+				</div>
 			</header>
 
 			{state.status === "loading" && <ServerGridSkeleton />}
@@ -144,6 +153,26 @@ function Home() {
 				</div>
 			)}
 		</div>
+	);
+}
+
+function DitherToggle() {
+	const enabled = useSyncExternalStore(
+		subscribeDither,
+		isDitherEnabled,
+		() => false,
+	);
+
+	return (
+		<Button
+			variant="ghost"
+			size="icon"
+			aria-label="Toggle background animation"
+			aria-pressed={enabled}
+			onClick={() => setDitherEnabled(!enabled)}
+		>
+			<WavesIcon className={cn("size-4", enabled && "text-lagoon")} />
+		</Button>
 	);
 }
 
