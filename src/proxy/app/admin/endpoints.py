@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import TypeAdapter
 
 from proxy.app.admin.auth import require_admin
-from proxy.providers import AuthProviderConfig
+from proxy.providers import AuthProviderConfig, AuthProviderLoadError
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
 from proxy.servers.repository import ServerNotFound, ServerNameTaken
@@ -74,6 +74,13 @@ def list_servers(request: Request) -> list[ServerView]:
     return [_to_view(config) for config in manager.snapshot()]
 
 
+def _invalid_config(error: Exception) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail=str(error),
+    )
+
+
 @router.post(
     "/servers",
     response_model=ServerView,
@@ -94,6 +101,8 @@ async def create_server(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         ) from error
+    except AuthProviderLoadError as error:
+        raise _invalid_config(error) from error
     return _to_view(created)
 
 
@@ -115,10 +124,7 @@ async def update_server(
             detail=str(error),
         ) from error
     except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(error),
-        ) from error
+        raise _invalid_config(error) from error
     return _to_view(updated)
 
 

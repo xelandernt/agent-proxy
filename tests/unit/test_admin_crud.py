@@ -4,7 +4,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 import proxy.app.admin.auth as admin_auth_module
-import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
 from proxy.providers import AuthProviderConfig
 from proxy.servers.models import McpServerConfig
@@ -45,7 +44,6 @@ def boot_gateway(
     ) -> StaticAuthProvider:
         return StaticAuthProvider(base_url=base_url, required_scopes=["mcp"])
 
-    monkeypatch.setattr(servers_app_module, "load_auth_provider", load_static_provider)
     monkeypatch.setattr(admin_auth_module, "load_auth_provider", load_static_provider)
     seed_servers(
         sqlite_url,
@@ -138,9 +136,20 @@ def test_crud_error_mappings(boot_gateway: TestClient) -> None:
         extra_field = client.post(
             "/api/admin/servers", headers=AUTH, json=unknown_field
         )
+        conflicting = server_payload("conflicting")
+        conflicting["auth"] = {
+            "provider": "jwt",
+            "public_key": "key",
+            "jwks_uri": "https://identity.example/jwks",
+        }
+        conflicting_config = client.post(
+            "/api/admin/servers", headers=AUTH, json=conflicting
+        )
 
     assert duplicate.status_code == 409
     assert missing_put.status_code == 404
     assert missing_delete.status_code == 404
     assert invalid_config.status_code == 422
     assert extra_field.status_code == 422
+    assert conflicting_config.status_code == 422
+    assert "not both" in conflicting_config.json()["detail"]

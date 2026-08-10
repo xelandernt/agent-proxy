@@ -11,6 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServerNameRouteImport } from './routes/$serverName'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminCallbackRouteImport } from './routes/admin/callback'
+import { Route as AdminNewRouteImport } from './routes/admin/new'
+import { Route as AdminServerNameEditRouteImport } from './routes/admin/$serverName.edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +27,92 @@ const ServerNameRoute = ServerNameRouteImport.update({
   path: '/$serverName',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCallbackRoute = AdminCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminNewRoute = AdminNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminServerNameEditRoute = AdminServerNameEditRouteImport.update({
+  id: '/$serverName/edit',
+  path: '/$serverName/edit',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$serverName': typeof ServerNameRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/admin/callback': typeof AdminCallbackRoute
+  '/admin/new': typeof AdminNewRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/$serverName/edit': typeof AdminServerNameEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$serverName': typeof ServerNameRoute
+  '/admin/callback': typeof AdminCallbackRoute
+  '/admin/new': typeof AdminNewRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/$serverName/edit': typeof AdminServerNameEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$serverName': typeof ServerNameRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/admin/callback': typeof AdminCallbackRoute
+  '/admin/new': typeof AdminNewRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/$serverName/edit': typeof AdminServerNameEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$serverName'
+  fullPaths:
+    | '/'
+    | '/$serverName'
+    | '/admin'
+    | '/admin/callback'
+    | '/admin/new'
+    | '/admin/'
+    | '/admin/$serverName/edit'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$serverName'
-  id: '__root__' | '/' | '/$serverName'
+  to:
+    | '/'
+    | '/$serverName'
+    | '/admin/callback'
+    | '/admin/new'
+    | '/admin'
+    | '/admin/$serverName/edit'
+  id:
+    | '__root__'
+    | '/'
+    | '/$serverName'
+    | '/admin'
+    | '/admin/callback'
+    | '/admin/new'
+    | '/admin/'
+    | '/admin/$serverName/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ServerNameRoute: typeof ServerNameRoute
+  AdminRoute: typeof AdminRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +131,64 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ServerNameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/callback': {
+      id: '/admin/callback'
+      path: '/callback'
+      fullPath: '/admin/callback'
+      preLoaderRoute: typeof AdminCallbackRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/new': {
+      id: '/admin/new'
+      path: '/new'
+      fullPath: '/admin/new'
+      preLoaderRoute: typeof AdminNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/$serverName/edit': {
+      id: '/admin/$serverName/edit'
+      path: '/$serverName/edit'
+      fullPath: '/admin/$serverName/edit'
+      preLoaderRoute: typeof AdminServerNameEditRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminCallbackRoute: typeof AdminCallbackRoute
+  AdminNewRoute: typeof AdminNewRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminServerNameEditRoute: typeof AdminServerNameEditRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCallbackRoute: AdminCallbackRoute,
+  AdminNewRoute: AdminNewRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminServerNameEditRoute: AdminServerNameEditRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ServerNameRoute: ServerNameRoute,
+  AdminRoute: AdminRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

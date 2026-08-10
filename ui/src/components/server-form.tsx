@@ -1,0 +1,251 @@
+import { Loader2Icon } from "lucide-react";
+import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+	AuthProviderForm,
+	type AuthProviderSchema,
+	SECRET_MASK,
+} from "#/components/auth-provider-form";
+import { Button } from "#/components/ui/button";
+import {
+	AdminApiError,
+	createAdminServer,
+	fetchAuthSchema,
+	type ServerPayload,
+	updateAdminServer,
+} from "#/lib/admin";
+import { getAdminToken } from "#/lib/auth";
+import { cn } from "#/lib/utils";
+
+type FormState =
+	| { status: "loading" }
+	| { status: "error"; message: string }
+	| { status: "ready"; schema: AuthProviderSchema };
+
+function TextField({
+	label,
+	value,
+	onChange,
+	placeholder,
+	error,
+	type = "text",
+}: {
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	placeholder?: string;
+	error?: string;
+	type?: string;
+}) {
+	return (
+		<div className="flex flex-col gap-1.5">
+			<span className="font-mono text-xs text-muted-foreground">{label}</span>
+			<input
+				type={type}
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				placeholder={placeholder}
+				className={cn(
+					"h-9 w-full rounded-md border bg-transparent px-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring",
+					error && "border-destructive",
+				)}
+			/>
+			{error && <span className="text-xs text-destructive">{error}</span>}
+		</div>
+	);
+}
+
+function stripMaskedSecrets(
+	value: Record<string, unknown>,
+): Record<string, unknown> {
+	const cleaned: Record<string, unknown> = {};
+	for (const [key, item] of Object.entries(value)) {
+		if (item === SECRET_MASK) continue;
+		if (Array.isArray(item)) {
+			cleaned[key] = item.filter((entry) => entry !== SECRET_MASK);
+		} else if (item && typeof item === "object") {
+			cleaned[key] = stripMaskedSecrets(item as Record<string, unknown>);
+		} else {
+			cleaned[key] = item;
+		}
+	}
+	return cleaned;
+}
+
+export function ServerForm({
+	title,
+	description,
+	mode,
+	initial,
+	onDone,
+	onCancelHref,
+}: {
+	title: string;
+	description: string;
+	mode: "create" | "edit";
+	initial?: ServerPayload;
+	onDone: () => void;
+	onCancelHref: string;
+}) {
+	const [state, setState] = useState<FormState>({ status: "loading" });
+	const [name, setName] = useState(initial?.name ?? "");
+	const [descriptionText, setDescriptionText] = useState(
+		initial?.description ?? "",
+	);
+	const [upstreamUrl, setUpstreamUrl] = useState(initial?.upstream_url ?? "");
+	const [verifyTls, setVerifyTls] = useState(
+		initial?.verify_upstream_tls ?? true,
+	);
+	const [auth, setAuth] = useState<Record<string, unknown>>(
+		initial?.auth ?? {},
+	);
+	const [fieldErrors, setFieldErrors] = useState<
+		Array<{ field: string; message: string }>
+	>([]);
+	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		const token = getAdminToken();
+		if (!token) {
+			setState({ status: "error", message: "Not authenticated." });
+			return;
+		}
+		fetchAuthSchema(token)
+			.then((schema) => setState({ status: "ready", schema }))
+			.catch((error: unknown) => {
+				setState({
+					status: "error",
+					message: error instanceof Error ? error.message : String(error),
+				});
+			});
+	}, []);
+
+	const submit = async (event: FormEvent) => {
+		event.preventDefault();
+		const token = getAdminToken();
+		if (!token) return;
+		setFieldErrors([]);
+		const payload: ServerPayload = {
+			...(mode === "create" ? { name } : {}),
+			description: descriptionText,
+			upstream_url: upstreamUrl,
+			auth: stripMaskedSecrets(auth),
+			verify_upstream_tls: verifyTls,
+		};
+		setSaving(true);
+		try {
+			if (mode === "create") {
+				await createAdminServer(token, payload);
+			} else if (initial?.name) {
+				await updateAdminServer(token, initial.name, payload);
+			}
+			toast.success(mode === "create" ? "Server created" : "Server updated");
+			onDone();
+		} catch (error) {
+			setSaving(false);
+			if (error instanceof AdminApiError) {
+				setFieldErrors(error.fieldErrors);
+				toast.error(error.message);
+			} else {
+				toast.error("Failed to save server.");
+			}
+		}
+	};
+
+	const errorFor = (path: string) =>
+		fieldErrors.find((entry) => entry.field === path)?.message;
+
+	return (
+		<form
+			onSubmit={submit}
+			className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8"
+		>
+			<header className="flex flex-col gap-2">
+				<p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
+					Agent Gateway
+				</p>
+				<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-3xl font-bold tracking-tight text-transparent">
+					{title}
+				</h1>
+				<p className="text-sm text-muted-foreground">{description}</p>
+			</header>
+
+			{state.status === "loading" && (
+				<p className="text-sm text-muted-foreground">Loading…</p>
+			)}
+			{state.status === "error" && (
+				<p className="text-sm text-destructive">{state.message}</p>
+			)}
+			{state.status === "ready" && (
+				<>
+					<div className="flex flex-col gap-4">
+						{mode === "create" && (
+							<TextField
+								label="Name *"
+								value={name}
+								onChange={setName}
+								placeholder="calendar"
+								error={errorFor("name")}
+							/>
+						)}
+						<TextField
+							label="Description"
+							value={descriptionText}
+							onChange={setDescriptionText}
+							placeholder="What does this server expose?"
+							error={errorFor("description")}
+						/>
+						<TextField
+							label="Upstream URL *"
+							type="url"
+							value={upstreamUrl}
+							onChange={setUpstreamUrl}
+							placeholder="http://calendar.internal:8000/mcp"
+							error={errorFor("upstream_url")}
+						/>
+						<div className="flex items-center gap-2">
+							<input
+								id="verify-tls"
+								type="checkbox"
+								checked={verifyTls}
+								onChange={(event) => setVerifyTls(event.target.checked)}
+								className="size-4 rounded border-border accent-[var(--color-primary)]"
+							/>
+							<label
+								htmlFor="verify-tls"
+								className="font-mono text-xs text-muted-foreground"
+							>
+								verify_upstream_tls
+							</label>
+						</div>
+					</div>
+
+					<div className="rounded-md border p-4">
+						<p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
+							Authentication
+						</p>
+						<AuthProviderForm
+							schema={state.schema}
+							value={auth}
+							onChange={setAuth}
+							fieldErrors={fieldErrors}
+						/>
+					</div>
+
+					<div className="flex justify-end gap-2">
+						<a href={onCancelHref}>
+							<Button type="button" variant="ghost">
+								Cancel
+							</Button>
+						</a>
+						<Button type="submit" disabled={saving}>
+							{saving && <Loader2Icon className="size-4 animate-spin" />}
+							{mode === "create" ? "Create server" : "Save changes"}
+						</Button>
+					</div>
+				</>
+			)}
+		</form>
+	);
+}

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ServerIcon } from "lucide-react";
+import { ServerCogIcon, ServerIcon } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { HarnessPanel } from "#/components/harness-panel";
 import { Badge } from "#/components/ui/badge";
@@ -82,6 +82,13 @@ function Home() {
 						copy their endpoints, and connect them to your AI client.
 					</p>
 				</div>
+				<Link
+					to="/admin"
+					className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+				>
+					<ServerCogIcon className="size-3.5" />
+					Manage
+				</Link>
 			</header>
 
 			{state.status === "loading" && <ServerGridSkeleton />}
@@ -109,9 +116,14 @@ function Home() {
 					<EmptyHeader>
 						<EmptyTitle>No MCP servers configured</EmptyTitle>
 						<EmptyDescription>
-							Add a server to your gateway config (for example{" "}
-							<code className="font-mono">resources/config.yaml</code>) and
-							restart the gateway.
+							Add a server through the{" "}
+							<Link
+								to="/admin"
+								className="underline underline-offset-4 hover:text-foreground"
+							>
+								admin interface
+							</Link>{" "}
+							and it goes live on the gateway immediately.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
