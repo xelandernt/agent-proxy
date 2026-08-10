@@ -1,3 +1,5 @@
+mod ui "ui/justfile"
+
 [default]
 [private]
 _:

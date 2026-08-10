@@ -39,8 +39,15 @@ hooks = [
     },
     {
     id = "type",
-    name ="type",
+    name ="just typecheck",
     entry = "just typecheck",
+    language = "system",
+    pass_filenames = false
+    },
+    {
+    id = "ui-lint",
+    name ="just ui lint",
+    entry = "just ui lint",
     language = "system",
     pass_filenames = false
     },

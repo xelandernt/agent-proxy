@@ -1,0 +1,19 @@
+
+
+[default]
+[private]
+_:
+    @just --list --list-submodules
+
+install:
+    npm install
+
+upgrade:
+    npm update
+
+lint:
+    npm exec -- biome check --write
+    just --unstable --fmt
+
+dev:
+    npm run dev
