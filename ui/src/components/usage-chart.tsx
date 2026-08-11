@@ -39,7 +39,15 @@ function rowsFor(point: SeriesBucket, dimension: DimensionId): ItemCount[] {
 
 export function UsageChart({ report }: { report: SeriesReport }) {
 	const [dimension, setDimension] = useState<DimensionId>("total");
-	const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+	const [hidden, setHidden] = useState<
+		Record<DimensionId, ReadonlySet<string>>
+	>({
+		total: new Set(),
+		tools: new Set(),
+		methods: new Set(),
+		clients: new Set(),
+		statuses: new Set(),
+	});
 
 	const counts = useMemo(() => {
 		const map = new Map<string, number>();
@@ -57,10 +65,7 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 		[counts],
 	);
 
-	const visibleNames =
-		dimension === "statuses"
-			? names.filter((name) => !hidden.has(name))
-			: names;
+	const visibleNames = names.filter((name) => !hidden[dimension].has(name));
 
 	const total = useMemo(
 		() => report.points.reduce((sum, point) => sum + point.total, 0),
@@ -70,6 +75,19 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 	if (total === 0) {
 		return <p className="text-sm text-muted-foreground">No activity.</p>;
 	}
+
+	const toggleHidden = (name: string) => {
+		setHidden((previous) => {
+			const current = previous[dimension];
+			const next = new Set(current);
+			if (next.has(name)) {
+				next.delete(name);
+			} else {
+				next.add(name);
+			}
+			return { ...previous, [dimension]: next };
+		});
+	};
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -98,17 +116,8 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 			<Legend
 				names={names}
 				counts={counts}
-				toggleable={dimension === "statuses"}
-				hidden={hidden}
-				onToggleStatus={(name) => {
-					const next = new Set(hidden);
-					if (next.has(name)) {
-						next.delete(name);
-					} else {
-						next.add(name);
-					}
-					setHidden(next);
-				}}
+				hidden={hidden[dimension]}
+				onToggle={toggleHidden}
 			/>
 		</div>
 	);
@@ -221,15 +230,13 @@ function StackedAreas({
 function Legend({
 	names,
 	counts,
-	toggleable,
 	hidden,
-	onToggleStatus,
+	onToggle,
 }: {
 	names: string[];
 	counts: Map<string, number>;
-	toggleable: boolean;
 	hidden: ReadonlySet<string>;
-	onToggleStatus: (name: string) => void;
+	onToggle: (name: string) => void;
 }) {
 	return (
 		<div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -239,12 +246,9 @@ function Legend({
 					<button
 						key={name}
 						type="button"
-						onClick={toggleable ? () => onToggleStatus(name) : undefined}
+						onClick={() => onToggle(name)}
 						className={cn(
-							"flex items-center gap-1.5 font-mono text-xs",
-							toggleable
-								? "text-foreground"
-								: "cursor-default text-muted-foreground",
+							"flex items-center gap-1.5 font-mono text-xs text-foreground",
 							isHidden && "opacity-40 line-through",
 						)}
 					>
