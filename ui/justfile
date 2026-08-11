@@ -11,6 +11,10 @@ install:
 upgrade:
     npm update
 
+gen:
+    uv run proxy openapi ../openapi.json
+    npm exec -- orval
+
 lint:
     npm exec -- biome check --write
     just --unstable --fmt

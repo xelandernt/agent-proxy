@@ -1,0 +1,3774 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/.well-known/mcp-servers": {
+      "get": {
+        "summary": "Mcp Servers",
+        "description": "Publish the gateway's mounted MCP servers for discovery.",
+        "operationId": "mcp_servers__well_known_mcp_servers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServersDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/servers/series": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Servers Usage Series",
+        "description": "Return request totals per server over a time window.",
+        "operationId": "servers_usage_series_api_servers_series_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bucket"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSeriesDocument"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/servers/{name}/usage": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Server Usage",
+        "description": "Return request volumes for a server over a time window.",
+        "operationId": "server_usage_api_servers__name__usage_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/servers/{name}/usage/series": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Server Usage Series",
+        "description": "Return bucketed request volumes for a server over a time window.",
+        "operationId": "server_usage_series_api_servers__name__usage_series_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bucket"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/auth-status": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Auth Status",
+        "description": "Describe the admin identity provider for the sign-in screen.\n\nAuthentication-free so the login page can decide how to present itself.\n``oauth`` carries the authorization server issuer and public client the UI\nshould use for a browser Authorization Code + PKCE flow, or None when only\na pasted token is accepted.",
+        "operationId": "auth_status_api_admin_auth_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Auth Status Api Admin Auth Status Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/login": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Login",
+        "description": "Resolve admin credentials to a bearer token.\n\nOnly providers that hold credentials themselves (``static``) support this;\nOAuth and token-verifier providers return 401.",
+        "operationId": "login_api_admin_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Login Api Admin Login Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/me": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Me",
+        "description": "Report whether the caller holds a valid admin token.",
+        "operationId": "me_api_admin_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "type": "object",
+                  "title": "Response Me Api Admin Me Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/auth-schema": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Auth Schema",
+        "description": "Serve the JSON schema for every supported auth provider.",
+        "operationId": "auth_schema_api_admin_auth_schema_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Auth Schema Api Admin Auth Schema Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/servers": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Servers",
+        "description": "Return the currently mounted servers.",
+        "operationId": "list_servers_api_admin_servers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ServerView"
+                  },
+                  "type": "array",
+                  "title": "Response List Servers Api Admin Servers Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Server",
+        "description": "Create and live-mount a server.",
+        "operationId": "create_server_api_admin_servers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/servers/{name}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Server",
+        "description": "Replace a server's definition live; the name is immutable.",
+        "operationId": "update_server_api_admin_servers__name__put",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServerUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Server",
+        "description": "Unmount and delete a server.",
+        "operationId": "delete_server_api_admin_servers__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Auth0AuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "auth0",
+            "title": "Provider"
+          },
+          "config_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Config Url"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Client Secret",
+            "writeOnly": true
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "config_url",
+          "client_id",
+          "client_secret",
+          "audience"
+        ],
+        "title": "Auth0AuthProviderConfig"
+      },
+      "AuthKitAuthProviderConfig": {
+        "properties": {
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "scopes_supported": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes Supported"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
+          },
+          "resource_documentation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Documentation"
+          },
+          "provider": {
+            "type": "string",
+            "const": "authkit",
+            "title": "Provider"
+          },
+          "authkit_domain": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Authkit Domain"
+          },
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "authkit_domain"
+        ],
+        "title": "AuthKitAuthProviderConfig"
+      },
+      "AwsCognitoAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "aws-cognito",
+            "title": "Provider"
+          },
+          "user_pool_id": {
+            "type": "string",
+            "title": "User Pool Id"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Client Secret",
+            "writeOnly": true
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "aws_region": {
+            "type": "string",
+            "title": "Aws Region",
+            "default": "eu-central-1"
+          },
+          "redirect_path": {
+            "type": "string",
+            "title": "Redirect Path",
+            "default": "/auth/callback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "user_pool_id",
+          "client_id",
+          "client_secret"
+        ],
+        "title": "AwsCognitoAuthProviderConfig"
+      },
+      "AzureAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "provider": {
+            "type": "string",
+            "const": "azure",
+            "title": "Provider"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          },
+          "tenant_id": {
+            "type": "string",
+            "title": "Tenant Id"
+          },
+          "required_scopes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Scopes"
+          },
+          "identifier_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identifier Uri"
+          },
+          "additional_authorize_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Additional Authorize Scopes"
+          },
+          "base_authority": {
+            "type": "string",
+            "title": "Base Authority",
+            "default": "login.microsoftonline.com"
+          },
+          "token_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Issuer"
+          },
+          "enable_cimd": {
+            "type": "boolean",
+            "title": "Enable Cimd",
+            "default": true
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "client_id",
+          "tenant_id",
+          "required_scopes"
+        ],
+        "title": "AzureAuthProviderConfig"
+      },
+      "DescopeAuthProviderConfig": {
+        "properties": {
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "scopes_supported": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes Supported"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
+          },
+          "resource_documentation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Documentation"
+          },
+          "provider": {
+            "type": "string",
+            "const": "descope",
+            "title": "Provider"
+          },
+          "config_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Url"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "descope_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descope Base Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "DescopeAuthProviderConfig"
+      },
+      "DiscordAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "discord",
+            "title": "Provider"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Client Secret",
+            "writeOnly": true
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "enable_cimd": {
+            "type": "boolean",
+            "title": "Enable Cimd",
+            "default": true
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "client_id",
+          "client_secret"
+        ],
+        "title": "DiscordAuthProviderConfig"
+      },
+      "GitHubAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "github",
+            "title": "Provider"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Client Secret",
+            "writeOnly": true
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "cache_ttl_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Ttl Seconds"
+          },
+          "max_cache_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cache Size"
+          },
+          "enable_cimd": {
+            "type": "boolean",
+            "title": "Enable Cimd",
+            "default": true
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "client_id",
+          "client_secret"
+        ],
+        "title": "GitHubAuthProviderConfig"
+      },
+      "GoogleAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "google",
+            "title": "Provider"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          },
+          "valid_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Scopes"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "extra_authorize_params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Authorize Params"
+          },
+          "enable_cimd": {
+            "type": "boolean",
+            "title": "Enable Cimd",
+            "default": true
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "client_id"
+        ],
+        "title": "GoogleAuthProviderConfig"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HuggingFaceAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "huggingface",
+            "title": "Provider"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Secret"
+          },
+          "valid_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Scopes"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "extra_authorize_params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Authorize Params"
+          },
+          "extra_token_params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Token Params"
+          },
+          "enable_cimd": {
+            "type": "boolean",
+            "title": "Enable Cimd",
+            "default": true
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "client_id"
+        ],
+        "title": "HuggingFaceAuthProviderConfig"
+      },
+      "ItemCount": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "count"
+        ],
+        "title": "ItemCount",
+        "description": "One labeled usage count."
+      },
+      "JwtAuthProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "jwt",
+            "title": "Provider"
+          },
+          "public_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Key"
+          },
+          "jwks_uri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwks Uri"
+          },
+          "issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience"
+          },
+          "algorithm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Algorithm"
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "ssrf_safe": {
+            "type": "boolean",
+            "title": "Ssrf Safe",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "JwtAuthProviderConfig"
+      },
+      "KeycloakAuthProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "keycloak",
+            "title": "Provider"
+          },
+          "realm_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Realm Url"
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "realm_url"
+        ],
+        "title": "KeycloakAuthProviderConfig"
+      },
+      "LoginRequest": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "McpServerListing": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "auth": {
+            "type": "string",
+            "enum": [
+              "oauth2",
+              "none"
+            ],
+            "title": "Auth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "url",
+          "auth"
+        ],
+        "title": "McpServerListing",
+        "description": "One publicly discoverable MCP server mounted by the gateway."
+      },
+      "McpServersDocument": {
+        "properties": {
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/McpServerListing"
+            },
+            "type": "array",
+            "title": "Servers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "servers"
+        ],
+        "title": "McpServersDocument",
+        "description": "The ``/.well-known/mcp-servers`` discovery document."
+      },
+      "OciAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "oci",
+            "title": "Provider"
+          },
+          "config_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Config Url"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Client Secret",
+            "writeOnly": true
+          },
+          "audience": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audience"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "config_url",
+          "client_id",
+          "client_secret"
+        ],
+        "title": "OciAuthProviderConfig"
+      },
+      "PropelAuthIntrospectionConfig": {
+        "properties": {
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
+          },
+          "cache_ttl_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Ttl Seconds"
+          },
+          "max_cache_size": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Cache Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PropelAuthIntrospectionConfig"
+      },
+      "PropelAuthProviderConfig": {
+        "properties": {
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "scopes_supported": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes Supported"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
+          },
+          "resource_documentation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Documentation"
+          },
+          "provider": {
+            "type": "string",
+            "const": "propelauth",
+            "title": "Provider"
+          },
+          "auth_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Auth Url"
+          },
+          "introspection_client_id": {
+            "type": "string",
+            "title": "Introspection Client Id"
+          },
+          "introspection_client_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Introspection Client Secret",
+            "writeOnly": true
+          },
+          "resource": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource"
+          },
+          "token_introspection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropelAuthIntrospectionConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "auth_url",
+          "introspection_client_id",
+          "introspection_client_secret"
+        ],
+        "title": "PropelAuthProviderConfig"
+      },
+      "ScalekitAuthProviderConfig": {
+        "properties": {
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "scopes_supported": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes Supported"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
+          },
+          "resource_documentation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Documentation"
+          },
+          "provider": {
+            "type": "string",
+            "const": "scalekit",
+            "title": "Provider"
+          },
+          "environment_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Environment Url"
+          },
+          "resource_id": {
+            "type": "string",
+            "title": "Resource Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "environment_url",
+          "resource_id"
+        ],
+        "title": "ScalekitAuthProviderConfig"
+      },
+      "SeriesBucket": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "methods": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Methods"
+          },
+          "clients": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Clients"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Statuses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "total",
+          "tools",
+          "methods",
+          "clients",
+          "statuses"
+        ],
+        "title": "SeriesBucket",
+        "description": "One time bucket in a usage series."
+      },
+      "SeriesPoint": {
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ts",
+          "total"
+        ],
+        "title": "SeriesPoint",
+        "description": "One time bucket's total request count for a server."
+      },
+      "SeriesReport": {
+        "properties": {
+          "server": {
+            "type": "string",
+            "title": "Server"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesBucket"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "server",
+          "start",
+          "end",
+          "bucket",
+          "points"
+        ],
+        "title": "SeriesReport",
+        "description": "Request volumes for one MCP server bucketed over a time window."
+      },
+      "ServerCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "upstream_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Upstream Url"
+          },
+          "auth": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/JwtAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OciAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/PropelAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/StaticCredentialsAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            ],
+            "title": "Auth",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
+                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
+                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
+                "azure": "#/components/schemas/AzureAuthProviderConfig",
+                "descope": "#/components/schemas/DescopeAuthProviderConfig",
+                "discord": "#/components/schemas/DiscordAuthProviderConfig",
+                "github": "#/components/schemas/GitHubAuthProviderConfig",
+                "google": "#/components/schemas/GoogleAuthProviderConfig",
+                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
+                "jwt": "#/components/schemas/JwtAuthProviderConfig",
+                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "oci": "#/components/schemas/OciAuthProviderConfig",
+                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
+                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
+                "static": "#/components/schemas/StaticCredentialsAuthProviderConfig",
+                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
+                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            }
+          },
+          "verify_upstream_tls": {
+            "type": "boolean",
+            "title": "Verify Upstream Tls",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "upstream_url",
+          "auth"
+        ],
+        "title": "ServerCreateRequest",
+        "description": "Payload for creating a server."
+      },
+      "ServerSeries": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "points"
+        ],
+        "title": "ServerSeries",
+        "description": "Totals-only request series for one server."
+      },
+      "ServerUpdateRequest": {
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "upstream_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Upstream Url"
+          },
+          "auth": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/JwtAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OciAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/PropelAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/StaticCredentialsAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            ],
+            "title": "Auth",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
+                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
+                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
+                "azure": "#/components/schemas/AzureAuthProviderConfig",
+                "descope": "#/components/schemas/DescopeAuthProviderConfig",
+                "discord": "#/components/schemas/DiscordAuthProviderConfig",
+                "github": "#/components/schemas/GitHubAuthProviderConfig",
+                "google": "#/components/schemas/GoogleAuthProviderConfig",
+                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
+                "jwt": "#/components/schemas/JwtAuthProviderConfig",
+                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "oci": "#/components/schemas/OciAuthProviderConfig",
+                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
+                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
+                "static": "#/components/schemas/StaticCredentialsAuthProviderConfig",
+                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
+                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            }
+          },
+          "verify_upstream_tls": {
+            "type": "boolean",
+            "title": "Verify Upstream Tls",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "upstream_url",
+          "auth"
+        ],
+        "title": "ServerUpdateRequest",
+        "description": "Payload for updating a server; the name is immutable."
+      },
+      "ServerView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "upstream_url": {
+            "type": "string",
+            "title": "Upstream Url"
+          },
+          "auth": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/JwtAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OciAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/PropelAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/StaticCredentialsAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            ],
+            "title": "Auth",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
+                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
+                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
+                "azure": "#/components/schemas/AzureAuthProviderConfig",
+                "descope": "#/components/schemas/DescopeAuthProviderConfig",
+                "discord": "#/components/schemas/DiscordAuthProviderConfig",
+                "github": "#/components/schemas/GitHubAuthProviderConfig",
+                "google": "#/components/schemas/GoogleAuthProviderConfig",
+                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
+                "jwt": "#/components/schemas/JwtAuthProviderConfig",
+                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "oci": "#/components/schemas/OciAuthProviderConfig",
+                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
+                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
+                "static": "#/components/schemas/StaticCredentialsAuthProviderConfig",
+                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
+                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            }
+          },
+          "verify_upstream_tls": {
+            "type": "boolean",
+            "title": "Verify Upstream Tls"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "upstream_url",
+          "auth",
+          "verify_upstream_tls"
+        ],
+        "title": "ServerView",
+        "description": "Admin-facing server representation with secrets masked."
+      },
+      "StaticCredentialsAuthProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "static",
+            "title": "Provider"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": "user"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "title": "Password",
+            "writeOnly": true
+          },
+          "jwt_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Jwt Secret",
+            "writeOnly": true
+          },
+          "token_ttl_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Token Ttl Seconds",
+            "default": 3600
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "StaticCredentialsAuthProviderConfig"
+      },
+      "SupabaseAuthProviderConfig": {
+        "properties": {
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "scopes_supported": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes Supported"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
+          },
+          "resource_documentation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Documentation"
+          },
+          "provider": {
+            "type": "string",
+            "const": "supabase",
+            "title": "Provider"
+          },
+          "project_url": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Project Url"
+          },
+          "auth_route": {
+            "type": "string",
+            "title": "Auth Route",
+            "default": "/auth/v1"
+          },
+          "algorithm": {
+            "type": "string",
+            "enum": [
+              "RS256",
+              "ES256"
+            ],
+            "title": "Algorithm",
+            "default": "ES256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "project_url"
+        ],
+        "title": "SupabaseAuthProviderConfig"
+      },
+      "UsageReport": {
+        "properties": {
+          "server": {
+            "type": "string",
+            "title": "Server"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "tools": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Tools"
+          },
+          "methods": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Methods"
+          },
+          "clients": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Clients"
+          },
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/ItemCount"
+            },
+            "type": "array",
+            "title": "Statuses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "server",
+          "start",
+          "end",
+          "total",
+          "tools",
+          "methods",
+          "clients",
+          "statuses"
+        ],
+        "title": "UsageReport",
+        "description": "Request volumes for one MCP server over a time window."
+      },
+      "UsageSeriesDocument": {
+        "properties": {
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/ServerSeries"
+            },
+            "type": "array",
+            "title": "Servers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "servers"
+        ],
+        "title": "UsageSeriesDocument",
+        "description": "Request totals per mounted server over a time window."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkOsAuthProviderConfig": {
+        "properties": {
+          "resource_base_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Base Url"
+          },
+          "issuer_url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Url"
+          },
+          "allowed_client_redirect_uris": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Client Redirect Uris"
+          },
+          "jwt_signing_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jwt Signing Key"
+          },
+          "require_authorization_consent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "remember",
+                  "external"
+                ]
+              }
+            ],
+            "title": "Require Authorization Consent",
+            "default": true
+          },
+          "consent_csp_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Csp Policy"
+          },
+          "forward_resource": {
+            "type": "boolean",
+            "title": "Forward Resource",
+            "default": true
+          },
+          "fallback_refresh_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Refresh Token Expiry Seconds"
+          },
+          "fastmcp_access_token_expiry_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fastmcp Access Token Expiry Seconds"
+          },
+          "token_expiry_threshold_seconds": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Token Expiry Threshold Seconds",
+            "default": 0
+          },
+          "required_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Required Scopes"
+          },
+          "provider": {
+            "type": "string",
+            "const": "workos",
+            "title": "Provider"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "client_secret": {
+            "type": "string",
+            "format": "password",
+            "title": "Client Secret",
+            "writeOnly": true
+          },
+          "authkit_domain": {
+            "type": "string",
+            "minLength": 1,
+            "format": "uri",
+            "title": "Authkit Domain"
+          },
+          "valid_scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Scopes"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Timeout Seconds",
+            "default": 10
+          },
+          "extra_authorize_params": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Authorize Params"
+          },
+          "enable_cimd": {
+            "type": "boolean",
+            "title": "Enable Cimd",
+            "default": true
+          },
+          "redirect_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redirect Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "client_id",
+          "client_secret",
+          "authkit_domain"
+        ],
+        "title": "WorkOsAuthProviderConfig"
+      }
+    }
+  }
+}
