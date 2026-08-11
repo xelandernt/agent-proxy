@@ -23,7 +23,7 @@ import {
 	useServerUsage,
 	useServerUsageSeries,
 } from "#/lib/queries";
-import { useRefetchCountdown } from "#/lib/refresh";
+import { useRefetchCountdown, useSpinWhile } from "#/lib/refresh";
 import { cn } from "#/lib/utils";
 
 const PRESETS = [
@@ -95,7 +95,9 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 
 	const error = usageQuery.error ?? seriesQuery.error;
 	const loading = usageQuery.isLoading || seriesQuery.isLoading;
-	const refreshing = usageQuery.isFetching || seriesQuery.isFetching;
+	const refreshing = useSpinWhile(
+		usageQuery.isFetching || seriesQuery.isFetching,
+	);
 
 	return (
 		<Card>

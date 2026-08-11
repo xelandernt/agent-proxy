@@ -10,7 +10,7 @@ import {
 	DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
 import { REFRESH_INTERVAL_MS, useUsageSeriesAll } from "#/lib/queries";
-import { useRefetchCountdown } from "#/lib/refresh";
+import { useRefetchCountdown, useSpinWhile } from "#/lib/refresh";
 import { cn } from "#/lib/utils";
 
 function windowTotal(servers: { points: { total: number }[] }[]): number {
@@ -27,6 +27,7 @@ export function UsagePill() {
 		query.dataUpdatedAt,
 		REFRESH_INTERVAL_MS,
 	);
+	const spinning = useSpinWhile(query.isFetching);
 	const total = windowTotal(query.data?.servers ?? []);
 	const perServer = (query.data?.servers ?? [])
 		.map((server) => ({
@@ -61,7 +62,7 @@ export function UsagePill() {
 						disabled={query.isFetching}
 					>
 						<RefreshCwIcon
-							className={cn("size-4", query.isFetching && "animate-spin")}
+							className={cn("size-4", spinning && "animate-spin")}
 						/>
 						Refresh
 						<span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">

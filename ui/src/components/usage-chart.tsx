@@ -90,6 +90,11 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 
 	const visibleNames = names.filter((name) => !hidden[dimension].has(name));
 
+	// Colors follow the full (unfiltered) ordering so a series keeps its
+	// color when others are hidden, matching the legend.
+	const colorFor = (name: string) =>
+		SERIES_COLORS[names.indexOf(name) % SERIES_COLORS.length];
+
 	const total = useMemo(
 		() => report.points.reduce((sum, point) => sum + point.total, 0),
 		[report],
@@ -135,12 +140,14 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 				report={report}
 				dimension={dimension}
 				names={visibleNames}
+				colorFor={colorFor}
 			/>
 			<Legend
 				names={names}
 				counts={counts}
 				hidden={hidden[dimension]}
 				onToggle={toggleHidden}
+				colorFor={colorFor}
 			/>
 		</div>
 	);
@@ -150,10 +157,12 @@ function StackedAreas({
 	report,
 	dimension,
 	names,
+	colorFor,
 }: {
 	report: SeriesReport;
 	dimension: DimensionId;
 	names: string[];
+	colorFor: (name: string) => string;
 }) {
 	const points = report.points;
 
@@ -185,6 +194,13 @@ function StackedAreas({
 		points.length <= 1 ? width / 2 : (index / (points.length - 1)) * width;
 	const yFor = (value: number) =>
 		VIEWBOX.padTop + (1 - value / yMax) * plotHeight;
+
+	const maxTicks = 5;
+	const tickIndices = Array.from(
+		{ length: Math.min(maxTicks, points.length) },
+		(_, index) =>
+			Math.round((index * (points.length - 1)) / Math.max(1, maxTicks - 1)),
+	).filter((value, index, all) => all.indexOf(value) === index);
 
 	const areas = names.map((_name, seriesIndex) => {
 		const top = cumulative.rows[seriesIndex];
@@ -226,7 +242,7 @@ function StackedAreas({
 						<path
 							key={names[index]}
 							d={path}
-							fill={SERIES_COLORS[index % SERIES_COLORS.length]}
+							fill={colorFor(names[index])}
 							fillOpacity={0.55}
 						/>
 					))}
@@ -247,16 +263,28 @@ function StackedAreas({
 					);
 				})}
 			</div>
-			<div className="mt-1 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
-				<span>
-					{timeFormat.format(new Date(points[0]?.ts ?? report.start))}
-				</span>
-				<span>{report.bucket} buckets</span>
-				<span>
-					{timeFormat.format(
-						new Date(points[points.length - 1]?.ts ?? report.end),
-					)}
-				</span>
+			<div className="mt-1 relative h-4 font-mono text-[10px] text-muted-foreground">
+				{tickIndices.map((index, tickIndex) => {
+					const label = timeFormat.format(new Date(points[index].ts));
+					const first = tickIndex === 0;
+					const last = tickIndex === tickIndices.length - 1;
+					return (
+						<span
+							key={index}
+							className="absolute top-0 whitespace-nowrap"
+							style={{
+								left: `${(xFor(index) / width) * 100}%`,
+								transform: first
+									? "none"
+									: last
+										? "translateX(-100%)"
+										: "translateX(-50%)",
+							}}
+						>
+							{label}
+						</span>
+					);
+				})}
 			</div>
 		</div>
 	);
@@ -267,15 +295,17 @@ function Legend({
 	counts,
 	hidden,
 	onToggle,
+	colorFor,
 }: {
 	names: string[];
 	counts: Map<string, number>;
 	hidden: ReadonlySet<string>;
 	onToggle: (name: string) => void;
+	colorFor: (name: string) => string;
 }) {
 	return (
 		<div className="flex flex-wrap gap-x-4 gap-y-1">
-			{names.map((name, index) => {
+			{names.map((name) => {
 				const isHidden = hidden.has(name);
 				return (
 					<button
@@ -290,7 +320,7 @@ function Legend({
 						<span
 							className="size-2 rounded-full"
 							style={{
-								backgroundColor: SERIES_COLORS[index % SERIES_COLORS.length],
+								backgroundColor: colorFor(name),
 							}}
 						/>
 						<span className="truncate">{name}</span>
