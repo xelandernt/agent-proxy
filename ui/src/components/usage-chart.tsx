@@ -22,6 +22,29 @@ const SERIES_COLORS = [
 ];
 
 const VIEWBOX = { width: 800, height: 200, padTop: 8, padBottom: 8 };
+const TICK_FRACTIONS = [0, 0.5, 1] as const;
+
+/** Round a maximum up to a "nice" number (1, 2, 5, 10 × 10^n). */
+function niceCeil(value: number): number {
+	const magnitude = 10 ** Math.floor(Math.log10(value));
+	const normalized = value / magnitude;
+	const nice =
+		normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+	return nice * magnitude;
+}
+
+function humanize(value: number): string {
+	if (value < 1000) return String(value);
+	const units = ["k", "M", "B"];
+	let unit = -1;
+	let scaled = value;
+	while (scaled >= 1000 && unit < units.length - 1) {
+		scaled /= 1000;
+		unit += 1;
+	}
+	const digits = scaled % 1 === 0 ? scaled.toFixed(0) : scaled.toFixed(1);
+	return `${digits}${units[unit]}`;
+}
 
 function countsFor(point: ItemCount[], name: string): number {
 	for (const item of point) {
@@ -149,7 +172,7 @@ function StackedAreas({
 		return { rows, max };
 	}, [points, dimension, names]);
 
-	const yMax = cumulative.max;
+	const yMax = niceCeil(cumulative.max);
 	const timeFormat = new Intl.DateTimeFormat(undefined, {
 		month: "short",
 		day: "numeric",
@@ -187,7 +210,7 @@ function StackedAreas({
 					role="img"
 					aria-label={`Requests per ${report.bucket} over the selected window`}
 				>
-					{[0, 0.5, 1].map((fraction) => (
+					{TICK_FRACTIONS.map((fraction) => (
 						<line
 							key={fraction}
 							x1={0}
@@ -208,9 +231,21 @@ function StackedAreas({
 						/>
 					))}
 				</svg>
-				<span className="absolute -top-5 right-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-					max {yMax}
-				</span>
+				{TICK_FRACTIONS.map((fraction) => {
+					const y = yFor(yMax * fraction);
+					return (
+						<span
+							key={fraction}
+							className="absolute right-0 font-mono text-[10px] tabular-nums text-muted-foreground"
+							style={{
+								top: `${(y / VIEWBOX.height) * 100}%`,
+								transform: "translateY(-50%)",
+							}}
+						>
+							{humanize(yMax * fraction)}
+						</span>
+					);
+				})}
 			</div>
 			<div className="mt-1 flex items-center justify-between font-mono text-[10px] text-muted-foreground">
 				<span>
