@@ -12,7 +12,7 @@ import {
 	serverUsageSeriesApiServersNameUsageSeriesGet,
 } from "#/api/generated/fastAPI";
 
-const REFRESH_INTERVAL_MS = 30_000;
+export const REFRESH_INTERVAL_MS = 30_000;
 
 function unwrap<T>(result: { data: unknown; status: number }): T {
 	if (result.status >= 200 && result.status < 300) return result.data as T;

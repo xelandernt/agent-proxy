@@ -1,7 +1,13 @@
-import { ActivityIcon } from "lucide-react";
+import { ActivityIcon, RefreshCwIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
+import {
+	Card,
+	CardAction,
+	CardContent,
+	CardHeader,
+	CardTitle,
+} from "#/components/ui/card";
 import {
 	Empty,
 	EmptyContent,
@@ -12,7 +18,13 @@ import {
 } from "#/components/ui/empty";
 import { Skeleton } from "#/components/ui/skeleton";
 import { UsageChart } from "#/components/usage-chart";
-import { useServerUsage, useServerUsageSeries } from "#/lib/queries";
+import {
+	REFRESH_INTERVAL_MS,
+	useServerUsage,
+	useServerUsageSeries,
+} from "#/lib/queries";
+import { useRefetchCountdown } from "#/lib/refresh";
+import { cn } from "#/lib/utils";
 
 const PRESETS = [
 	{ label: "5m", minutes: 5 },
@@ -71,6 +83,10 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 
 	const usageQuery = useServerUsage(serverName, range);
 	const seriesQuery = useServerUsageSeries(serverName, range);
+	const countdown = useRefetchCountdown(
+		seriesQuery.dataUpdatedAt,
+		REFRESH_INTERVAL_MS,
+	);
 
 	const applyCustom = () => {
 		if (!customFrom || !customTo) return;
@@ -79,6 +95,7 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 
 	const error = usageQuery.error ?? seriesQuery.error;
 	const loading = usageQuery.isLoading || seriesQuery.isLoading;
+	const refreshing = usageQuery.isFetching || seriesQuery.isFetching;
 
 	return (
 		<Card>
@@ -86,6 +103,24 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 				<CardTitle className="font-sans text-base font-semibold">
 					Usage
 				</CardTitle>
+				<CardAction className="flex items-center gap-2">
+					<span className="font-mono text-xs tabular-nums text-muted-foreground">
+						refreshes in {countdown}s
+					</span>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => {
+							usageQuery.refetch();
+							seriesQuery.refetch();
+						}}
+					>
+						<RefreshCwIcon
+							className={cn("size-3.5", refreshing && "animate-spin")}
+						/>
+						Refresh
+					</Button>
+				</CardAction>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				<div className="flex flex-wrap items-center gap-2">

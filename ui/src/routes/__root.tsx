@@ -5,6 +5,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { BackgroundDither } from "#/components/background-dither";
 import { DitherToggle, ThemeToggle } from "#/components/toggles";
 import { Toaster } from "#/components/ui/sonner";
+import { UsagePill } from "#/components/usage-pill";
 import { patchGatewayFetch } from "#/lib/gateway";
 import { ThemeProvider } from "#/lib/theme";
 
@@ -69,6 +70,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<QueryClientProvider client={queryClient}>
 					<ThemeProvider>
 						<header className="relative z-40 flex items-center justify-end gap-1 px-8 pt-6">
+							<UsagePill />
 							<DitherToggle />
 							<ThemeToggle />
 						</header>
