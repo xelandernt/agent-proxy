@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, TypeAdapter
 
-from proxy.app.admin.auth import get_admin_provider, require_admin
+from proxy.app.admin.auth import (
+    CookieSameSite,
+    clear_admin_session_cookie,
+    get_admin_provider,
+    request_is_secure,
+    require_admin,
+    set_admin_session_cookie,
+)
 from proxy.providers import AuthProviderConfig, AuthProviderLoadError
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
@@ -65,12 +72,21 @@ class LoginRequest(BaseModel):
     password: str
 
 
+def _cookie_policy(request: Request) -> CookieSameSite:
+    admin = request.app.state.config.admin
+    if admin is None:
+        return "lax"
+    return admin.session_cookie_samesite
+
+
 @public_router.post("/login")
-async def login(payload: LoginRequest, request: Request) -> dict:
-    """Resolve admin credentials to a bearer token.
+async def login(payload: LoginRequest, request: Request, response: Response) -> dict:
+    """Resolve admin credentials to a session.
 
     Only providers that hold credentials themselves (``static``) support this;
-    OAuth and token-verifier providers return 401.
+    OAuth and token-verifier providers return 401. On success the bearer token
+    is stored in an HttpOnly session cookie so the browser UI never persists
+    it; the token stays in the response for non-browser API clients.
     """
 
     provider = get_admin_provider(request)
@@ -80,7 +96,52 @@ async def login(payload: LoginRequest, request: Request) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password.",
         )
+    set_admin_session_cookie(
+        response,
+        token,
+        secure=request_is_secure(request),
+        samesite=_cookie_policy(request),
+    )
     return {"token": token}
+
+
+class SessionRequest(BaseModel):
+    token: str
+
+
+@public_router.post("/session")
+async def establish_session(
+    payload: SessionRequest,
+    request: Request,
+    response: Response,
+) -> dict:
+    """Adopt a browser-flow or pasted bearer token into the session cookie.
+
+    The browser Authorization Code + PKCE flow and the pasted-token flow
+    terminate in JavaScript, so the UI hands the resulting token back to the
+    gateway, which verifies it and stores it in an HttpOnly cookie.
+    """
+
+    provider = get_admin_provider(request)
+    if await provider.verify_token(payload.token) is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired bearer token.",
+        )
+    set_admin_session_cookie(
+        response,
+        payload.token,
+        secure=request_is_secure(request),
+        samesite=_cookie_policy(request),
+    )
+    return {"authenticated": True}
+
+
+@public_router.delete("/session", status_code=status.HTTP_204_NO_CONTENT)
+async def end_session(response: Response) -> None:
+    """Clear the admin session cookie."""
+
+    clear_admin_session_cookie(response)
 
 
 @router.get("/auth-schema")

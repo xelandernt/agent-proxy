@@ -10,13 +10,11 @@ import {
 	listAdminServers,
 	updateAdminServer,
 } from "#/lib/admin";
-import { getAdminToken } from "#/lib/auth";
 
 export function useAdminServers() {
 	return useQuery({
 		queryKey: ["admin", "servers"],
 		queryFn: () => listAdminServers(),
-		enabled: getAdminToken() !== null,
 	});
 }
 
@@ -24,7 +22,6 @@ export function useAuthSchema() {
 	return useQuery({
 		queryKey: ["admin", "auth-schema"],
 		queryFn: () => fetchAuthSchema(),
-		enabled: getAdminToken() !== null,
 	});
 }
 

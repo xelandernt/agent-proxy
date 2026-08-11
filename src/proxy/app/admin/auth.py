@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, Request, Response, status
 from fastmcp.server.auth import AuthProvider
 
 from proxy.providers import (
@@ -15,6 +15,48 @@ from proxy.providers import (
 from proxy.settings import AdminConfig
 
 logger = logging.getLogger(__name__)
+
+ADMIN_SESSION_COOKIE: str = "admin_token"
+
+
+CookieSameSite = Literal["strict", "lax", "none"]
+
+
+def request_is_secure(request: Request) -> bool:
+    """Whether the request arrived over TLS, honoring proxy-forwarded schemes."""
+
+    forwarded = request.headers.get("x-forwarded-proto", "")
+    scheme = forwarded.split(",")[0].strip() if forwarded else request.url.scheme
+    return scheme.lower() == "https"
+
+
+def set_admin_session_cookie(
+    response: Response,
+    token: str,
+    *,
+    secure: bool,
+    samesite: CookieSameSite,
+) -> None:
+    """Persist the admin token in an HttpOnly session cookie.
+
+    ``samesite="none"`` is only honored by browsers together with ``Secure``,
+    so the cookie is marked secure whenever that policy is chosen.
+    """
+
+    response.set_cookie(
+        ADMIN_SESSION_COOKIE,
+        token,
+        path="/",
+        secure=secure or samesite == "none",
+        httponly=True,
+        samesite=samesite,
+    )
+
+
+def clear_admin_session_cookie(response: Response) -> None:
+    """Drop the admin session cookie."""
+
+    response.delete_cookie(ADMIN_SESSION_COOKIE, path="/")
 
 
 @dataclass(frozen=True)
@@ -118,21 +160,65 @@ def get_admin_provider(request: Request) -> AdminAuthProvider:
     return provider
 
 
-async def require_admin(request: Request) -> None:
-    """Reject requests whose bearer token the admin provider cannot verify."""
-
-    provider = get_admin_provider(request)
+def _bearer_token(request: Request) -> str | None:
     authorization = request.headers.get("Authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return token.strip()
+
+
+def _session_token(request: Request) -> str | None:
+    token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    return token.strip() if token and token.strip() else None
+
+
+def _origin_allowed(request: Request) -> bool:
+    """Whether a browser-sent Origin may submit state-changing cookie requests.
+
+    Guards cookie-authenticated mutations against cross-site request forgery
+    when the cookie policy is ``SameSite=None``. Requests without an Origin
+    header are treated as non-browser clients and allowed.
+    """
+
+    origin = request.headers.get("origin")
+    if origin is None:
+        return True
+    settings = request.app.state.config
+    allowed = {str(cors_origin).rstrip("/") for cors_origin in settings.cors_origins}
+    allowed.add(str(settings.public_base_url).rstrip("/"))
+    return origin.rstrip("/") in allowed
+
+
+async def require_admin(request: Request) -> None:
+    """Reject requests whose bearer token or session cookie is not valid."""
+
+    provider = get_admin_provider(request)
+    bearer = _bearer_token(request)
+    cookie = _session_token(request)
+    token = bearer or cookie
+    if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing bearer token.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    if await provider.verify_token(token.strip()) is None:
+    if await provider.verify_token(token) is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired bearer token.",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    admin = request.app.state.config.admin
+    if (
+        bearer is None
+        and cookie is not None
+        and request.method not in ("GET", "HEAD", "OPTIONS")
+        and admin is not None
+        and admin.session_cookie_samesite == "none"
+        and not _origin_allowed(request)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cross-site admin request rejected.",
         )

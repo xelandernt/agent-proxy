@@ -20,8 +20,7 @@ import { Skeleton } from "#/components/ui/skeleton";
 import {
 	type AdminAuthStatus,
 	checkAdminAuth,
-	clearAdminToken,
-	getAdminToken,
+	endAdminSession,
 } from "#/lib/auth";
 
 export const Route = createFileRoute("/admin")({ component: AdminLayout });
@@ -33,14 +32,9 @@ function AdminLayout() {
 	const onCallbackPath = location.pathname.endsWith("/admin/callback");
 
 	const check = useCallback(() => {
-		const token = getAdminToken();
-		if (!token) {
-			setStatus("unauthenticated");
-			return;
-		}
 		setStatus("checking");
-		checkAdminAuth(token).then((next) => {
-			if (next === "unauthenticated") clearAdminToken();
+		checkAdminAuth().then((next) => {
+			if (next === "unauthenticated") endAdminSession();
 			setStatus(next);
 		});
 	}, []);

@@ -10,7 +10,6 @@ import {
 	listServersApiAdminServersGet,
 	updateServerApiAdminServersNamePut,
 } from "#/api/generated/fastAPI";
-import { adminHeaders } from "#/lib/gateway";
 
 export type AdminServer = ServerView;
 export type ServerPayload = ServerCreateRequest | ServerUpdateRequest;
@@ -76,9 +75,7 @@ function adminError<T>(status: number, data: T): AdminApiError {
 }
 
 export async function listAdminServers(): Promise<AdminServer[]> {
-	const result = await listServersApiAdminServersGet({
-		headers: adminHeaders(),
-	});
+	const result = await listServersApiAdminServersGet();
 	if (result.status === 200) return result.data as AdminServer[];
 	throw adminError(result.status, result.data);
 }
@@ -86,9 +83,7 @@ export async function listAdminServers(): Promise<AdminServer[]> {
 export async function createAdminServer(
 	payload: ServerCreateRequest,
 ): Promise<AdminServer> {
-	const result = await createServerApiAdminServersPost(payload, {
-		headers: adminHeaders(),
-	});
+	const result = await createServerApiAdminServersPost(payload);
 	if (result.status === 201) return result.data as AdminServer;
 	throw adminError(result.status, result.data);
 }
@@ -97,25 +92,19 @@ export async function updateAdminServer(
 	name: string,
 	payload: ServerUpdateRequest,
 ): Promise<AdminServer> {
-	const result = await updateServerApiAdminServersNamePut(name, payload, {
-		headers: adminHeaders(),
-	});
+	const result = await updateServerApiAdminServersNamePut(name, payload);
 	if (result.status === 200) return result.data as AdminServer;
 	throw adminError(result.status, result.data);
 }
 
 export async function deleteAdminServer(name: string): Promise<void> {
-	const result = await deleteServerApiAdminServersNameDelete(name, {
-		headers: adminHeaders(),
-	});
+	const result = await deleteServerApiAdminServersNameDelete(name);
 	if (result.status === 204) return;
 	throw adminError(result.status, result.data);
 }
 
 export async function fetchAuthSchema(): Promise<Record<string, unknown>> {
-	const result = await authSchemaApiAdminAuthSchemaGet({
-		headers: adminHeaders(),
-	});
+	const result = await authSchemaApiAdminAuthSchemaGet();
 	if (result.status === 200) return result.data as Record<string, unknown>;
 	throw adminError(result.status, result.data);
 }

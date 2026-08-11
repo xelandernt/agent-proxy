@@ -25,7 +25,6 @@ import {
 	useCreateServer,
 	useUpdateServer,
 } from "#/lib/admin-queries";
-import { getAdminToken } from "#/lib/auth";
 import { cn } from "#/lib/utils";
 
 type FormState =
@@ -121,28 +120,25 @@ export function ServerForm({
 	const createMutation = useCreateServer();
 	const updateMutation = useUpdateServer();
 
-	const state: FormState = !getAdminToken()
-		? { status: "error", message: "Not authenticated." }
-		: authSchemaQuery.isLoading
-			? { status: "loading" }
-			: authSchemaQuery.isError
+	const state: FormState = authSchemaQuery.isLoading
+		? { status: "loading" }
+		: authSchemaQuery.isError
+			? {
+					status: "error",
+					message:
+						authSchemaQuery.error instanceof Error
+							? authSchemaQuery.error.message
+							: String(authSchemaQuery.error),
+				}
+			: authSchemaQuery.isSuccess
 				? {
-						status: "error",
-						message:
-							authSchemaQuery.error instanceof Error
-								? authSchemaQuery.error.message
-								: String(authSchemaQuery.error),
+						status: "ready",
+						schema: authSchemaQuery.data as AuthProviderSchema,
 					}
-				: authSchemaQuery.isSuccess
-					? {
-							status: "ready",
-							schema: authSchemaQuery.data as AuthProviderSchema,
-						}
-					: { status: "error", message: "Not authenticated." };
+				: { status: "error", message: "Could not load the form." };
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
-		if (!getAdminToken()) return;
 		setFieldErrors([]);
 		const payload = {
 			...(mode === "create" ? { name } : {}),

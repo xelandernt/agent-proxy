@@ -2,12 +2,12 @@ import * as oauth from "oauth4webapi";
 
 import {
 	authStatusApiAdminAuthStatusGet,
-	type LoginApiAdminLoginPost200,
+	endSessionApiAdminSessionDelete,
+	establishSessionApiAdminSessionPost,
 	loginApiAdminLoginPost,
 	meApiAdminMeGet,
 } from "#/api/generated/fastAPI";
 
-export const TOKEN_KEY = "admin-token";
 const PKCE_STATE_KEY = "admin-oauth-state";
 
 export type AdminAuthStatus =
@@ -27,16 +27,26 @@ export type AdminAuthInfo = {
 	oauth: AdminOAuthInfo | null;
 };
 
-export function getAdminToken(): string | null {
-	return localStorage.getItem(TOKEN_KEY);
+/**
+ * Adopt a bearer token into the gateway's HttpOnly session cookie. The token
+ * is never persisted in browser storage.
+ */
+export async function establishAdminSession(token: string): Promise<boolean> {
+	try {
+		const result = await establishSessionApiAdminSessionPost({ token });
+		return result.status === 200;
+	} catch {
+		return false;
+	}
 }
 
-export function setAdminToken(token: string): void {
-	localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearAdminToken(): void {
-	localStorage.removeItem(TOKEN_KEY);
+/** Clear the gateway's HttpOnly session cookie. */
+export async function endAdminSession(): Promise<void> {
+	try {
+		await endSessionApiAdminSessionDelete();
+	} catch {
+		// the cookie expires with the browser session anyway
+	}
 }
 
 export async function fetchAdminAuthInfo(): Promise<AdminAuthInfo | null> {
@@ -50,11 +60,9 @@ export async function fetchAdminAuthInfo(): Promise<AdminAuthInfo | null> {
 	}
 }
 
-export async function checkAdminAuth(token: string): Promise<AdminAuthStatus> {
+export async function checkAdminAuth(): Promise<AdminAuthStatus> {
 	try {
-		const result = await meApiAdminMeGet({
-			headers: { Authorization: `Bearer ${token}` },
-		});
+		const result = await meApiAdminMeGet();
 		if (result.status === 200) return "authenticated";
 		if (result.status === 503) return "unconfigured";
 		return "unauthenticated";
@@ -69,11 +77,7 @@ export async function loginWithPassword(
 ): Promise<boolean> {
 	try {
 		const result = await loginApiAdminLoginPost({ username, password });
-		if (result.status !== 200) return false;
-		const payload = result.data as LoginApiAdminLoginPost200;
-		if (typeof payload.token !== "string") return false;
-		setAdminToken(payload.token);
-		return true;
+		return result.status === 200;
 	} catch {
 		return false;
 	}
@@ -138,7 +142,21 @@ export async function completeOAuthLogin(
 	const stored = sessionStorage.getItem(PKCE_STATE_KEY);
 	sessionStorage.removeItem(PKCE_STATE_KEY);
 	if (!stored) throw new Error("No pending login flow found.");
-	const { codeVerifier, state } = JSON.parse(stored) as {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(stored);
+	} catch {
+		throw new Error("Stored login flow is corrupted.");
+	}
+	if (
+		typeof parsed !== "object" ||
+		parsed === null ||
+		typeof (parsed as { codeVerifier?: unknown }).codeVerifier !== "string" ||
+		typeof (parsed as { state?: unknown }).state !== "string"
+	) {
+		throw new Error("Stored login flow is corrupted.");
+	}
+	const { codeVerifier, state } = parsed as {
 		codeVerifier: string;
 		state: string;
 	};
@@ -167,5 +185,7 @@ export async function completeOAuthLogin(
 		client,
 		response,
 	);
-	setAdminToken(tokens.access_token);
+	if (!(await establishAdminSession(tokens.access_token))) {
+		throw new Error("The gateway rejected the access token.");
+	}
 }

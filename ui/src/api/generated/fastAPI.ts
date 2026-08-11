@@ -478,7 +478,7 @@ export type McpServerListingAuth =
   (typeof McpServerListingAuth)[keyof typeof McpServerListingAuth];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const McpServerListingAuth = {
+const McpServerListingAuth = {
   oauth2: "oauth2",
   none: "none",
 } as const;
@@ -739,6 +739,10 @@ export interface ServerView {
   verify_upstream_tls: boolean;
 }
 
+export interface SessionRequest {
+  token: string;
+}
+
 export interface StaticCredentialsAuthProviderConfig {
   provider: "static";
   username?: string;
@@ -760,7 +764,7 @@ export type SupabaseAuthProviderConfigAlgorithm =
   (typeof SupabaseAuthProviderConfigAlgorithm)[keyof typeof SupabaseAuthProviderConfigAlgorithm];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-export const SupabaseAuthProviderConfigAlgorithm = {
+const SupabaseAuthProviderConfigAlgorithm = {
   RS256: "RS256",
   ES256: "ES256",
 } as const;
@@ -888,6 +892,8 @@ export type ServerUsageSeriesApiServersNameUsageSeriesGetParams = {
 export type AuthStatusApiAdminAuthStatusGet200 = { [key: string]: unknown };
 
 export type LoginApiAdminLoginPost200 = { [key: string]: unknown };
+
+export type EstablishSessionApiAdminSessionPost200 = { [key: string]: unknown };
 
 export type MeApiAdminMeGet200 = { [key: string]: boolean };
 
@@ -1186,10 +1192,12 @@ export const authStatusApiAdminAuthStatusGet = async (
 };
 
 /**
- * Resolve admin credentials to a bearer token.
+ * Resolve admin credentials to a session.
 
 Only providers that hold credentials themselves (``static``) support this;
-OAuth and token-verifier providers return 401.
+OAuth and token-verifier providers return 401. On success the bearer token
+is stored in an HttpOnly session cookie so the browser UI never persists
+it; the token stays in the response for non-browser API clients.
  * @summary Login
  */
 export type loginApiAdminLoginPostResponse200 = {
@@ -1239,6 +1247,104 @@ export const loginApiAdminLoginPost = async (
     status: res.status,
     headers: res.headers,
   } as loginApiAdminLoginPostResponse;
+};
+
+/**
+ * Adopt a browser-flow or pasted bearer token into the session cookie.
+
+The browser Authorization Code + PKCE flow and the pasted-token flow
+terminate in JavaScript, so the UI hands the resulting token back to the
+gateway, which verifies it and stores it in an HttpOnly cookie.
+ * @summary Establish Session
+ */
+export type establishSessionApiAdminSessionPostResponse200 = {
+  data: EstablishSessionApiAdminSessionPost200;
+  status: 200;
+};
+
+export type establishSessionApiAdminSessionPostResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type establishSessionApiAdminSessionPostResponseSuccess =
+  establishSessionApiAdminSessionPostResponse200 & {
+    headers: Headers;
+  };
+export type establishSessionApiAdminSessionPostResponseError =
+  establishSessionApiAdminSessionPostResponse422 & {
+    headers: Headers;
+  };
+
+export type establishSessionApiAdminSessionPostResponse =
+  | establishSessionApiAdminSessionPostResponseSuccess
+  | establishSessionApiAdminSessionPostResponseError;
+
+export const getEstablishSessionApiAdminSessionPostUrl = () => {
+  return `/api/admin/session`;
+};
+
+export const establishSessionApiAdminSessionPost = async (
+  sessionRequest: SessionRequest,
+  options?: RequestInit,
+): Promise<establishSessionApiAdminSessionPostResponse> => {
+  const res = await fetch(getEstablishSessionApiAdminSessionPostUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sessionRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: establishSessionApiAdminSessionPostResponse["data"] = body
+    ? JSON.parse(body)
+    : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as establishSessionApiAdminSessionPostResponse;
+};
+
+/**
+ * Clear the admin session cookie.
+ * @summary End Session
+ */
+export type endSessionApiAdminSessionDeleteResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type endSessionApiAdminSessionDeleteResponseSuccess =
+  endSessionApiAdminSessionDeleteResponse204 & {
+    headers: Headers;
+  };
+export type endSessionApiAdminSessionDeleteResponse =
+  endSessionApiAdminSessionDeleteResponseSuccess;
+
+export const getEndSessionApiAdminSessionDeleteUrl = () => {
+  return `/api/admin/session`;
+};
+
+export const endSessionApiAdminSessionDelete = async (
+  options?: RequestInit,
+): Promise<endSessionApiAdminSessionDeleteResponse> => {
+  const res = await fetch(getEndSessionApiAdminSessionDeleteUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: endSessionApiAdminSessionDeleteResponse["data"] = body
+    ? JSON.parse(body)
+    : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as endSessionApiAdminSessionDeleteResponse;
 };
 
 /**

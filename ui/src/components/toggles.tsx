@@ -43,14 +43,14 @@ export function DitherToggle() {
 	);
 }
 
+const THEME_OPTIONS = [
+	{ value: "light", label: "Light", icon: SunIcon },
+	{ value: "dark", label: "Dark", icon: MoonIcon },
+	{ value: "system", label: "System", icon: MonitorIcon },
+] as const;
+
 export function ThemeToggle() {
 	const { setTheme, theme } = useTheme();
-
-	const options = [
-		{ value: "light", label: "Light", icon: SunIcon },
-		{ value: "dark", label: "Dark", icon: MoonIcon },
-		{ value: "system", label: "System", icon: MonitorIcon },
-	] as const;
 
 	return (
 		<DropdownMenu>
@@ -62,7 +62,7 @@ export function ThemeToggle() {
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
 				<DropdownMenuGroup>
-					{options.map((option) => (
+					{THEME_OPTIONS.map((option) => (
 						<DropdownMenuItem
 							key={option.value}
 							onClick={() => setTheme(option.value)}

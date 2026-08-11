@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from pydantic import (
     AnyHttpUrl,
@@ -61,6 +61,17 @@ class AdminConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     auth: AuthProviderConfig
+    session_cookie_samesite: Literal["strict", "lax", "none"] = Field(
+        default="lax",
+        description=(
+            "SameSite policy for the admin session cookie. 'lax' suits the "
+            "default same-site deployment where the admin UI and the gateway "
+            "share a site; 'none' is required when the UI is served from a "
+            "different site and requires HTTPS. With 'none', state-changing "
+            "admin requests are additionally checked against the configured "
+            "CORS origins."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_keycloak_client(self) -> AdminConfig:

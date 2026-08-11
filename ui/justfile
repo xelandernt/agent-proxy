@@ -14,6 +14,7 @@ upgrade:
 gen:
     uv run proxy openapi ../openapi.json
     npm exec -- orval
+    node scripts/strip-unused-generated-exports.mjs
 
 lint:
     npm exec -- biome check --write

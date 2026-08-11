@@ -13,11 +13,28 @@ import {
 } from "#/components/ui/card";
 import {
 	type AdminAuthInfo,
+	establishAdminSession,
 	fetchAdminAuthInfo,
 	loginWithPassword,
-	setAdminToken,
 	startOAuthLogin,
 } from "#/lib/auth";
+
+function FieldLabel({
+	htmlFor,
+	children,
+}: {
+	htmlFor: string;
+	children: string;
+}) {
+	return (
+		<label
+			htmlFor={htmlFor}
+			className="font-mono text-xs text-muted-foreground"
+		>
+			{children}
+		</label>
+	);
+}
 
 export function AdminLogin({
 	onAuthenticated,
@@ -29,14 +46,18 @@ export function AdminLogin({
 	const [password, setPassword] = useState("");
 	const [tokenInput, setTokenInput] = useState("");
 	const [authInfo, setAuthInfo] = useState<AdminAuthInfo | null>(null);
-	const [error, setError] = useState<string | null>(() => {
-		const stored = sessionStorage.getItem("admin-login-error");
-		if (stored) sessionStorage.removeItem("admin-login-error");
-		return stored;
-	});
+	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		fetchAdminAuthInfo().then(setAuthInfo);
+	}, []);
+
+	useEffect(() => {
+		const stored = sessionStorage.getItem("admin-login-error");
+		if (stored) {
+			sessionStorage.removeItem("admin-login-error");
+			setError(stored);
+		}
 	}, []);
 
 	const signInWithOAuth = async () => {
@@ -65,12 +86,18 @@ export function AdminLogin({
 		onAuthenticated();
 	};
 
-	const submitToken = (event: FormEvent) => {
+	const submitToken = async (event: FormEvent) => {
 		event.preventDefault();
 		const token = tokenInput.trim();
 		if (!token) return;
-		setAdminToken(token);
 		setBusy("token");
+		setError(null);
+		const ok = await establishAdminSession(token);
+		if (!ok) {
+			setBusy(null);
+			setError("The gateway rejected the token.");
+			return;
+		}
 		onAuthenticated();
 	};
 
@@ -99,7 +126,9 @@ export function AdminLogin({
 				<CardContent className="flex flex-col gap-4">
 					{staticPassword ? (
 						<form onSubmit={submitPassword} className="flex flex-col gap-3">
+							<FieldLabel htmlFor="admin-username">Username</FieldLabel>
 							<input
+								id="admin-username"
 								type="text"
 								value={username}
 								onChange={(event) => setUsername(event.target.value)}
@@ -107,7 +136,9 @@ export function AdminLogin({
 								autoComplete="username"
 								className="h-9 w-full rounded-md border bg-transparent px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 							/>
+							<FieldLabel htmlFor="admin-password">Password</FieldLabel>
 							<input
+								id="admin-password"
 								type="password"
 								value={password}
 								onChange={(event) => setPassword(event.target.value)}
@@ -134,7 +165,9 @@ export function AdminLogin({
 								<span className="h-px flex-1 bg-border" />
 							</div>
 							<form onSubmit={submitToken} className="flex flex-col gap-3">
+								<FieldLabel htmlFor="admin-token">Access token</FieldLabel>
 								<input
+									id="admin-token"
 									type="password"
 									value={tokenInput}
 									onChange={(event) => setTokenInput(event.target.value)}
@@ -159,7 +192,9 @@ export function AdminLogin({
 								token from your identity provider and paste it below.
 							</p>
 							<form onSubmit={submitToken} className="flex flex-col gap-3">
+								<FieldLabel htmlFor="admin-token">Access token</FieldLabel>
 								<input
+									id="admin-token"
 									type="password"
 									value={tokenInput}
 									onChange={(event) => setTokenInput(event.target.value)}

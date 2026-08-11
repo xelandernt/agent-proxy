@@ -57,6 +57,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         gateway.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
+            allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allow_headers=["*"],
         )

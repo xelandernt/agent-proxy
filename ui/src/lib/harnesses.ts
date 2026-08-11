@@ -1,5 +1,3 @@
-import type { McpServerListing } from "#/lib/mcp";
-
 export type Harness = {
 	id: string;
 	label: string;
@@ -59,14 +57,6 @@ export const HARNESSES: Harness[] = [
 		config: mcpServersJson,
 	},
 ];
-
-export function harnessFor(server: McpServerListing) {
-	return HARNESSES.map((harness) => ({
-		harness,
-		command: harness.command?.(server.name, server.url),
-		config: harness.config(server.name, server.url),
-	}));
-}
 
 const SELECTED_HARNESS_KEY = "harness-id";
 

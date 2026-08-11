@@ -462,7 +462,8 @@ export function BackgroundDither() {
 		start();
 
 		return () => {
-			stop();
+			running = false;
+			cancelAnimationFrame(frame);
 			observer.disconnect();
 			document.removeEventListener("visibilitychange", onVisibility);
 			window.removeEventListener("resize", onResize);

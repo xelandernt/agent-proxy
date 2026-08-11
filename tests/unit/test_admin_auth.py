@@ -247,3 +247,103 @@ def test_login_unsupported_by_token_verifier_providers(
         )
 
     assert response.status_code == 401
+
+
+def test_static_login_sets_http_only_session_cookie(
+    static_config: GatewayConfig,
+) -> None:
+    with boot(static_config) as client:
+        login = client.post(
+            "/api/admin/login",
+            json={"username": STATIC_USERNAME, "password": STATIC_PASSWORD},
+        )
+        cookie = login.cookies.get("admin_token")
+        me = client.get("/api/admin/me")
+
+    assert login.status_code == 200
+    assert cookie is not None
+    assert "HttpOnly" in login.headers["set-cookie"]
+    assert me.status_code == 200
+    assert me.json() == {"authenticated": True}
+
+
+def test_session_endpoint_adopts_token_into_cookie(
+    keycloak_config: GatewayConfig,
+    use_static_admin_provider: None,
+) -> None:
+    with boot(keycloak_config) as client:
+        adopted = client.post("/api/admin/session", json={"token": "valid-token"})
+        me = client.get("/api/admin/me")
+
+    assert adopted.status_code == 200
+    assert adopted.cookies.get("admin_token") == "valid-token"
+    assert me.status_code == 200
+
+
+def test_session_endpoint_rejects_invalid_token(
+    keycloak_config: GatewayConfig,
+    use_static_admin_provider: None,
+) -> None:
+    with boot(keycloak_config) as client:
+        rejected = client.post("/api/admin/session", json={"token": "wrong-token"})
+
+    assert rejected.status_code == 401
+    assert rejected.cookies.get("admin_token") is None
+
+
+def test_logout_clears_session_cookie(
+    static_config: GatewayConfig,
+) -> None:
+    with boot(static_config) as client:
+        login = client.post(
+            "/api/admin/login",
+            json={"username": STATIC_USERNAME, "password": STATIC_PASSWORD},
+        )
+        logout = client.delete("/api/admin/session")
+        me = client.get("/api/admin/me")
+
+    assert login.status_code == 200
+    assert logout.status_code == 204
+    assert "admin_token=" in logout.headers["set-cookie"]
+    assert me.status_code == 401
+
+
+def test_cookie_mutation_blocks_cross_site_origin_when_samesite_none(
+    sqlite_url: str,
+    use_static_admin_provider: None,
+) -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "public_base_url": "https://gateway.example",
+            "database": {"url": sqlite_url},
+            "cors_origins": ["https://ui.example.com"],
+            "admin": {
+                "auth": {
+                    "provider": "keycloak",
+                    "realm_url": REALM_URL,
+                    "client_id": UI_CLIENT_ID,
+                },
+                "session_cookie_samesite": "none",
+            },
+        }
+    )
+    with TestClient(create_app(config), base_url="https://testserver") as client:
+        adopted = client.post(
+            "/api/admin/session",
+            json={"token": "valid-token"},
+            headers={"Origin": "https://ui.example.com"},
+        )
+        blocked = client.post(
+            "/api/admin/servers",
+            json={},
+            headers={"Origin": "https://evil.example"},
+        )
+        allowed = client.post(
+            "/api/admin/servers",
+            json={},
+            headers={"Origin": "https://ui.example.com"},
+        )
+
+    assert adopted.status_code == 200
+    assert blocked.status_code == 403
+    assert allowed.status_code == 422  # authenticated, rejected on payload

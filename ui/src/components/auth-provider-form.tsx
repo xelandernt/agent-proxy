@@ -107,10 +107,12 @@ function parseValue(kind: ReturnType<typeof inputKind>, raw: string): Value {
 
 function FieldInput({
 	kind,
+	label,
 	value,
 	onChange,
 }: {
 	kind: ReturnType<typeof inputKind>;
+	label?: string;
 	value: Value;
 	onChange: (value: Value) => void;
 }) {
@@ -120,6 +122,7 @@ function FieldInput({
 				type="checkbox"
 				checked={value === true}
 				onChange={(event) => onChange(event.target.checked)}
+				aria-label={label}
 				className="size-4 rounded border-border accent-[var(--color-primary)]"
 			/>
 		);
@@ -245,6 +248,7 @@ function ProviderFields({
 						>
 							<FieldInput
 								kind={kind}
+								label={property.title ?? name}
 								value={ownedValue}
 								onChange={(next) => onChange({ ...value, [name]: next })}
 							/>

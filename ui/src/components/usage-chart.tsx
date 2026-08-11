@@ -24,6 +24,16 @@ const SERIES_COLORS = [
 const VIEWBOX = { width: 800, height: 200, padTop: 8, padBottom: 8 };
 const TICK_FRACTIONS = [0, 0.5, 1] as const;
 
+// Built once at module scope: gateway timestamps are UTC, and explicit
+// locale and time zone keep server and browser rendering identical.
+const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
+	month: "short",
+	day: "numeric",
+	hour: "2-digit",
+	minute: "2-digit",
+	timeZone: "UTC",
+});
+
 /** Round a maximum up to a "nice" number (1, 2, 5, 10 × 10^n). */
 function niceCeil(value: number): number {
 	const magnitude = 10 ** Math.floor(Math.log10(value));
@@ -182,12 +192,6 @@ function StackedAreas({
 	}, [points, dimension, names]);
 
 	const yMax = niceCeil(cumulative.max);
-	const timeFormat = new Intl.DateTimeFormat(undefined, {
-		month: "short",
-		day: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
 	const width = VIEWBOX.width;
 	const plotHeight = VIEWBOX.height - VIEWBOX.padTop - VIEWBOX.padBottom;
 	const xFor = (index: number) =>
@@ -265,7 +269,7 @@ function StackedAreas({
 			</div>
 			<div className="mt-1 relative h-4 font-mono text-[10px] text-muted-foreground">
 				{tickIndices.map((index, tickIndex) => {
-					const label = timeFormat.format(new Date(points[index].ts));
+					const label = TIME_FORMAT.format(new Date(points[index].ts));
 					const first = tickIndex === 0;
 					const last = tickIndex === tickIndices.length - 1;
 					return (

@@ -308,7 +308,7 @@
           "admin"
         ],
         "summary": "Login",
-        "description": "Resolve admin credentials to a bearer token.\n\nOnly providers that hold credentials themselves (``static``) support this;\nOAuth and token-verifier providers return 401.",
+        "description": "Resolve admin credentials to a session.\n\nOnly providers that hold credentials themselves (``static``) support this;\nOAuth and token-verifier providers return 401. On success the bearer token\nis stored in an HttpOnly session cookie so the browser UI never persists\nit; the token stays in the response for non-browser API clients.",
         "operationId": "login_api_admin_login_post",
         "requestBody": {
           "content": {
@@ -342,6 +342,63 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/admin/session": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Establish Session",
+        "description": "Adopt a browser-flow or pasted bearer token into the session cookie.\n\nThe browser Authorization Code + PKCE flow and the pasted-token flow\nterminate in JavaScript, so the UI hands the resulting token back to the\ngateway, which verifies it and stores it in an HttpOnly cookie.",
+        "operationId": "establish_session_api_admin_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Establish Session Api Admin Session Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "End Session",
+        "description": "Clear the admin session cookie.",
+        "operationId": "end_session_api_admin_session_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           }
         }
       }
@@ -3309,6 +3366,19 @@
         ],
         "title": "ServerView",
         "description": "Admin-facing server representation with secrets masked."
+      },
+      "SessionRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "SessionRequest"
       },
       "StaticCredentialsAuthProviderConfig": {
         "properties": {
