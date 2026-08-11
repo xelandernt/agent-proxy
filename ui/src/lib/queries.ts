@@ -1,4 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import type {
+	McpServersDocument,
+	SeriesReport,
+	UsageReport,
+	UsageSeriesDocument,
+} from "#/api/generated/fastAPI";
 import {
 	mcpServersWellKnownMcpServersGet,
 	serversUsageSeriesApiServersSeriesGet,
@@ -16,25 +22,33 @@ function unwrap<T>(result: { data: unknown; status: number }): T {
 export function useMcpServers() {
 	return useQuery({
 		queryKey: ["mcp-servers"],
-		queryFn: async () => unwrap(await mcpServersWellKnownMcpServersGet()),
+		queryFn: async () =>
+			unwrap<McpServersDocument>(await mcpServersWellKnownMcpServersGet()),
 	});
 }
 
 export function useUsageSeriesAll() {
 	return useQuery({
 		queryKey: ["servers", "series"],
-		queryFn: async () => unwrap(await serversUsageSeriesApiServersSeriesGet()),
+		queryFn: async () =>
+			unwrap<UsageSeriesDocument>(
+				await serversUsageSeriesApiServersSeriesGet(),
+			),
 		refetchInterval: REFRESH_INTERVAL_MS,
 	});
 }
 
-export function useServerUsage(serverName: string, from: Date, to: Date) {
-	const fromISO = from.toISOString();
-	const toISO = to.toISOString();
+export function useServerUsage(
+	serverName: string,
+	range: { from: Date; to: Date } | null,
+) {
+	const fromISO = range?.from.toISOString() ?? "";
+	const toISO = range?.to.toISOString() ?? "";
 	return useQuery({
 		queryKey: ["server", serverName, "usage", fromISO, toISO],
+		enabled: range !== null,
 		queryFn: async () =>
-			unwrap(
+			unwrap<UsageReport>(
 				await serverUsageApiServersNameUsageGet(serverName, {
 					from: fromISO,
 					to: toISO,
@@ -44,13 +58,17 @@ export function useServerUsage(serverName: string, from: Date, to: Date) {
 	});
 }
 
-export function useServerUsageSeries(serverName: string, from: Date, to: Date) {
-	const fromISO = from.toISOString();
-	const toISO = to.toISOString();
+export function useServerUsageSeries(
+	serverName: string,
+	range: { from: Date; to: Date } | null,
+) {
+	const fromISO = range?.from.toISOString() ?? "";
+	const toISO = range?.to.toISOString() ?? "";
 	return useQuery({
 		queryKey: ["server", serverName, "usage-series", fromISO, toISO],
+		enabled: range !== null,
 		queryFn: async () =>
-			unwrap(
+			unwrap<SeriesReport>(
 				await serverUsageSeriesApiServersNameUsageSeriesGet(serverName, {
 					from: fromISO,
 					to: toISO,

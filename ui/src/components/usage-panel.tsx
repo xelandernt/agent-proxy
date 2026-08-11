@@ -1,5 +1,5 @@
 import { ActivityIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import {
@@ -12,13 +12,7 @@ import {
 } from "#/components/ui/empty";
 import { Skeleton } from "#/components/ui/skeleton";
 import { UsageChart } from "#/components/usage-chart";
-import {
-	fetchServerUsage,
-	fetchServerUsageSeries,
-	type ItemCount,
-	type SeriesReport,
-	type UsageReport,
-} from "#/lib/mcp";
+import { useServerUsage, useServerUsageSeries } from "#/lib/queries";
 
 const PRESETS = [
 	{ label: "5m", minutes: 5 },
@@ -27,12 +21,7 @@ const PRESETS = [
 	{ label: "1h", minutes: 60 },
 ] as const;
 
-type LoadState =
-	| { status: "loading" }
-	| { status: "error"; message: string }
-	| { status: "ready"; report: UsageReport; series: SeriesReport };
-
-function CountRow({ row }: { row: ItemCount }) {
+function CountRow({ row }: { row: { name: string; count: number } }) {
 	return (
 		<div className="flex items-center justify-between gap-4 py-1.5 font-mono text-sm">
 			<span className="min-w-0 truncate text-muted-foreground">{row.name}</span>
@@ -41,7 +30,13 @@ function CountRow({ row }: { row: ItemCount }) {
 	);
 }
 
-function CountList({ title, rows }: { title: string; rows: ItemCount[] }) {
+function CountList({
+	title,
+	rows,
+}: {
+	title: string;
+	rows: { name: string; count: number }[];
+}) {
 	return (
 		<div className="min-w-0 flex-1 rounded border p-4">
 			<h3 className="mb-2 font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
@@ -56,37 +51,11 @@ function CountList({ title, rows }: { title: string; rows: ItemCount[] }) {
 	);
 }
 
-function UsageContent({
-	state,
-}: {
-	state: Extract<LoadState, { status: "ready" }>;
-}) {
-	const { report, series } = state;
-	return (
-		<div className="flex flex-col gap-6">
-			<UsageChart report={series} />
-			<div className="flex items-baseline gap-3">
-				<span className="font-serif text-5xl font-bold tabular-nums tracking-tight">
-					{report.total}
-				</span>
-				<span className="text-sm text-muted-foreground">requests</span>
-			</div>
-			<div className="flex flex-col gap-4 md:flex-row">
-				<CountList title="By tool" rows={report.tools} />
-				<CountList title="By method" rows={report.methods} />
-				<CountList title="By client" rows={report.clients} />
-				<CountList title="By status" rows={report.statuses} />
-			</div>
-		</div>
-	);
-}
-
 export function UsagePanel({ serverName }: { serverName: string }) {
 	const [presetMinutes, setPresetMinutes] = useState<number>(60);
 	const [customFrom, setCustomFrom] = useState<string>("");
 	const [customTo, setCustomTo] = useState<string>("");
 	const [customActive, setCustomActive] = useState(false);
-	const [state, setState] = useState<LoadState>({ status: "loading" });
 
 	const range = useMemo(() => {
 		if (customActive) {
@@ -100,39 +69,16 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 		return { from: new Date(to.getTime() - presetMinutes * 60_000), to };
 	}, [customActive, customFrom, customTo, presetMinutes]);
 
-	const load = useCallback(() => {
-		if (!range) return undefined;
-		const controller = new AbortController();
-		setState({ status: "loading" });
-		Promise.all([
-			fetchServerUsage(serverName, range.from, range.to, controller.signal),
-			fetchServerUsageSeries(
-				serverName,
-				range.from,
-				range.to,
-				controller.signal,
-			),
-		])
-			.then(([report, series]) => setState({ status: "ready", report, series }))
-			.catch((error: unknown) => {
-				if (controller.signal.aborted) return;
-				setState({
-					status: "error",
-					message: error instanceof Error ? error.message : String(error),
-				});
-			});
-		return controller;
-	}, [range, serverName]);
-
-	useEffect(() => {
-		const controller = load();
-		return () => controller?.abort();
-	}, [load]);
+	const usageQuery = useServerUsage(serverName, range);
+	const seriesQuery = useServerUsageSeries(serverName, range);
 
 	const applyCustom = () => {
 		if (!customFrom || !customTo) return;
 		setCustomActive(true);
 	};
+
+	const error = usageQuery.error ?? seriesQuery.error;
+	const loading = usageQuery.isLoading || seriesQuery.isLoading;
 
 	return (
 		<Card>
@@ -186,30 +132,54 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 						</Button>
 					</div>
 				</div>
-				{state.status === "loading" && (
+				{loading && (
 					<div className="flex flex-col gap-4">
 						<Skeleton className="h-44 w-full" />
 						<Skeleton className="h-10 w-28" />
 						<Skeleton className="h-40 w-full" />
 					</div>
 				)}
-				{state.status === "error" && (
+				{!loading && error && (
 					<Empty>
 						<EmptyMedia variant="icon">
 							<ActivityIcon />
 						</EmptyMedia>
 						<EmptyHeader>
 							<EmptyTitle>Could not load usage</EmptyTitle>
-							<EmptyDescription>{state.message}</EmptyDescription>
+							<EmptyDescription>
+								{error instanceof Error ? error.message : String(error)}
+							</EmptyDescription>
 						</EmptyHeader>
 						<EmptyContent>
-							<Button variant="outline" onClick={() => load()}>
+							<Button
+								variant="outline"
+								onClick={() => {
+									usageQuery.refetch();
+									seriesQuery.refetch();
+								}}
+							>
 								Retry
 							</Button>
 						</EmptyContent>
 					</Empty>
 				)}
-				{state.status === "ready" && <UsageContent state={state} />}
+				{!loading && !error && usageQuery.data && seriesQuery.data && (
+					<div className="flex flex-col gap-6">
+						<UsageChart report={seriesQuery.data} />
+						<div className="flex items-baseline gap-3">
+							<span className="font-serif text-5xl font-bold tabular-nums tracking-tight">
+								{usageQuery.data.total}
+							</span>
+							<span className="text-sm text-muted-foreground">requests</span>
+						</div>
+						<div className="flex flex-col gap-4 md:flex-row">
+							<CountList title="By tool" rows={usageQuery.data.tools} />
+							<CountList title="By method" rows={usageQuery.data.methods} />
+							<CountList title="By client" rows={usageQuery.data.clients} />
+							<CountList title="By status" rows={usageQuery.data.statuses} />
+						</div>
+					</div>
+				)}
 			</CardContent>
 		</Card>
 	);

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ServerCogIcon, ServerIcon } from "lucide-react";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { HarnessPanel } from "#/components/harness-panel";
 import { Sparkline } from "#/components/sparkline";
 import { Badge } from "#/components/ui/badge";
@@ -28,75 +28,27 @@ import {
 	setSelectedHarnessId,
 	subscribeHarnessSelection,
 } from "#/lib/harnesses";
-import {
-	fetchMcpServers,
-	fetchUsageSeriesAll,
-	type McpServerListing,
-	type SeriesPoint,
-} from "#/lib/mcp";
+import type { McpServerListing, SeriesPoint } from "#/lib/mcp";
+import { useMcpServers, useUsageSeriesAll } from "#/lib/queries";
 import { cn } from "#/lib/utils";
 
 export const Route = createFileRoute("/")({ component: Home });
 
-type LoadState =
-	| { status: "loading" }
-	| { status: "error"; message: string }
-	| { status: "ready"; servers: McpServerListing[] };
-
-type SparkState =
-	| { status: "loading" }
-	| { status: "error" }
-	| { status: "ready"; byServer: Map<string, SeriesPoint[]> };
-
 function Home() {
-	const [state, setState] = useState<LoadState>({ status: "loading" });
-	const [sparkState, setSparkState] = useState<SparkState>({
-		status: "loading",
-	});
 	const harnessId = useSyncExternalStore(
 		subscribeHarnessSelection,
 		selectedHarnessId,
 		() => HARNESSES[0].id,
 	);
+	const serversQuery = useMcpServers();
+	const seriesQuery = useUsageSeriesAll();
 
-	const load = useCallback(() => {
-		const controller = new AbortController();
-		setState({ status: "loading" });
-		fetchMcpServers(controller.signal)
-			.then((document) =>
-				setState({ status: "ready", servers: document.servers }),
-			)
-			.catch((error: unknown) => {
-				if (controller.signal.aborted) return;
-				setState({
-					status: "error",
-					message: error instanceof Error ? error.message : String(error),
-				});
-			});
-		return controller;
-	}, []);
-
-	useEffect(() => {
-		const controller = load();
-		return () => controller.abort();
-	}, [load]);
-
-	useEffect(() => {
-		const controller = new AbortController();
-		fetchUsageSeriesAll(controller.signal)
-			.then((document) =>
-				setSparkState({
-					status: "ready",
-					byServer: new Map(
-						document.servers.map((entry) => [entry.name, entry.points]),
-					),
-				}),
-			)
-			.catch(() => {
-				if (!controller.signal.aborted) setSparkState({ status: "error" });
-			});
-		return () => controller.abort();
-	}, []);
+	const byServer = new Map(
+		(seriesQuery.data?.servers ?? []).map((entry) => [
+			entry.name,
+			entry.points,
+		]),
+	);
 
 	return (
 		<div className="mx-auto flex w-full max-w-4xl flex-col gap-10 p-8">
@@ -122,24 +74,28 @@ function Home() {
 				</Link>
 			</header>
 
-			{state.status === "loading" && <ServerGridSkeleton />}
-			{state.status === "error" && (
+			{serversQuery.isLoading && <ServerGridSkeleton />}
+			{serversQuery.isError && (
 				<Empty>
 					<EmptyMedia variant="icon">
 						<ServerIcon />
 					</EmptyMedia>
 					<EmptyHeader>
 						<EmptyTitle>Could not load MCP servers</EmptyTitle>
-						<EmptyDescription>{state.message}</EmptyDescription>
+						<EmptyDescription>
+							{serversQuery.error instanceof Error
+								? serversQuery.error.message
+								: String(serversQuery.error)}
+						</EmptyDescription>
 					</EmptyHeader>
 					<EmptyContent>
-						<Button variant="outline" onClick={() => load()}>
+						<Button variant="outline" onClick={() => serversQuery.refetch()}>
 							Retry
 						</Button>
 					</EmptyContent>
 				</Empty>
 			)}
-			{state.status === "ready" && state.servers.length === 0 && (
+			{serversQuery.isSuccess && serversQuery.data.servers.length === 0 && (
 				<Empty>
 					<EmptyMedia variant="icon">
 						<ServerIcon />
@@ -159,19 +115,15 @@ function Home() {
 					</EmptyHeader>
 				</Empty>
 			)}
-			{state.status === "ready" && state.servers.length > 0 && (
+			{serversQuery.isSuccess && serversQuery.data.servers.length > 0 && (
 				<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-					{state.servers.map((server) => (
+					{serversQuery.data.servers.map((server) => (
 						<ServerCard
 							key={server.name}
 							server={server}
 							harnessId={harnessId}
 							onHarnessIdChange={setSelectedHarnessId}
-							sparkline={
-								sparkState.status === "ready"
-									? sparkState.byServer.get(server.name)
-									: undefined
-							}
+							sparkline={byServer.get(server.name)}
 						/>
 					))}
 				</div>

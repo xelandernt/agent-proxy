@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ServerIcon } from "lucide-react";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { HarnessPanel } from "#/components/harness-panel";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -22,56 +22,22 @@ import {
 	setSelectedHarnessId,
 	subscribeHarnessSelection,
 } from "#/lib/harnesses";
-import { fetchMcpServers, type McpServerListing } from "#/lib/mcp";
+import { useMcpServers } from "#/lib/queries";
 import { cn } from "#/lib/utils";
 
 export const Route = createFileRoute("/$serverName")({ component: ServerPage });
 
-type LoadState =
-	| { status: "loading" }
-	| { status: "error"; message: string }
-	| { status: "ready"; server: McpServerListing };
-
 function ServerPage() {
 	const { serverName } = Route.useParams();
-	const [state, setState] = useState<LoadState>({ status: "loading" });
 	const harnessId = useSyncExternalStore(
 		subscribeHarnessSelection,
 		selectedHarnessId,
 		() => HARNESSES[0].id,
 	);
-
-	const load = useCallback(() => {
-		const controller = new AbortController();
-		setState({ status: "loading" });
-		fetchMcpServers(controller.signal)
-			.then((document) => {
-				const server = document.servers.find(
-					(candidate) => candidate.name === serverName,
-				);
-				if (!server) {
-					setState({
-						status: "error",
-						message: `Unknown MCP server "${serverName}".`,
-					});
-					return;
-				}
-				setState({ status: "ready", server });
-			})
-			.catch((error: unknown) => {
-				if (controller.signal.aborted) return;
-				setState({
-					status: "error",
-					message: error instanceof Error ? error.message : String(error),
-				});
-			});
-		return controller;
-	}, [serverName]);
-
-	useEffect(() => {
-		const controller = load();
-		return () => controller.abort();
-	}, [load]);
+	const serversQuery = useMcpServers();
+	const server = serversQuery.data?.servers.find(
+		(candidate) => candidate.name === serverName,
+	);
 
 	return (
 		<div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-8">
@@ -83,31 +49,48 @@ function ServerPage() {
 				All servers
 			</Link>
 
-			{state.status === "loading" && <ServerPageSkeleton />}
-			{state.status === "error" && (
+			{serversQuery.isLoading && <ServerPageSkeleton />}
+			{serversQuery.isError && (
 				<Empty>
 					<EmptyMedia variant="icon">
 						<ServerIcon />
 					</EmptyMedia>
 					<EmptyHeader>
 						<EmptyTitle>Server not found</EmptyTitle>
-						<EmptyDescription>{state.message}</EmptyDescription>
+						<EmptyDescription>
+							{serversQuery.error instanceof Error
+								? serversQuery.error.message
+								: String(serversQuery.error)}
+						</EmptyDescription>
 					</EmptyHeader>
 					<EmptyContent>
-						<Button variant="outline" onClick={() => load()}>
+						<Button variant="outline" onClick={() => serversQuery.refetch()}>
 							Retry
 						</Button>
 					</EmptyContent>
 				</Empty>
 			)}
-			{state.status === "ready" && (
+			{serversQuery.isSuccess && !server && (
+				<Empty>
+					<EmptyMedia variant="icon">
+						<ServerIcon />
+					</EmptyMedia>
+					<EmptyHeader>
+						<EmptyTitle>Server not found</EmptyTitle>
+						<EmptyDescription>
+							Unknown MCP server "{serverName}".
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			)}
+			{serversQuery.isSuccess && server && (
 				<>
 					<header className="flex flex-col gap-3">
 						<div className="flex items-center gap-3">
 							<h1 className="font-serif text-4xl font-bold tracking-tight">
-								{state.server.name}
+								{server.name}
 							</h1>
-							{state.server.auth === "oauth2" && (
+							{server.auth === "oauth2" && (
 								<Badge
 									variant="outline"
 									className="gap-1.5 px-2.5 py-1 text-xs font-medium text-muted-foreground"
@@ -118,11 +101,11 @@ function ServerPage() {
 							)}
 						</div>
 						<p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-							{state.server.description || "No description provided."}
+							{server.description || "No description provided."}
 						</p>
-						<ServerUrlRow url={state.server.url} />
+						<ServerUrlRow url={server.url} />
 					</header>
-					<UsagePanel serverName={state.server.name} />
+					<UsagePanel serverName={server.name} />
 					<Card>
 						<CardHeader>
 							<CardTitle className="font-sans text-base font-semibold">
@@ -131,7 +114,7 @@ function ServerPage() {
 						</CardHeader>
 						<CardContent>
 							<HarnessPanel
-								server={state.server}
+								server={server}
 								harnessId={harnessId}
 								onHarnessIdChange={setSelectedHarnessId}
 							/>
