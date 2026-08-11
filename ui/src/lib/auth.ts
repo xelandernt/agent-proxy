@@ -1,6 +1,11 @@
 import * as oauth from "oauth4webapi";
 
-import { GATEWAY_URL } from "#/lib/gateway";
+import {
+	authStatusApiAdminAuthStatusGet,
+	type LoginApiAdminLoginPost200,
+	loginApiAdminLoginPost,
+	meApiAdminMeGet,
+} from "#/api/generated/fastAPI";
 
 export const TOKEN_KEY = "admin-token";
 const PKCE_STATE_KEY = "admin-oauth-state";
@@ -36,47 +41,42 @@ export function clearAdminToken(): void {
 
 export async function fetchAdminAuthInfo(): Promise<AdminAuthInfo | null> {
 	try {
-		const response = await fetch(`${GATEWAY_URL}/api/admin/auth-status`);
-		if (!response.ok) return null;
-		return (await response.json()) as AdminAuthInfo;
+		const result = await authStatusApiAdminAuthStatusGet();
+		if (result.status !== 200) return null;
+		const payload = result.data as AdminAuthInfo;
+		return payload;
 	} catch {
 		return null;
 	}
 }
 
 export async function checkAdminAuth(token: string): Promise<AdminAuthStatus> {
-	let response: Response;
 	try {
-		response = await fetch(`${GATEWAY_URL}/api/admin/me`, {
+		const result = await meApiAdminMeGet({
 			headers: { Authorization: `Bearer ${token}` },
 		});
+		if (result.status === 200) return "authenticated";
+		if (result.status === 503) return "unconfigured";
+		return "unauthenticated";
 	} catch {
 		return "error";
 	}
-	if (response.status === 200) return "authenticated";
-	if (response.status === 503) return "unconfigured";
-	return "unauthenticated";
 }
 
 export async function loginWithPassword(
 	username: string,
 	password: string,
 ): Promise<boolean> {
-	let response: Response;
 	try {
-		response = await fetch(`${GATEWAY_URL}/api/admin/login`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ username, password }),
-		});
+		const result = await loginApiAdminLoginPost({ username, password });
+		if (result.status !== 200) return false;
+		const payload = result.data as LoginApiAdminLoginPost200;
+		if (typeof payload.token !== "string") return false;
+		setAdminToken(payload.token);
+		return true;
 	} catch {
 		return false;
 	}
-	if (!response.ok) return false;
-	const payload = (await response.json()) as { token?: string };
-	if (!payload.token) return false;
-	setAdminToken(payload.token);
-	return true;
 }
 
 function adminCallbackUrl(): string {

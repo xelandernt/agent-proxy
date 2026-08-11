@@ -1,20 +1,19 @@
-import { GATEWAY_URL } from "#/lib/mcp";
+import type {
+	ServerCreateRequest,
+	ServerUpdateRequest,
+	ServerView,
+} from "#/api/generated/fastAPI";
+import {
+	authSchemaApiAdminAuthSchemaGet,
+	createServerApiAdminServersPost,
+	deleteServerApiAdminServersNameDelete,
+	listServersApiAdminServersGet,
+	updateServerApiAdminServersNamePut,
+} from "#/api/generated/fastAPI";
+import { adminHeaders } from "#/lib/gateway";
 
-export type AdminServer = {
-	name: string;
-	description: string;
-	upstream_url: string;
-	auth: Record<string, unknown>;
-	verify_upstream_tls: boolean;
-};
-
-export type ServerPayload = {
-	name?: string;
-	description: string;
-	upstream_url: string;
-	auth: Record<string, unknown>;
-	verify_upstream_tls: boolean;
-};
+export type AdminServer = ServerView;
+export type ServerPayload = ServerCreateRequest | ServerUpdateRequest;
 
 export type FieldError = {
 	field: string;
@@ -59,84 +58,64 @@ function extractFieldErrors(detail: unknown): FieldError[] {
 	return errors;
 }
 
-async function adminFetch<T>(
-	token: string,
-	path: string,
-	init?: RequestInit,
-): Promise<T | null> {
-	const response = await fetch(`${GATEWAY_URL}${path}`, {
-		...init,
-		headers: {
-			Authorization: `Bearer ${token}`,
-			...(init?.body ? { "Content-Type": "application/json" } : {}),
-			...init?.headers,
-		},
-	});
-	if (!response.ok) {
-		let message = `Request failed (${response.status}).`;
-		let fieldErrors: FieldError[] = [];
-		try {
-			const payload = (await response.json()) as { detail?: unknown };
-			if (typeof payload.detail === "string") {
-				message = payload.detail;
-			} else {
-				fieldErrors = extractFieldErrors(payload.detail);
-				if (fieldErrors.length > 0) {
-					message = fieldErrors
-						.map((error) => `${error.field}: ${error.message}`)
-						.join("; ");
-				}
-			}
-		} catch {
-			// Non-JSON error body; keep the generic message.
+function adminError<T>(status: number, data: T): AdminApiError {
+	let message = `Request failed (${status}).`;
+	let fieldErrors: FieldError[] = [];
+	const detail = (data as { detail?: unknown } | null | undefined)?.detail;
+	if (typeof detail === "string") {
+		message = detail;
+	} else {
+		fieldErrors = extractFieldErrors(detail);
+		if (fieldErrors.length > 0) {
+			message = fieldErrors
+				.map((error) => `${error.field}: ${error.message}`)
+				.join("; ");
 		}
-		throw new AdminApiError(response.status, message, fieldErrors);
 	}
-	if (response.status === 204) return null;
-	return (await response.json()) as T;
+	return new AdminApiError(status, message, fieldErrors);
 }
 
-export function listAdminServers(token: string): Promise<AdminServer[]> {
-	return adminFetch<AdminServer[]>(token, "/api/admin/servers") as Promise<
-		AdminServer[]
-	>;
+export async function listAdminServers(): Promise<AdminServer[]> {
+	const result = await listServersApiAdminServersGet({
+		headers: adminHeaders(),
+	});
+	if (result.status === 200) return result.data as AdminServer[];
+	throw adminError(result.status, result.data);
 }
 
-export function createAdminServer(
-	token: string,
-	payload: ServerPayload,
+export async function createAdminServer(
+	payload: ServerCreateRequest,
 ): Promise<AdminServer> {
-	return adminFetch<AdminServer>(token, "/api/admin/servers", {
-		method: "POST",
-		body: JSON.stringify(payload),
-	}) as Promise<AdminServer>;
+	const result = await createServerApiAdminServersPost(payload, {
+		headers: adminHeaders(),
+	});
+	if (result.status === 201) return result.data as AdminServer;
+	throw adminError(result.status, result.data);
 }
 
-export function updateAdminServer(
-	token: string,
+export async function updateAdminServer(
 	name: string,
-	payload: ServerPayload,
+	payload: ServerUpdateRequest,
 ): Promise<AdminServer> {
-	return adminFetch<AdminServer>(
-		token,
-		`/api/admin/servers/${encodeURIComponent(name)}`,
-		{ method: "PUT", body: JSON.stringify(payload) },
-	) as Promise<AdminServer>;
+	const result = await updateServerApiAdminServersNamePut(name, payload, {
+		headers: adminHeaders(),
+	});
+	if (result.status === 200) return result.data as AdminServer;
+	throw adminError(result.status, result.data);
 }
 
-export function deleteAdminServer(token: string, name: string): Promise<null> {
-	return adminFetch<null>(
-		token,
-		`/api/admin/servers/${encodeURIComponent(name)}`,
-		{ method: "DELETE" },
-	);
+export async function deleteAdminServer(name: string): Promise<void> {
+	const result = await deleteServerApiAdminServersNameDelete(name, {
+		headers: adminHeaders(),
+	});
+	if (result.status === 204) return;
+	throw adminError(result.status, result.data);
 }
 
-export function fetchAuthSchema(
-	token: string,
-): Promise<Record<string, unknown>> {
-	return adminFetch<Record<string, unknown>>(
-		token,
-		"/api/admin/auth-schema",
-	) as Promise<Record<string, unknown>>;
+export async function fetchAuthSchema(): Promise<Record<string, unknown>> {
+	const result = await authSchemaApiAdminAuthSchemaGet({
+		headers: adminHeaders(),
+	});
+	if (result.status === 200) return result.data as Record<string, unknown>;
+	throw adminError(result.status, result.data);
 }

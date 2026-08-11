@@ -6,7 +6,7 @@ import {
 	ServerIcon,
 	Trash2Icon,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -26,67 +26,35 @@ import {
 	EmptyTitle,
 } from "#/components/ui/empty";
 import { Skeleton } from "#/components/ui/skeleton";
-import {
-	AdminApiError,
-	type AdminServer,
-	deleteAdminServer,
-	listAdminServers,
-} from "#/lib/admin";
-import { getAdminToken } from "#/lib/auth";
+import { AdminApiError } from "#/lib/admin";
+import { useAdminServers, useDeleteServer } from "#/lib/admin-queries";
 
 export const Route = createFileRoute("/admin/")({ component: AdminIndex });
 
-type LoadState =
-	| { status: "loading" }
-	| { status: "error"; message: string }
-	| { status: "ready"; servers: AdminServer[] };
-
-function providerName(server: AdminServer): string {
-	const auth = server.auth;
-	return typeof auth.provider === "string" ? auth.provider : "unknown";
+function providerName(server: { auth: unknown }): string {
+	const auth = server.auth as { provider?: unknown } | null;
+	return typeof auth?.provider === "string" ? auth.provider : "unknown";
 }
 
 function AdminIndex() {
-	const [state, setState] = useState<LoadState>({ status: "loading" });
 	const [deleting, setDeleting] = useState<string | null>(null);
+	const serversQuery = useAdminServers();
+	const deleteMutation = useDeleteServer();
 
-	const load = useCallback(() => {
-		const token = getAdminToken();
-		if (!token) {
-			setState({ status: "error", message: "Not authenticated." });
-			return;
-		}
-		setState({ status: "loading" });
-		listAdminServers(token)
-			.then((servers) => setState({ status: "ready", servers }))
-			.catch((error: unknown) => {
-				setState({
-					status: "error",
-					message: error instanceof Error ? error.message : String(error),
-				});
-			});
-	}, []);
-
-	useEffect(() => {
-		load();
-	}, [load]);
-
-	const remove = async (server: AdminServer) => {
-		const token = getAdminToken();
-		if (!token) return;
-		if (!window.confirm(`Delete server "${server.name}"?`)) return;
-		setDeleting(server.name);
+	const remove = async (name: string) => {
+		if (!window.confirm(`Delete server "${name}"?`)) return;
+		setDeleting(name);
 		try {
-			await deleteAdminServer(token, server.name);
-			toast.success(`Deleted ${server.name}`);
-			load();
+			await deleteMutation.mutateAsync(name);
+			toast.success(`Deleted ${name}`);
 		} catch (error) {
-			setDeleting(null);
 			if (error instanceof AdminApiError) {
 				toast.error(error.message);
 			} else {
 				toast.error("Failed to delete server.");
 			}
+		} finally {
+			setDeleting(null);
 		}
 	};
 
@@ -120,24 +88,28 @@ function AdminIndex() {
 				</Link>
 			</header>
 
-			{state.status === "loading" && <ServerListSkeleton />}
-			{state.status === "error" && (
+			{serversQuery.isLoading && <ServerListSkeleton />}
+			{serversQuery.isError && (
 				<Empty>
 					<EmptyMedia variant="icon">
 						<ServerIcon />
 					</EmptyMedia>
 					<EmptyHeader>
 						<EmptyTitle>Could not load servers</EmptyTitle>
-						<EmptyDescription>{state.message}</EmptyDescription>
+						<EmptyDescription>
+							{serversQuery.error instanceof Error
+								? serversQuery.error.message
+								: String(serversQuery.error)}
+						</EmptyDescription>
 					</EmptyHeader>
 					<EmptyContent>
-						<Button variant="outline" onClick={load}>
+						<Button variant="outline" onClick={() => serversQuery.refetch()}>
 							Retry
 						</Button>
 					</EmptyContent>
 				</Empty>
 			)}
-			{state.status === "ready" && state.servers.length === 0 && (
+			{serversQuery.isSuccess && serversQuery.data.length === 0 && (
 				<Empty>
 					<EmptyMedia variant="icon">
 						<ServerIcon />
@@ -158,9 +130,9 @@ function AdminIndex() {
 					</EmptyContent>
 				</Empty>
 			)}
-			{state.status === "ready" && state.servers.length > 0 && (
+			{serversQuery.isSuccess && serversQuery.data.length > 0 && (
 				<div className="flex flex-col gap-4">
-					{state.servers.map((server) => (
+					{serversQuery.data.map((server) => (
 						<Card key={server.name}>
 							<CardHeader className="flex-row items-center justify-between">
 								<CardTitle className="truncate font-sans text-base font-semibold">
@@ -199,7 +171,7 @@ function AdminIndex() {
 									variant="outline"
 									size="sm"
 									disabled={deleting === server.name}
-									onClick={() => remove(server)}
+									onClick={() => remove(server.name)}
 									className="text-destructive"
 								>
 									<Trash2Icon className="size-3.5" />

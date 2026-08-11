@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
 	AuthProviderForm,
@@ -17,11 +17,14 @@ import {
 } from "#/components/ui/card";
 import {
 	AdminApiError,
-	createAdminServer,
-	fetchAuthSchema,
+	type FieldError,
 	type ServerPayload,
-	updateAdminServer,
 } from "#/lib/admin";
+import {
+	useAuthSchema,
+	useCreateServer,
+	useUpdateServer,
+} from "#/lib/admin-queries";
 import { getAdminToken } from "#/lib/auth";
 import { cn } from "#/lib/utils";
 
@@ -91,11 +94,16 @@ export function ServerForm({
 	title: string;
 	description: string;
 	mode: "create" | "edit";
-	initial?: ServerPayload;
+	initial?: {
+		name?: string;
+		description: string;
+		upstream_url: string;
+		auth: Record<string, unknown>;
+		verify_upstream_tls: boolean;
+	};
 	onDone: () => void;
 	onCancelHref: string;
 }) {
-	const [state, setState] = useState<FormState>({ status: "loading" });
 	const [name, setName] = useState(initial?.name ?? "");
 	const [descriptionText, setDescriptionText] = useState(
 		initial?.description ?? "",
@@ -107,45 +115,53 @@ export function ServerForm({
 	const [auth, setAuth] = useState<Record<string, unknown>>(
 		initial?.auth ?? {},
 	);
-	const [fieldErrors, setFieldErrors] = useState<
-		Array<{ field: string; message: string }>
-	>([]);
+	const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 	const [saving, setSaving] = useState(false);
+	const authSchemaQuery = useAuthSchema();
+	const createMutation = useCreateServer();
+	const updateMutation = useUpdateServer();
 
-	useEffect(() => {
-		const token = getAdminToken();
-		if (!token) {
-			setState({ status: "error", message: "Not authenticated." });
-			return;
-		}
-		fetchAuthSchema(token)
-			.then((schema) => setState({ status: "ready", schema }))
-			.catch((error: unknown) => {
-				setState({
-					status: "error",
-					message: error instanceof Error ? error.message : String(error),
-				});
-			});
-	}, []);
+	const state: FormState = !getAdminToken()
+		? { status: "error", message: "Not authenticated." }
+		: authSchemaQuery.isLoading
+			? { status: "loading" }
+			: authSchemaQuery.isError
+				? {
+						status: "error",
+						message:
+							authSchemaQuery.error instanceof Error
+								? authSchemaQuery.error.message
+								: String(authSchemaQuery.error),
+					}
+				: authSchemaQuery.isSuccess
+					? {
+							status: "ready",
+							schema: authSchemaQuery.data as AuthProviderSchema,
+						}
+					: { status: "error", message: "Not authenticated." };
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
-		const token = getAdminToken();
-		if (!token) return;
+		if (!getAdminToken()) return;
 		setFieldErrors([]);
-		const payload: ServerPayload = {
+		const payload = {
 			...(mode === "create" ? { name } : {}),
 			description: descriptionText,
 			upstream_url: upstreamUrl,
 			auth: stripMaskedSecrets(auth),
 			verify_upstream_tls: verifyTls,
-		};
+		} as unknown as ServerPayload;
 		setSaving(true);
 		try {
 			if (mode === "create") {
-				await createAdminServer(token, payload);
+				await createMutation.mutateAsync(
+					payload as ServerPayload & { name: string },
+				);
 			} else if (initial?.name) {
-				await updateAdminServer(token, initial.name, payload);
+				await updateMutation.mutateAsync({
+					name: initial.name,
+					payload,
+				});
 			}
 			toast.success(mode === "create" ? "Server created" : "Server updated");
 			onDone();

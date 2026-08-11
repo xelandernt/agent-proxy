@@ -9,5 +9,3 @@ export type {
 	UsageReport,
 	UsageSeriesDocument,
 } from "#/api/generated/fastAPI";
-
-export { GATEWAY_URL } from "#/lib/gateway";

@@ -1,72 +1,49 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
 import { ServerForm } from "#/components/server-form";
-import { type AdminServer, listAdminServers } from "#/lib/admin";
-import { getAdminToken } from "#/lib/auth";
+import { useAdminServers } from "#/lib/admin-queries";
 
 export const Route = createFileRoute("/admin/$serverName/edit")({
 	component: AdminEdit,
 });
 
-type LoadState =
-	| { status: "loading" }
-	| { status: "error"; message: string }
-	| { status: "ready"; server: AdminServer };
-
 function AdminEdit() {
 	const { serverName } = Route.useParams();
 	const navigate = useNavigate();
-	const [state, setState] = useState<LoadState>({ status: "loading" });
+	const serversQuery = useAdminServers();
+	const server = serversQuery.data?.find(
+		(candidate) => candidate.name === serverName,
+	);
 
-	const load = useCallback(() => {
-		const token = getAdminToken();
-		if (!token) {
-			setState({ status: "error", message: "Not authenticated." });
-			return;
-		}
-		listAdminServers(token)
-			.then((servers) => {
-				const server = servers.find(
-					(candidate) => candidate.name === serverName,
-				);
-				if (!server) {
-					setState({
-						status: "error",
-						message: `Unknown server "${serverName}".`,
-					});
-					return;
-				}
-				setState({ status: "ready", server });
-			})
-			.catch((error: unknown) => {
-				setState({
-					status: "error",
-					message: error instanceof Error ? error.message : String(error),
-				});
-			});
-	}, [serverName]);
-
-	useEffect(() => {
-		load();
-	}, [load]);
-
-	if (state.status === "loading") {
+	if (serversQuery.isLoading) {
 		return <p className="p-8 text-sm text-muted-foreground">Loading…</p>;
 	}
-	if (state.status === "error") {
-		return <p className="p-8 text-sm text-destructive">{state.message}</p>;
+	if (serversQuery.isError) {
+		return (
+			<p className="p-8 text-sm text-destructive">
+				{serversQuery.error instanceof Error
+					? serversQuery.error.message
+					: String(serversQuery.error)}
+			</p>
+		);
+	}
+	if (!server) {
+		return (
+			<p className="p-8 text-sm text-destructive">
+				Unknown server "{serverName}".
+			</p>
+		);
 	}
 	return (
 		<ServerForm
-			title={`Edit ${state.server.name}`}
+			title={`Edit ${server.name}`}
 			description="Changes apply to the running gateway immediately."
 			mode="edit"
 			initial={{
-				name: state.server.name,
-				description: state.server.description,
-				upstream_url: state.server.upstream_url,
-				auth: state.server.auth,
-				verify_upstream_tls: state.server.verify_upstream_tls,
+				name: server.name,
+				description: server.description,
+				upstream_url: server.upstream_url,
+				auth: server.auth as unknown as Record<string, unknown>,
+				verify_upstream_tls: server.verify_upstream_tls,
 			}}
 			onDone={() => navigate({ to: "/admin" })}
 			onCancelHref="/admin"
