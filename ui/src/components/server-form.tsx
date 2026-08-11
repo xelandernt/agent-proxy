@@ -1,4 +1,5 @@
-import { Loader2Icon } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -8,6 +9,12 @@ import {
 	SECRET_MASK,
 } from "#/components/auth-provider-form";
 import { Button } from "#/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardFooter,
+	CardHeader,
+} from "#/components/ui/card";
 import {
 	AdminApiError,
 	createAdminServer,
@@ -161,91 +168,105 @@ export function ServerForm({
 			onSubmit={submit}
 			className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8"
 		>
-			<header className="flex flex-col gap-2">
-				<p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
-					Agent Gateway
-				</p>
-				<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-3xl font-bold tracking-tight text-transparent">
-					{title}
-				</h1>
-				<p className="text-sm text-muted-foreground">{description}</p>
-			</header>
+			<Link
+				to="/admin"
+				className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+			>
+				<ArrowLeftIcon className="size-3" />
+				Back to servers
+			</Link>
 
-			{state.status === "loading" && (
-				<p className="text-sm text-muted-foreground">Loading…</p>
-			)}
-			{state.status === "error" && (
-				<p className="text-sm text-destructive">{state.message}</p>
-			)}
-			{state.status === "ready" && (
-				<>
-					<div className="flex flex-col gap-4">
-						{mode === "create" && (
+			<Card>
+				<CardHeader className="flex flex-col items-start gap-2">
+					<p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
+						Agent Gateway
+					</p>
+					<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-3xl font-bold tracking-tight text-transparent">
+						{title}
+					</h1>
+					<p className="text-sm text-muted-foreground">{description}</p>
+				</CardHeader>
+
+				{state.status === "loading" && (
+					<CardContent>
+						<p className="text-sm text-muted-foreground">Loading…</p>
+					</CardContent>
+				)}
+				{state.status === "error" && (
+					<CardContent>
+						<p className="text-sm text-destructive">{state.message}</p>
+					</CardContent>
+				)}
+				{state.status === "ready" && (
+					<>
+						<CardContent className="flex flex-col gap-4">
+							{mode === "create" && (
+								<TextField
+									label="Name *"
+									value={name}
+									onChange={setName}
+									placeholder="calendar"
+									error={errorFor("name")}
+								/>
+							)}
 							<TextField
-								label="Name *"
-								value={name}
-								onChange={setName}
-								placeholder="calendar"
-								error={errorFor("name")}
+								label="Description"
+								value={descriptionText}
+								onChange={setDescriptionText}
+								placeholder="What does this server expose?"
+								error={errorFor("description")}
 							/>
-						)}
-						<TextField
-							label="Description"
-							value={descriptionText}
-							onChange={setDescriptionText}
-							placeholder="What does this server expose?"
-							error={errorFor("description")}
-						/>
-						<TextField
-							label="Upstream URL *"
-							type="url"
-							value={upstreamUrl}
-							onChange={setUpstreamUrl}
-							placeholder="http://calendar.internal:8000/mcp"
-							error={errorFor("upstream_url")}
-						/>
-						<div className="flex items-center gap-2">
-							<input
-								id="verify-tls"
-								type="checkbox"
-								checked={verifyTls}
-								onChange={(event) => setVerifyTls(event.target.checked)}
-								className="size-4 rounded border-border accent-[var(--color-primary)]"
+							<TextField
+								label="Upstream URL *"
+								type="url"
+								value={upstreamUrl}
+								onChange={setUpstreamUrl}
+								placeholder="http://calendar.internal:8000/mcp"
+								error={errorFor("upstream_url")}
 							/>
-							<label
-								htmlFor="verify-tls"
-								className="font-mono text-xs text-muted-foreground"
-							>
-								verify_upstream_tls
-							</label>
+							<div className="flex items-center gap-2">
+								<input
+									id="verify-tls"
+									type="checkbox"
+									checked={verifyTls}
+									onChange={(event) => setVerifyTls(event.target.checked)}
+									className="size-4 rounded border-border accent-[var(--color-primary)]"
+								/>
+								<label
+									htmlFor="verify-tls"
+									className="font-mono text-xs text-muted-foreground"
+								>
+									verify_upstream_tls
+								</label>
+							</div>
+						</CardContent>
+
+						<div className="rounded-md border p-4">
+							<p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
+								Authentication
+							</p>
+							<AuthProviderForm
+								schema={state.schema}
+								value={auth}
+								onChange={setAuth}
+								fieldErrors={fieldErrors}
+							/>
 						</div>
-					</div>
 
-					<div className="rounded-md border p-4">
-						<p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
-							Authentication
-						</p>
-						<AuthProviderForm
-							schema={state.schema}
-							value={auth}
-							onChange={setAuth}
-							fieldErrors={fieldErrors}
-						/>
-					</div>
-
-					<div className="flex justify-end gap-2">
-						<a href={onCancelHref}>
-							<Button type="button" variant="ghost">
-								Cancel
+						<CardFooter className="justify-end gap-2">
+							<a href={onCancelHref}>
+								<Button type="button" variant="ghost">
+									Cancel
+								</Button>
+							</a>
+							<Button type="submit" disabled={saving}>
+								{saving && <Loader2Icon className="size-4 animate-spin" />}
+								{mode === "create" ? "Create server" : "Save changes"}
 							</Button>
-						</a>
-						<Button type="submit" disabled={saving}>
-							{saving && <Loader2Icon className="size-4 animate-spin" />}
-							{mode === "create" ? "Create server" : "Save changes"}
-						</Button>
-					</div>
-				</>
-			)}
+						</CardFooter>
+					</>
+				)}
+			</Card>
 		</form>
 	);
 }

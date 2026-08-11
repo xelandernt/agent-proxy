@@ -1,5 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PencilIcon, PlusIcon, ServerIcon, Trash2Icon } from "lucide-react";
+import {
+	ArrowLeftIcon,
+	PencilIcon,
+	PlusIcon,
+	ServerIcon,
+	Trash2Icon,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "#/components/ui/badge";
@@ -86,6 +92,13 @@ function AdminIndex() {
 
 	return (
 		<div className="mx-auto flex w-full max-w-4xl flex-col gap-8 p-8">
+			<Link
+				to="/"
+				className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+			>
+				<ArrowLeftIcon className="size-3" />
+				All servers
+			</Link>
 			<header className="flex items-start justify-between gap-4">
 				<div className="flex flex-col gap-3">
 					<p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">

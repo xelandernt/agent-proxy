@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ServerCogIcon, ServerIcon } from "lucide-react";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { HarnessPanel } from "#/components/harness-panel";
+import { Sparkline } from "#/components/sparkline";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import {
@@ -27,7 +28,12 @@ import {
 	setSelectedHarnessId,
 	subscribeHarnessSelection,
 } from "#/lib/harnesses";
-import { fetchMcpServers, type McpServerListing } from "#/lib/mcp";
+import {
+	fetchMcpServers,
+	fetchUsageSeriesAll,
+	type McpServerListing,
+	type SeriesPoint,
+} from "#/lib/mcp";
 import { cn } from "#/lib/utils";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -37,8 +43,16 @@ type LoadState =
 	| { status: "error"; message: string }
 	| { status: "ready"; servers: McpServerListing[] };
 
+type SparkState =
+	| { status: "loading" }
+	| { status: "error" }
+	| { status: "ready"; byServer: Map<string, SeriesPoint[]> };
+
 function Home() {
 	const [state, setState] = useState<LoadState>({ status: "loading" });
+	const [sparkState, setSparkState] = useState<SparkState>({
+		status: "loading",
+	});
 	const harnessId = useSyncExternalStore(
 		subscribeHarnessSelection,
 		selectedHarnessId,
@@ -66,6 +80,23 @@ function Home() {
 		const controller = load();
 		return () => controller.abort();
 	}, [load]);
+
+	useEffect(() => {
+		const controller = new AbortController();
+		fetchUsageSeriesAll(controller.signal)
+			.then((document) =>
+				setSparkState({
+					status: "ready",
+					byServer: new Map(
+						document.servers.map((entry) => [entry.name, entry.points]),
+					),
+				}),
+			)
+			.catch(() => {
+				if (!controller.signal.aborted) setSparkState({ status: "error" });
+			});
+		return () => controller.abort();
+	}, []);
 
 	return (
 		<div className="mx-auto flex w-full max-w-4xl flex-col gap-10 p-8">
@@ -136,6 +167,11 @@ function Home() {
 							server={server}
 							harnessId={harnessId}
 							onHarnessIdChange={setSelectedHarnessId}
+							sparkline={
+								sparkState.status === "ready"
+									? sparkState.byServer.get(server.name)
+									: undefined
+							}
 						/>
 					))}
 				</div>
@@ -148,10 +184,12 @@ function ServerCard({
 	server,
 	harnessId,
 	onHarnessIdChange,
+	sparkline,
 }: {
 	server: McpServerListing;
 	harnessId: string;
 	onHarnessIdChange: (harnessId: string) => void;
+	sparkline?: SeriesPoint[];
 }) {
 	return (
 		<Card className="flex h-full flex-col transition-colors hover:border-lagoon/40">
@@ -185,6 +223,14 @@ function ServerCard({
 						<p className="text-sm text-muted-foreground">
 							No description provided.
 						</p>
+					)}
+					{sparkline && (
+						<div className="flex flex-col gap-1">
+							<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-kicker">
+								Activity · 24h
+							</p>
+							<Sparkline points={sparkline} />
+						</div>
 					)}
 				</CardContent>
 			</Link>

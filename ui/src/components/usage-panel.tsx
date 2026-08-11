@@ -11,7 +11,14 @@ import {
 	EmptyTitle,
 } from "#/components/ui/empty";
 import { Skeleton } from "#/components/ui/skeleton";
-import { fetchServerUsage, type ItemCount, type UsageReport } from "#/lib/mcp";
+import { UsageChart } from "#/components/usage-chart";
+import {
+	fetchServerUsage,
+	fetchServerUsageSeries,
+	type ItemCount,
+	type SeriesReport,
+	type UsageReport,
+} from "#/lib/mcp";
 
 const PRESETS = [
 	{ label: "5m", minutes: 5 },
@@ -23,7 +30,7 @@ const PRESETS = [
 type LoadState =
 	| { status: "loading" }
 	| { status: "error"; message: string }
-	| { status: "ready"; report: UsageReport };
+	| { status: "ready"; report: UsageReport; series: SeriesReport };
 
 function CountRow({ row }: { row: ItemCount }) {
 	return (
@@ -54,9 +61,10 @@ function UsageContent({
 }: {
 	state: Extract<LoadState, { status: "ready" }>;
 }) {
-	const { report } = state;
+	const { report, series } = state;
 	return (
 		<div className="flex flex-col gap-6">
+			<UsageChart report={series} />
 			<div className="flex items-baseline gap-3">
 				<span className="font-serif text-5xl font-bold tabular-nums tracking-tight">
 					{report.total}
@@ -96,8 +104,16 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 		if (!range) return undefined;
 		const controller = new AbortController();
 		setState({ status: "loading" });
-		fetchServerUsage(serverName, range.from, range.to, controller.signal)
-			.then((report) => setState({ status: "ready", report }))
+		Promise.all([
+			fetchServerUsage(serverName, range.from, range.to, controller.signal),
+			fetchServerUsageSeries(
+				serverName,
+				range.from,
+				range.to,
+				controller.signal,
+			),
+		])
+			.then(([report, series]) => setState({ status: "ready", report, series }))
 			.catch((error: unknown) => {
 				if (controller.signal.aborted) return;
 				setState({
@@ -172,6 +188,7 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 				</div>
 				{state.status === "loading" && (
 					<div className="flex flex-col gap-4">
+						<Skeleton className="h-44 w-full" />
 						<Skeleton className="h-10 w-28" />
 						<Skeleton className="h-40 w-full" />
 					</div>

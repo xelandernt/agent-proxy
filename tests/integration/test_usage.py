@@ -155,7 +155,17 @@ def usage_client(
             },
         }
     )
-    seed_servers(postgres_url, [server])
+    quiet = McpServerConfig.model_validate(
+        {
+            "name": "notes",
+            "upstream_url": "http://127.0.0.1:9/mcp",
+            "auth": {
+                "provider": "keycloak",
+                "realm_url": "https://identity.example/realms/test",
+            },
+        }
+    )
+    seed_servers(postgres_url, [server, quiet])
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
@@ -319,3 +329,156 @@ def test_usage_rejects_inverted_window(usage_client: TestClient) -> None:
     )
 
     assert response.status_code == 422
+
+
+def _aligned_window(hours: int) -> dict[str, str]:
+    end = datetime.now(UTC).replace(second=0, microsecond=0) + timedelta(minutes=1)
+    start = end - timedelta(hours=hours)
+    return {
+        "from": start.isoformat(),
+        "to": end.isoformat(),
+    }
+
+
+def _fetch_series(
+    client: TestClient,
+    params: dict[str, str],
+    expected_total: int,
+) -> dict[str, object]:
+    deadline = time.monotonic() + 5.0
+    last: dict[str, object] = {}
+    while time.monotonic() < deadline:
+        response = client.get(
+            "/api/servers/calendar/usage/series",
+            params=params,
+        )
+        assert response.status_code == 200
+        last = response.json()
+        points = last["points"]
+        if sum(point["total"] for point in points) >= expected_total:
+            return last
+        time.sleep(0.05)
+    return last
+
+
+def test_usage_series_buckets_requests(usage_client: TestClient) -> None:
+    client = usage_client
+    for _ in range(2):
+        response = client.post(
+            "/calendar/mcp",
+            headers=usage_headers("tools/list"),
+            json=usage_request("tools/list"),
+        )
+        assert response.status_code == 200
+    response = client.post(
+        "/calendar/mcp",
+        headers=usage_headers("tools/call", **{"MCP-Name": "get_weather"}),
+        json=usage_request("tools/call", name="get_weather"),
+    )
+    assert response.status_code == 200
+
+    params = _aligned_window(1) | {"bucket": "minute"}
+    series = _fetch_series(client, params, expected_total=3)
+
+    points = series["points"]
+    assert isinstance(points, list)
+    assert len(points) == 60
+    assert sum(point["total"] for point in points) == 3
+    active = [point for point in points if point["total"] > 0]
+    assert len(active) >= 1
+    for point in active:
+        assert point["methods"] == [
+            {"name": "tools/list", "count": 2},
+            {"name": "tools/call", "count": 1},
+        ]
+        assert point["tools"] == [{"name": "get_weather", "count": 1}]
+        assert point["clients"] == [{"name": "gateway-test", "count": 3}]
+        assert point["statuses"] == [{"name": "200", "count": 3}]
+
+
+def test_usage_series_picks_bucket_for_window(usage_client: TestClient) -> None:
+    response = usage_client.get(
+        "/api/servers/calendar/usage/series",
+        params=_aligned_window(1),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["bucket"] == "minute"
+
+    response = usage_client.get(
+        "/api/servers/calendar/usage/series",
+        params=_aligned_window(8),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["bucket"] == "hour"
+
+    response = usage_client.get(
+        "/api/servers/calendar/usage/series",
+        params=_aligned_window(24 * 8),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["bucket"] == "day"
+
+
+def test_usage_series_rejects_invalid_bucket(usage_client: TestClient) -> None:
+    response = usage_client.get(
+        "/api/servers/calendar/usage/series",
+        params=_aligned_window(1) | {"bucket": "month"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_usage_series_unknown_server_returns_404(usage_client: TestClient) -> None:
+    response = usage_client.get(
+        "/api/servers/unknown/usage/series",
+        params=_aligned_window(1),
+    )
+
+    assert response.status_code == 404
+
+
+def test_usage_series_rejects_inverted_window(usage_client: TestClient) -> None:
+    end = datetime.now(UTC).isoformat()
+    start = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    response = usage_client.get(
+        "/api/servers/calendar/usage/series",
+        params={"from": start, "to": end},
+    )
+
+    assert response.status_code == 422
+
+
+def test_servers_usage_series_fills_empty_servers(usage_client: TestClient) -> None:
+    client = usage_client
+    for _ in range(2):
+        response = client.post(
+            "/calendar/mcp",
+            headers=usage_headers("tools/list"),
+            json=usage_request("tools/list"),
+        )
+        assert response.status_code == 200
+
+    params = _aligned_window(24)
+    deadline = time.monotonic() + 5.0
+    last: dict[str, object] = {}
+    while time.monotonic() < deadline:
+        response = client.get("/api/servers/series", params=params)
+        assert response.status_code == 200
+        last = response.json()
+        servers = {entry["name"]: entry for entry in last["servers"]}
+        if sum(point["total"] for point in servers["calendar"]["points"]) >= 2:
+            break
+        time.sleep(0.05)
+
+    assert response.status_code == 200
+    servers = {entry["name"]: entry for entry in last["servers"]}
+    assert set(servers) == {"calendar", "notes"}
+    calendar = servers["calendar"]["points"]
+    assert len(calendar) == 25
+    assert sum(point["total"] for point in calendar) == 2
+    notes = servers["notes"]["points"]
+    assert len(notes) == 25
+    assert all(point["total"] == 0 for point in notes)
