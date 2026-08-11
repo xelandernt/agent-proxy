@@ -44,11 +44,6 @@ def boot_gateway(
     ) -> StaticAuthProvider:
         return StaticAuthProvider(base_url=base_url, required_scopes=["mcp"])
 
-    monkeypatch.setattr(
-        admin_auth_module,
-        "build_keycloak_admin_provider",
-        lambda _config, *, base_url: None,
-    )
     monkeypatch.setattr(admin_auth_module, "load_auth_provider", load_static_provider)
     seed_servers(
         sqlite_url,
@@ -72,6 +67,7 @@ def boot_gateway(
                 "auth": {
                     "provider": "keycloak",
                     "realm_url": "https://identity.example/realms/test",
+                    "client_id": "agent-proxy-admin-ui",
                 }
             },
         }

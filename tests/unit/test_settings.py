@@ -54,6 +54,7 @@ def test_admin_accepts_auth_provider() -> None:
                 "auth": {
                     "provider": "keycloak",
                     "realm_url": "https://identity.example/realms/test",
+                    "client_id": "agent-proxy-admin-ui",
                 }
             },
         }
@@ -61,6 +62,23 @@ def test_admin_accepts_auth_provider() -> None:
 
     assert config.admin is not None
     assert config.admin.auth.provider == "keycloak"
+
+
+def test_admin_rejects_keycloak_without_client_id() -> None:
+    with pytest.raises(ValidationError, match="client_id is required"):
+        GatewayConfig.model_validate(
+            {
+                "database": {
+                    "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+                },
+                "admin": {
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                    }
+                },
+            }
+        )
 
 
 def test_admin_defaults_to_absent() -> None:
@@ -86,6 +104,7 @@ def test_admin_rejects_unknown_fields() -> None:
                     "auth": {
                         "provider": "keycloak",
                         "realm_url": "https://identity.example/realms/test",
+                        "client_id": "agent-proxy-admin-ui",
                     },
                     "settings": {},
                 },
@@ -130,6 +149,7 @@ admin:
   auth:
     provider: keycloak
     realm_url: https://identity.example/realms/test
+    client_id: agent-proxy-admin-ui
 """.lstrip()
     )
     monkeypatch.setenv(CONFIG_FILE_ENV, str(config_file))

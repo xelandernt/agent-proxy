@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Protocol
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Protocol, cast
 
 from fastapi import HTTPException, Request, status
-from fastapi.routing import BaseRoute
-from starlette.routing import Route
+from fastmcp.server.auth import AuthProvider
 
-from proxy.app.admin.oauth import KeycloakAdminOAuthProvider
 from proxy.providers import (
     KeycloakAuthProviderConfig,
     load_auth_provider,
@@ -16,40 +16,64 @@ from proxy.settings import AdminConfig
 
 logger = logging.getLogger(__name__)
 
-ADMIN_OAUTH_PREFIX = "/admin/oauth"
+
+@dataclass(frozen=True)
+class AdminOAuthBrowserFlow:
+    """How the admin UI can run a browser Authorization Code + PKCE flow.
+
+    The UI performs the flow directly against the identity provider's
+    authorization server (``issuer``), acting as the pre-registered public
+    client ``client_id``; the gateway backend only verifies the resulting
+    bearer tokens.
+    """
+
+    issuer: str
+    client_id: str
 
 
 class AdminAuthProvider(Protocol):
     """The subset of an identity provider the gateway's admin layer relies on."""
 
-    def get_routes(self) -> list[Route]:
-        """Provider routes mounted (unprefixed) under the admin OAuth prefix."""
-
     async def verify_token(self, token: str) -> object | None:
         """Verify a bearer token; return non-None when valid."""
 
+    def oauth_browser_flow(self) -> AdminOAuthBrowserFlow | None:
+        """Browser sign-in metadata, or None when only token verification works."""
 
-def build_keycloak_admin_provider(
-    config: KeycloakAuthProviderConfig,
-    *,
-    base_url: str,
-) -> KeycloakAdminOAuthProvider | None:
-    """Build the gateway-hosted Keycloak authorization server for the admin UI.
+    async def login(self, username: str, password: str) -> str | None:
+        """Resolve username/password to a token, or None on bad credentials.
 
-    Returns None when the provider cannot be constructed (for example the realm
-    rejects dynamic client registration), letting the gateway fall back to
-    token verification only.
-    """
+        Only password-capable providers (``static``) implement this; the rest
+        always return None.
+        """
 
-    try:
-        return KeycloakAdminOAuthProvider.from_config(config, base_url=base_url)
-    except Exception:
-        logger.warning(
-            "Admin OAuth browser sign-in is unavailable; falling back to token "
-            "verification only.",
-            exc_info=True,
+
+class _AdminAuthProvider(AdminAuthProvider):
+    """Adapter binding a provider to the admin browser-flow metadata."""
+
+    def __init__(
+        self,
+        provider: AuthProvider,
+        *,
+        oauth_browser_flow: AdminOAuthBrowserFlow | None,
+    ) -> None:
+        self._provider = provider
+        self._flow = oauth_browser_flow
+
+    async def verify_token(self, token: str) -> object | None:
+        return await self._provider.verify_token(token)
+
+    def oauth_browser_flow(self) -> AdminOAuthBrowserFlow | None:
+        return self._flow
+
+    async def login(self, username: str, password: str) -> str | None:
+        login = cast(
+            Callable[[str, str], Awaitable[str | None]] | None,
+            getattr(self._provider, "login", None),
         )
-        return None
+        if login is None:
+            return None
+        return await login(username, password)
 
 
 def build_admin_provider(
@@ -60,51 +84,26 @@ def build_admin_provider(
 
     if admin is None:
         return None
-    base_url = f"{public_base_url.rstrip('/')}{ADMIN_OAUTH_PREFIX}"
-    if admin.auth.provider == "keycloak":
-        keycloak_provider = build_keycloak_admin_provider(
-            admin.auth,
-            base_url=base_url,
+    base_url = f"{public_base_url.rstrip('/')}/admin"
+    oauth_browser_flow: AdminOAuthBrowserFlow | None = None
+    if (
+        isinstance(admin.auth, KeycloakAuthProviderConfig)
+        and admin.auth.client_id is not None
+    ):
+        oauth_browser_flow = AdminOAuthBrowserFlow(
+            issuer=str(admin.auth.realm_url),
+            client_id=admin.auth.client_id,
         )
-        if keycloak_provider is not None:
-            return keycloak_provider
-    return load_auth_provider(admin.auth, base_url=base_url)
-
-
-def admin_provider_routes(provider: AdminAuthProvider) -> list[BaseRoute]:
-    """Return the provider's OAuth routes mounted under the admin prefix.
-
-    Server apps already hoist ``/.well-known/*`` routes to the gateway root,
-    so the admin provider must not claim the same paths. Anchoring its routes
-    (and its advertised base URL) under ``/admin/oauth`` keeps discovery and
-    callback URLs self-consistent and collision-free.
-    """
-
-    return [
-        Route(
-            path=f"{ADMIN_OAUTH_PREFIX}{route.path}",
-            endpoint=route.endpoint,
-            methods=route.methods,
-            name=route.name,
-            include_in_schema=False,
+    try:
+        provider = load_auth_provider(admin.auth, base_url=base_url)
+    except Exception:
+        logger.warning(
+            "Admin authentication is unavailable; admin endpoints require a "
+            "configured identity provider.",
+            exc_info=True,
         )
-        for route in provider.get_routes()
-        if isinstance(route, Route) and isinstance(route.path, str)
-    ]
-
-
-def provider_hosts_oauth(provider: AdminAuthProvider) -> bool:
-    """Whether the provider hosts an RFC 8414 authorization server on the gateway.
-
-    OAuth-proxy providers expose an ``/authorize`` route; token-verifier
-    providers (Keycloak, JWT, …) only advertise protected-resource metadata and
-    cannot run a browser sign-in flow.
-    """
-
-    return any(
-        isinstance(route, Route) and route.path == "/authorize"
-        for route in provider.get_routes()
-    )
+        return None
+    return _AdminAuthProvider(provider, oauth_browser_flow=oauth_browser_flow)
 
 
 def get_admin_provider(request: Request) -> AdminAuthProvider:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from fastmcp.server.auth import AuthProvider
+from fastmcp.server.auth.oidc_proxy import OIDCConfiguration
 from fastmcp.server.auth.providers.auth0 import Auth0Provider
 from fastmcp.server.auth.providers.aws import AWSCognitoProvider
 from fastmcp.server.auth.providers.azure import AzureProvider
@@ -17,7 +18,6 @@ from fastmcp.server.auth.providers.propelauth import PropelAuthProvider
 from fastmcp.server.auth.providers.scalekit import ScalekitProvider
 from fastmcp.server.auth.providers.supabase import SupabaseProvider
 from fastmcp.server.auth.providers.workos import AuthKitProvider, WorkOSProvider
-from fastmcp.server.auth.oidc_proxy import OIDCConfiguration
 from pydantic import TypeAdapter, ValidationError
 
 from proxy.providers import (
@@ -36,6 +36,8 @@ from proxy.providers import (
     OciAuthProviderConfig,
     PropelAuthProviderConfig,
     ScalekitAuthProviderConfig,
+    StaticCredentialsAuthProvider,
+    StaticCredentialsAuthProviderConfig,
     SupabaseAuthProviderConfig,
     WorkOsAuthProviderConfig,
     load_auth_provider,
@@ -196,6 +198,15 @@ def stub_oidc_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
             SupabaseProvider,
         ),
         (
+            StaticCredentialsAuthProviderConfig(
+                provider="static",
+                username="admin",
+                password="hunter2",
+                jwt_secret="a-very-long-random-secret-at-least-32-bytes",
+            ),
+            StaticCredentialsAuthProvider,
+        ),
+        (
             WorkOsAuthProviderConfig(
                 provider="workos",
                 client_id="client-id",
@@ -236,6 +247,7 @@ def test_auth_schema_exposes_only_named_typed_providers() -> None:
         "oci",
         "propelauth",
         "scalekit",
+        "static",
         "supabase",
         "workos",
     }

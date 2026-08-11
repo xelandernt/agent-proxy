@@ -4,7 +4,7 @@ import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from fastmcp.client.transports import StreamableHttpTransport
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, TypeAdapter
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
@@ -21,20 +21,6 @@ from tests.integration.test_gateway import (
 pytestmark = pytest.mark.integration
 
 RESOURCE_AUDIENCE = "https://gateway.example/calendar/mcp"
-
-
-class AuthorizationServerMetadata(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-    registration_endpoint: AnyHttpUrl
-    scopes_supported: list[str]
-
-
-class DynamicClientRegistrationResponse(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-    client_id: str
-    scope: str
 
 
 class TokenResponse(BaseModel):
@@ -101,38 +87,6 @@ def boot_keycloak_gateway(
         }
     )
     return TestClient(create_app(config))
-
-
-def test_keycloak_dcr_is_available(keycloak_realm_url: str) -> None:
-    with httpx2.Client(timeout=10) as client:
-        metadata_response = client.get(
-            f"{keycloak_realm_url}/.well-known/oauth-authorization-server"
-        )
-        response = client.post(
-            f"{keycloak_realm_url}/clients-registrations/openid-connect",
-            json={
-                "client_name": "gateway-dcr-test",
-                "redirect_uris": ["http://localhost:8765/callback"],
-                "grant_types": ["authorization_code"],
-                "response_types": ["code"],
-                "token_endpoint_auth_method": "none",
-            },
-        )
-
-    assert metadata_response.status_code == 200
-    metadata = AuthorizationServerMetadata.model_validate(metadata_response.json())
-    assert str(metadata.registration_endpoint) == (
-        f"{keycloak_realm_url}/clients-registrations/openid-connect"
-    )
-    assert set(metadata.scopes_supported) == {
-        "openid",
-        "mcp-audience",
-        "offline_access",
-    }
-    assert response.status_code == 201, response.text
-    registration = DynamicClientRegistrationResponse.model_validate(response.json())
-    assert registration.client_id
-    assert "offline_access" in registration.scope.split()
 
 
 def test_compose_example_user_can_request_offline_access(

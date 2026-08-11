@@ -10,6 +10,7 @@ from pydantic import (
     ConfigDict,
     Field,
     SecretStr,
+    model_validator,
 )
 from pydantic_settings import (
     BaseSettings,
@@ -18,7 +19,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from proxy.providers import AuthProviderConfig
+from proxy.providers import AuthProviderConfig, KeycloakAuthProviderConfig
 
 CONFIG_DIRECTORY: Final = ".proxy"
 CONFIG_FILE_ENV: Final = "PROXY_CONFIG_FILE"
@@ -60,6 +61,20 @@ class AdminConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     auth: AuthProviderConfig
+
+    @model_validator(mode="after")
+    def validate_keycloak_client(self) -> AdminConfig:
+        if (
+            isinstance(self.auth, KeycloakAuthProviderConfig)
+            and self.auth.client_id is None
+        ):
+            raise ValueError(
+                "admin.auth.client_id is required for the keycloak provider: "
+                "without it the gateway cannot run the browser sign-in flow and "
+                "would accept any token from the realm. Use provider 'static' "
+                "for username/password or 'jwt' for pasted tokens instead."
+            )
+        return self
 
 
 class GatewayConfig(BaseModel):

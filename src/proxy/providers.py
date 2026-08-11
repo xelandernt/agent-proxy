@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import secrets
+import time
 from typing import Annotated, Literal
 
-from fastmcp.server.auth import AuthProvider
+from fastmcp.server.auth import AccessToken, AuthProvider
 from fastmcp.server.auth.providers.auth0 import Auth0Provider
 from fastmcp.server.auth.providers.aws import AWSCognitoProvider
 from fastmcp.server.auth.providers.azure import AzureProvider
@@ -21,6 +23,8 @@ from fastmcp.server.auth.providers.propelauth import (
 from fastmcp.server.auth.providers.scalekit import ScalekitProvider
 from fastmcp.server.auth.providers.supabase import SupabaseProvider
 from fastmcp.server.auth.providers.workos import AuthKitProvider, WorkOSProvider
+from joserfc.jwk import OctKey
+from joserfc.jwt import encode as jwt_encode
 from pydantic import (
     AnyHttpUrl,
     BaseModel,
@@ -396,22 +400,13 @@ class KeycloakAuthProviderConfig(_AuthProviderConfig):
     required_scopes: list[str] | None = None
     audience: str | list[str] | None = None
     client_id: str | None = None
-    client_secret: SecretStr | None = None
-
-    @model_validator(mode="after")
-    def validate_client_credentials(self) -> KeycloakAuthProviderConfig:
-        if (self.client_id is None) != (self.client_secret is None):
-            raise ValueError(
-                "Keycloak client_id and client_secret must be configured together."
-            )
-        return self
 
     def build(self, *, base_url: str) -> AuthProvider:
         return KeycloakAuthProvider(
             realm_url=self.realm_url,
             base_url=base_url,
             required_scopes=self.required_scopes,
-            audience=self.audience,
+            audience=self.audience or self.client_id,
         )
 
 
@@ -620,6 +615,80 @@ class JwtAuthProviderConfig(_AuthProviderConfig):
         )
 
 
+class StaticCredentialsAuthProvider(AuthProvider):
+    """Admin password authentication via gateway-signed HS256 JWTs.
+
+    ``login`` verifies the configured username/password (constant-time) and
+    mints a short-lived JWT signed with ``jwt_secret``; ``verify_token``
+    validates that signature locally with the same secret.
+    """
+
+    def __init__(
+        self,
+        *,
+        username: str,
+        password: str,
+        jwt_secret: str,
+        base_url: str,
+        token_ttl_seconds: int = 3600,
+    ) -> None:
+        self._username = username
+        self._password = password
+        self._secret = jwt_secret
+        self._issuer = str(base_url).rstrip("/") + "/admin"
+        self._audience = "admin"
+        self._token_ttl_seconds = token_ttl_seconds
+        self._verifier = JWTVerifier(
+            public_key=jwt_secret,
+            algorithm="HS256",
+            issuer=self._issuer,
+            audience=self._audience,
+            base_url=base_url,
+        )
+
+    async def login(self, username: str, password: str) -> str | None:
+        """Return a fresh admin token, or None when the credentials are wrong."""
+
+        if not secrets.compare_digest(username, self._username):
+            return None
+        if not secrets.compare_digest(password, self._password):
+            return None
+        now = int(time.time())
+        header = {"alg": "HS256", "typ": "JWT"}
+        claims = {
+            "iss": self._issuer,
+            "aud": self._audience,
+            "sub": self._username,
+            "iat": now,
+            "exp": now + self._token_ttl_seconds,
+        }
+        return jwt_encode(header, claims, OctKey.import_key(self._secret))
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        return await self._verifier.verify_token(token)
+
+
+class StaticCredentialsAuthProviderConfig(_AuthProviderConfig):
+    provider: Literal["static"]
+    username: str = "user"
+    password: SecretStr = Field(default_factory=lambda: SecretStr("password"))
+    jwt_secret: SecretStr = Field(
+        default_factory=lambda: SecretStr(
+            "agent-proxy-dev-only-secret-change-me-before-using"
+        )
+    )
+    token_ttl_seconds: int = Field(default=3600, gt=0)
+
+    def build(self, *, base_url: str) -> AuthProvider:
+        return StaticCredentialsAuthProvider(
+            username=self.username,
+            password=self.password.get_secret_value(),
+            jwt_secret=self.jwt_secret.get_secret_value(),
+            base_url=base_url,
+            token_ttl_seconds=self.token_ttl_seconds,
+        )
+
+
 AuthProviderConfig = Annotated[
     Auth0AuthProviderConfig
     | AuthKitAuthProviderConfig
@@ -635,6 +704,7 @@ AuthProviderConfig = Annotated[
     | OciAuthProviderConfig
     | PropelAuthProviderConfig
     | ScalekitAuthProviderConfig
+    | StaticCredentialsAuthProviderConfig
     | SupabaseAuthProviderConfig
     | WorkOsAuthProviderConfig,
     Field(discriminator="provider"),

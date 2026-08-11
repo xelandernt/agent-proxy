@@ -16,5 +16,6 @@ logfire:
 
 admin:
   auth:
-    provider: keycloak
-    realm_url: http://keycloak.localhost:8080/realms/agent-proxy
+    provider: static
+    username: user
+    password: password

@@ -3,7 +3,8 @@ import { useEffect } from "react";
 import { Skeleton } from "#/components/ui/skeleton";
 import {
 	completeOAuthLogin,
-	fetchAuthorizationServerMetadata,
+	fetchAdminAuthInfo,
+	fetchAuthorizationServer,
 } from "#/lib/auth";
 
 export const Route = createFileRoute("/admin/callback")({
@@ -20,14 +21,16 @@ function AdminCallback() {
 
 	useEffect(() => {
 		const code = search.code ?? "";
-		const state = search.state ?? "";
 		(async () => {
 			try {
 				if (!code) throw new Error("Authorization response missing a code.");
-				const metadata = await fetchAuthorizationServerMetadata();
-				if (!metadata)
+				const authInfo = await fetchAdminAuthInfo();
+				const oauthInfo = authInfo?.oauth;
+				if (!oauthInfo) throw new Error("Admin OAuth is not configured.");
+				const server = await fetchAuthorizationServer(oauthInfo.issuer);
+				if (!server)
 					throw new Error("Authorization server metadata unavailable.");
-				await completeOAuthLogin(code, state, metadata);
+				await completeOAuthLogin(oauthInfo, server);
 			} catch (error) {
 				sessionStorage.setItem(
 					"admin-login-error",
@@ -36,7 +39,7 @@ function AdminCallback() {
 			}
 			navigate({ to: "/admin", replace: true });
 		})();
-	}, [search.code, search.state, navigate]);
+	}, [search.code, navigate]);
 
 	return (
 		<div className="mx-auto flex w-full max-w-md flex-col gap-4 p-8">

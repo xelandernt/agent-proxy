@@ -14,6 +14,7 @@ import {
 import {
 	type AdminAuthInfo,
 	fetchAdminAuthInfo,
+	loginWithPassword,
 	setAdminToken,
 	startOAuthLogin,
 } from "#/lib/auth";
@@ -23,7 +24,9 @@ export function AdminLogin({
 }: {
 	onAuthenticated: () => void;
 }) {
-	const [busy, setBusy] = useState<"oauth" | "token" | null>(null);
+	const [busy, setBusy] = useState<"oauth" | "password" | "token" | null>(null);
+	const [username, setUsername] = useState("");
+	const [password, setPassword] = useState("");
 	const [tokenInput, setTokenInput] = useState("");
 	const [authInfo, setAuthInfo] = useState<AdminAuthInfo | null>(null);
 	const [error, setError] = useState<string | null>(() => {
@@ -43,9 +46,23 @@ export function AdminLogin({
 		if (outcome === "unsupported") {
 			setBusy(null);
 			setError(
-				"This gateway's admin provider does not host an OAuth authorization server. Paste an access token from your identity provider below.",
+				"This gateway's admin identity provider has no browser sign-in configured. Paste an access token from your identity provider below.",
 			);
 		}
+	};
+
+	const submitPassword = async (event: FormEvent) => {
+		event.preventDefault();
+		if (!username.trim() || !password) return;
+		setBusy("password");
+		setError(null);
+		const ok = await loginWithPassword(username, password);
+		if (!ok) {
+			setBusy(null);
+			setError("Invalid username or password.");
+			return;
+		}
+		onAuthenticated();
 	};
 
 	const submitToken = (event: FormEvent) => {
@@ -57,7 +74,8 @@ export function AdminLogin({
 		onAuthenticated();
 	};
 
-	const oauthUnsupported = authInfo !== null && !authInfo.oauth;
+	const staticPassword = authInfo !== null && authInfo.provider === "static";
+	const oauthAvailable = authInfo !== null && authInfo.oauth !== null;
 
 	return (
 		<div className="mx-auto flex w-full max-w-md flex-col gap-6 p-8">
@@ -79,42 +97,85 @@ export function AdminLogin({
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
-					{oauthUnsupported ? (
-						<p className="text-sm leading-relaxed text-muted-foreground">
-							The admin provider{" "}
-							<code className="font-mono">{authInfo?.provider}</code> verifies
-							tokens but does not host a browser sign-in flow. Get an access
-							token from your identity provider and paste it below.
-						</p>
+					{staticPassword ? (
+						<form onSubmit={submitPassword} className="flex flex-col gap-3">
+							<input
+								type="text"
+								value={username}
+								onChange={(event) => setUsername(event.target.value)}
+								placeholder="Username"
+								autoComplete="username"
+								className="h-9 w-full rounded-md border bg-transparent px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+							/>
+							<input
+								type="password"
+								value={password}
+								onChange={(event) => setPassword(event.target.value)}
+								placeholder="Password"
+								autoComplete="current-password"
+								className="h-9 w-full rounded-md border bg-transparent px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+							/>
+							<Button
+								type="submit"
+								disabled={busy !== null || !username.trim() || !password}
+							>
+								{busy === "password" ? "Signing in…" : "Sign in"}
+							</Button>
+						</form>
+					) : oauthAvailable ? (
+						<>
+							<Button onClick={signInWithOAuth} disabled={busy !== null}>
+								<LogInIcon className="size-4" />
+								{busy === "oauth" ? "Redirecting…" : "Sign in with provider"}
+							</Button>
+							<div className="flex items-center gap-3 text-xs text-muted-foreground">
+								<span className="h-px flex-1 bg-border" />
+								or paste an access token
+								<span className="h-px flex-1 bg-border" />
+							</div>
+							<form onSubmit={submitToken} className="flex flex-col gap-3">
+								<input
+									type="password"
+									value={tokenInput}
+									onChange={(event) => setTokenInput(event.target.value)}
+									placeholder="Bearer token"
+									autoComplete="off"
+									className="h-9 w-full rounded-md border bg-transparent px-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+								/>
+								<Button
+									type="submit"
+									disabled={busy !== null || !tokenInput.trim()}
+								>
+									{busy === "token" ? "Checking…" : "Sign in with token"}
+								</Button>
+							</form>
+						</>
 					) : (
-						<Button onClick={signInWithOAuth} disabled={busy !== null}>
-							<LogInIcon className="size-4" />
-							{busy === "oauth" ? "Redirecting…" : "Sign in with provider"}
-						</Button>
+						<>
+							<p className="text-sm leading-relaxed text-muted-foreground">
+								The admin provider{" "}
+								<code className="font-mono">{authInfo?.provider}</code> verifies
+								tokens but has no browser sign-in configured. Get an access
+								token from your identity provider and paste it below.
+							</p>
+							<form onSubmit={submitToken} className="flex flex-col gap-3">
+								<input
+									type="password"
+									value={tokenInput}
+									onChange={(event) => setTokenInput(event.target.value)}
+									placeholder="Bearer token"
+									autoComplete="off"
+									className="h-9 w-full rounded-md border bg-transparent px-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+								/>
+								<Button
+									type="submit"
+									disabled={busy !== null || !tokenInput.trim()}
+								>
+									{busy === "token" ? "Checking…" : "Sign in with token"}
+								</Button>
+							</form>
+						</>
 					)}
-					{!oauthUnsupported && (
-						<div className="flex items-center gap-3 text-xs text-muted-foreground">
-							<span className="h-px flex-1 bg-border" />
-							or paste an access token
-							<span className="h-px flex-1 bg-border" />
-						</div>
-					)}
-					<form onSubmit={submitToken} className="flex flex-col gap-3">
-						<input
-							type="password"
-							value={tokenInput}
-							onChange={(event) => setTokenInput(event.target.value)}
-							placeholder="Bearer token"
-							autoComplete="off"
-							className="h-9 w-full rounded-md border bg-transparent px-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-						/>
-						<Button
-							type="submit"
-							disabled={busy !== null || !tokenInput.trim()}
-						>
-							{busy === "token" ? "Checking…" : "Sign in with token"}
-						</Button>
-					</form>
 					{error && <p className="text-sm text-destructive">{error}</p>}
 				</CardContent>
 			</Card>

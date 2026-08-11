@@ -200,46 +200,56 @@ The admin identity boundary reuses the gateway's provider machinery: the
 `/api/admin/*` endpoint validates `Authorization: Bearer <token>` through the
 provider.
 
-For `keycloak` the gateway itself hosts an OAuth authorization server (RFC
-8414) under `/admin/oauth` and proxies the interactive flow to the realm, so
-the admin UI at `/admin` signs in with a normal browser flow. The access token
-handed to the UI is the realm-issued token itself, verified against the realm's
-JWKS — the same token is accepted whether it arrives via the browser flow or is
-pasted in manually.
-
-When the gateway has no Keycloak client credentials of its own
-(`client_id`/`client_secret` omitted), it registers a confidential client with
-the realm's dynamic client registration endpoint
-(`/realms/{realm}/clients-registrations/default`) at startup, using its OAuth
-callback (`{public_base_url}/admin/oauth/callback`) as the redirect URI. This
-requires dynamic client registration to be enabled in the realm. To use a
-fixed client instead, configure credentials and register the callback as a
-redirect URI on that client:
+For `keycloak` the admin UI runs the standard Authorization Code Flow with
+PKCE **directly against the realm**: the login screen reads the realm's
+authorization server metadata and redirects the browser to Keycloak, where the
+user authenticates as a pre-registered **public** client (no client secret).
+The UI exchanges the resulting code for the realm-issued access token and
+attaches it to admin API calls, which the gateway verifies against the realm's
+JWKS — the same token is accepted whether it arrives via the browser flow or
+is pasted in manually.
 
 ```yaml
 admin:
   auth:
     provider: keycloak
     realm_url: https://identity.example.com/realms/agents
-    # client_id: agent-proxy-admin
-    # client_secret: ...
+    # Required: public client the admin UI uses for the browser sign-in flow.
+    # Register {ui-origin}/admin/callback as a redirect URI on this client and
+    # enable PKCE (S256). The gateway rejects the config without it — without
+    # an audience check it would accept any token from the realm.
+    client_id: agent-proxy-admin-ui
 ```
-
-When the provider cannot be set up for OAuth (for example the realm rejects
-dynamic registration), the gateway falls back to token verification only and
-the admin login screen asks you to paste an access token from the identity
-provider.
 
 OAuth-proxy providers such as Auth0 or Google are also supported as `admin.auth`
 providers and use the same browser flow. Providers that only verify tokens
-(such as `jwt`) have no gateway-hosted OAuth routes; for those, obtain an
-access token from your identity provider and paste it into the admin login
-screen. The token is stored in `localStorage` and attached to admin API calls;
-a 401 clears it and returns to the login screen.
+(such as `jwt`) have no browser sign-in; for those, obtain an access token from
+your identity provider and paste it into the admin login screen. The token is
+stored in `localStorage` and attached to admin API calls; a 401 clears it and
+returns to the login screen.
 
 For the browser flow, register the UI's redirect URI —
-`{ui-origin}/admin/callback` — with the provider (for example, via
-`allowed_client_redirect_uris`), and include the UI origin in `cors_origins`.
+`{ui-origin}/admin/callback` — with the provider, and include the UI origin in
+`cors_origins`.
+
+Alternatively, a plain username/password admin account can be configured
+instead of an OAuth provider. The gateway checks the credentials at
+`POST /api/admin/login` (constant-time comparison) and signs a short-lived
+HS256 JWT with `jwt_secret`; the UI stores the token in `localStorage` and
+sends it as a bearer token exactly like the OAuth flow:
+
+```yaml
+admin:
+  auth:
+    provider: static
+    # username: user          # defaults to "user"
+    # password: change-me     # defaults to "password"
+    # 32+ random bytes; keep it secret — anyone with this secret can forge
+    # admin tokens. Defaults to a public development-only value: always set
+    # it explicitly.
+    jwt_secret: ${ADMIN_JWT_SECRET}
+    # token_ttl_seconds: 3600
+```
 
 ### Usage tracing
 

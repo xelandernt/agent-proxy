@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 
-from proxy.app.admin.auth import provider_hosts_oauth, require_admin
+from proxy.app.admin.auth import get_admin_provider, require_admin
 from proxy.providers import AuthProviderConfig, AuthProviderLoadError
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
-from proxy.servers.repository import ServerNotFound, ServerNameTaken
+from proxy.servers.repository import ServerNameTaken, ServerNotFound
 from proxy.servers.schemas import (
     ServerCreateRequest,
     ServerUpdateRequest,
@@ -29,9 +29,10 @@ AUTH_SCHEMA: dict = TypeAdapter(AuthProviderConfig).json_schema()
 def auth_status(request: Request) -> dict:
     """Describe the admin identity provider for the sign-in screen.
 
-    Authentication-free so the login page can decide how to present itself:
-    providers that host an OAuth authorization server support a browser flow,
-    token-verifier providers (Keycloak, JWT, …) require a pasted token.
+    Authentication-free so the login page can decide how to present itself.
+    ``oauth`` carries the authorization server issuer and public client the UI
+    should use for a browser Authorization Code + PKCE flow, or None when only
+    a pasted token is accepted.
     """
 
     provider = request.app.state.admin_provider
@@ -41,9 +42,14 @@ def auth_status(request: Request) -> dict:
             detail="Admin interface is not configured.",
         )
     admin = request.app.state.config.admin
+    flow = provider.oauth_browser_flow()
     return {
         "provider": admin.auth.provider if admin is not None else None,
-        "oauth": provider_hosts_oauth(provider),
+        "oauth": (
+            {"issuer": flow.issuer, "client_id": flow.client_id}
+            if flow is not None
+            else None
+        ),
     }
 
 
@@ -52,6 +58,29 @@ def me() -> dict[str, bool]:
     """Report whether the caller holds a valid admin token."""
 
     return {"authenticated": True}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@public_router.post("/login")
+async def login(payload: LoginRequest, request: Request) -> dict:
+    """Resolve admin credentials to a bearer token.
+
+    Only providers that hold credentials themselves (``static``) support this;
+    OAuth and token-verifier providers return 401.
+    """
+
+    provider = get_admin_provider(request)
+    token = await provider.login(payload.username, payload.password)
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password.",
+        )
+    return {"token": token}
 
 
 @router.get("/auth-schema")

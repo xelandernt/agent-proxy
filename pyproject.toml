@@ -11,11 +11,11 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "asyncpg>=0.30.0",
-    "authlib>=1.4.1",
     "cyclopts>=4.16.1",
     "fastapi>=0.139.2",
     "fastmcp==4.0.0b2",
     "httpx2>=2.9.1",
+    "joserfc>=1.7.4",
     "logfire[fastapi,system-metrics]>=4.34.0",
     "pydantic>=2.12.0",
     "pydantic-settings[yaml]>=2.14.1",
