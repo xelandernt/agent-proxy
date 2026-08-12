@@ -635,7 +635,7 @@ class StaticCredentialsAuthProvider(AuthProvider):
         self._username = username
         self._password = password
         self._secret = jwt_secret
-        self._issuer = str(base_url).rstrip("/") + "/admin"
+        self._issuer = base_url.rstrip("/") + "/admin"
         self._audience = "admin"
         self._token_ttl_seconds = token_ttl_seconds
         self._verifier = JWTVerifier(
@@ -689,7 +689,7 @@ class StaticCredentialsAuthProviderConfig(_AuthProviderConfig):
         )
 
 
-AuthProviderConfig = Annotated[
+ServerAuthProviderConfig = Annotated[
     Auth0AuthProviderConfig
     | AuthKitAuthProviderConfig
     | AwsCognitoAuthProviderConfig
@@ -704,14 +704,25 @@ AuthProviderConfig = Annotated[
     | OciAuthProviderConfig
     | PropelAuthProviderConfig
     | ScalekitAuthProviderConfig
-    | StaticCredentialsAuthProviderConfig
     | SupabaseAuthProviderConfig
     | WorkOsAuthProviderConfig,
     Field(discriminator="provider"),
 ]
 
 
-def load_auth_provider(config: AuthProviderConfig, *, base_url: str) -> AuthProvider:
+AdminAuthProviderConfig = Annotated[
+    JwtAuthProviderConfig
+    | KeycloakAuthProviderConfig
+    | StaticCredentialsAuthProviderConfig,
+    Field(discriminator="provider"),
+]
+
+
+def load_auth_provider(
+    config: ServerAuthProviderConfig | AdminAuthProviderConfig,
+    *,
+    base_url: str,
+) -> AuthProvider:
     """Construct a FastMCP provider from a fully validated typed configuration."""
 
     try:

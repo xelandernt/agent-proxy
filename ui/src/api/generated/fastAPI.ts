@@ -654,7 +654,6 @@ export type ServerCreateRequestAuth =
   | OciAuthProviderConfig
   | PropelAuthProviderConfig
   | ScalekitAuthProviderConfig
-  | StaticCredentialsAuthProviderConfig
   | SupabaseAuthProviderConfig
   | WorkOsAuthProviderConfig;
 
@@ -662,10 +661,17 @@ export type ServerCreateRequestAuth =
  * Payload for creating a server.
  */
 export interface ServerCreateRequest {
-  /** @pattern ^[a-z0-9][a-z0-9-]*$ */
+  /**
+   * @maxLength 100
+   * @pattern ^[a-z0-9][a-z0-9-]*$
+   */
   name: string;
+  /** @maxLength 255 */
   description?: string;
-  /** @minLength 1 */
+  /**
+   * @minLength 1
+   * @maxLength 2048
+   */
   upstream_url: string;
   auth: ServerCreateRequestAuth;
   verify_upstream_tls?: boolean;
@@ -694,7 +700,6 @@ export type ServerUpdateRequestAuth =
   | OciAuthProviderConfig
   | PropelAuthProviderConfig
   | ScalekitAuthProviderConfig
-  | StaticCredentialsAuthProviderConfig
   | SupabaseAuthProviderConfig
   | WorkOsAuthProviderConfig;
 
@@ -702,8 +707,12 @@ export type ServerUpdateRequestAuth =
  * Payload for updating a server; the name is immutable.
  */
 export interface ServerUpdateRequest {
+  /** @maxLength 255 */
   description?: string;
-  /** @minLength 1 */
+  /**
+   * @minLength 1
+   * @maxLength 2048
+   */
   upstream_url: string;
   auth: ServerUpdateRequestAuth;
   verify_upstream_tls?: boolean;
@@ -724,7 +733,6 @@ export type ServerViewAuth =
   | OciAuthProviderConfig
   | PropelAuthProviderConfig
   | ScalekitAuthProviderConfig
-  | StaticCredentialsAuthProviderConfig
   | SupabaseAuthProviderConfig
   | WorkOsAuthProviderConfig;
 
@@ -741,15 +749,6 @@ export interface ServerView {
 
 export interface SessionRequest {
   token: string;
-}
-
-export interface StaticCredentialsAuthProviderConfig {
-  provider: "static";
-  username?: string;
-  password?: string;
-  jwt_secret?: string;
-  /** */
-  token_ttl_seconds?: number;
 }
 
 export type SupabaseAuthProviderConfigRequiredScopes = string[] | null;

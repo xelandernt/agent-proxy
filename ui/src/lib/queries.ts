@@ -11,6 +11,11 @@ import {
 	serverUsageApiServersNameUsageGet,
 	serverUsageSeriesApiServersNameUsageSeriesGet,
 } from "#/api/generated/fastAPI";
+import {
+	resolveUsageRange,
+	type UsageRange,
+	usageRangeKey,
+} from "#/lib/usage-range";
 
 export const REFRESH_INTERVAL_MS = 30_000;
 
@@ -38,42 +43,35 @@ export function useUsageSeriesAll() {
 	});
 }
 
-export function useServerUsage(
-	serverName: string,
-	range: { from: Date; to: Date } | null,
-) {
-	const fromISO = range?.from.toISOString() ?? "";
-	const toISO = range?.to.toISOString() ?? "";
+export function useServerUsage(serverName: string, range: UsageRange | null) {
 	return useQuery({
-		queryKey: ["server", serverName, "usage", fromISO, toISO],
+		queryKey: ["server", serverName, "usage", ...usageRangeKey(range)],
 		enabled: range !== null,
-		queryFn: async () =>
-			unwrap<UsageReport>(
-				await serverUsageApiServersNameUsageGet(serverName, {
-					from: fromISO,
-					to: toISO,
-				}),
-			),
+		queryFn: async () => {
+			if (range === null) throw new Error("Usage range is unavailable.");
+			const params = resolveUsageRange(range);
+			return unwrap<UsageReport>(
+				await serverUsageApiServersNameUsageGet(serverName, params),
+			);
+		},
 		refetchInterval: REFRESH_INTERVAL_MS,
 	});
 }
 
 export function useServerUsageSeries(
 	serverName: string,
-	range: { from: Date; to: Date } | null,
+	range: UsageRange | null,
 ) {
-	const fromISO = range?.from.toISOString() ?? "";
-	const toISO = range?.to.toISOString() ?? "";
 	return useQuery({
-		queryKey: ["server", serverName, "usage-series", fromISO, toISO],
+		queryKey: ["server", serverName, "usage-series", ...usageRangeKey(range)],
 		enabled: range !== null,
-		queryFn: async () =>
-			unwrap<SeriesReport>(
-				await serverUsageSeriesApiServersNameUsageSeriesGet(serverName, {
-					from: fromISO,
-					to: toISO,
-				}),
-			),
+		queryFn: async () => {
+			if (range === null) throw new Error("Usage range is unavailable.");
+			const params = resolveUsageRange(range);
+			return unwrap<SeriesReport>(
+				await serverUsageSeriesApiServersNameUsageSeriesGet(serverName, params),
+			);
+		},
 		refetchInterval: REFRESH_INTERVAL_MS,
 	});
 }

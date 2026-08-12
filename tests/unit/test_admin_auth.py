@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 import proxy.app.admin.auth as admin_auth_module
 import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
-from proxy.providers import AuthProviderConfig
 from proxy.settings import GatewayConfig
 from tests.support import StaticAuthProvider
 
@@ -60,7 +59,7 @@ def keycloak_config(sqlite_url: str) -> GatewayConfig:
 @pytest.fixture()
 def use_static_admin_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: AuthProviderConfig,
+        _config: object,
         *,
         base_url: str,
     ) -> StaticAuthProvider:

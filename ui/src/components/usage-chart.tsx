@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import type { ItemCount, SeriesBucket, SeriesReport } from "#/lib/mcp";
+import type { SeriesReport } from "#/lib/mcp";
+import { rowsFor, stackSeries, type UsageDimension } from "#/lib/usage-chart";
 import { cn } from "#/lib/utils";
 
 const DIMENSIONS = [
@@ -10,7 +11,7 @@ const DIMENSIONS = [
 	{ id: "statuses", label: "Statuses" },
 ] as const;
 
-type DimensionId = (typeof DIMENSIONS)[number]["id"];
+type DimensionId = UsageDimension;
 
 const SERIES_COLORS = [
 	"var(--lagoon)",
@@ -54,20 +55,6 @@ function humanize(value: number): string {
 	}
 	const digits = scaled % 1 === 0 ? scaled.toFixed(0) : scaled.toFixed(1);
 	return `${digits}${units[unit]}`;
-}
-
-function countsFor(point: ItemCount[], name: string): number {
-	for (const item of point) {
-		if (item.name === name) return item.count;
-	}
-	return 0;
-}
-
-function rowsFor(point: SeriesBucket, dimension: DimensionId): ItemCount[] {
-	if (dimension === "total") {
-		return point.total > 0 ? [{ name: "requests", count: point.total }] : [];
-	}
-	return point[dimension];
 }
 
 export function UsageChart({ report }: { report: SeriesReport }) {
@@ -176,20 +163,10 @@ function StackedAreas({
 }) {
 	const points = report.points;
 
-	const cumulative = useMemo(() => {
-		const rows: number[][] = names.map(() => points.map(() => 0));
-		let max = 1;
-		for (let seriesIndex = 0; seriesIndex < names.length; seriesIndex++) {
-			const name = names[seriesIndex];
-			let running = 0;
-			for (let index = 0; index < points.length; index++) {
-				running += countsFor(rowsFor(points[index], dimension), name);
-				rows[seriesIndex][index] = running;
-				if (running > max) max = running;
-			}
-		}
-		return { rows, max };
-	}, [points, dimension, names]);
+	const cumulative = useMemo(
+		() => stackSeries(points, dimension, names),
+		[points, dimension, names],
+	);
 
 	const yMax = niceCeil(cumulative.max);
 	const width = VIEWBOX.width;

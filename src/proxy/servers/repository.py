@@ -7,8 +7,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from proxy.servers.models import (
-    ServerConfig,
     McpServerConfig,
+    ServerConfig,
     config_to_auth_payload,
 )
 

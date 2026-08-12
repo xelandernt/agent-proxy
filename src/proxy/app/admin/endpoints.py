@@ -11,9 +11,9 @@ from proxy.app.admin.auth import (
     require_admin,
     set_admin_session_cookie,
 )
-from proxy.providers import AuthProviderConfig, AuthProviderLoadError
+from proxy.providers import AuthProviderLoadError, ServerAuthProviderConfig
 from proxy.servers.manager import ServerManager
-from proxy.servers.models import McpServerConfig
+from proxy.servers.models import McpServerConfig, merge_masked_auth_secrets
 from proxy.servers.repository import ServerNameTaken, ServerNotFound
 from proxy.servers.schemas import (
     ServerCreateRequest,
@@ -29,7 +29,7 @@ router = APIRouter(
 
 public_router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-AUTH_SCHEMA: dict = TypeAdapter(AuthProviderConfig).json_schema()
+AUTH_SCHEMA: dict = TypeAdapter(ServerAuthProviderConfig).json_schema()
 
 
 @public_router.get("/auth-status")
@@ -180,6 +180,19 @@ def _new_config(
     )
 
 
+def _updated_config(
+    current: McpServerConfig,
+    payload: ServerUpdateRequest,
+) -> McpServerConfig:
+    return McpServerConfig(
+        name=current.name,
+        description=payload.description,
+        upstream_url=payload.upstream_url,
+        auth=merge_masked_auth_secrets(current.auth, payload.auth),
+        verify_upstream_tls=payload.verify_upstream_tls,
+    )
+
+
 @router.get("/servers", response_model=list[ServerView])
 def list_servers(request: Request) -> list[ServerView]:
     """Return the currently mounted servers."""
@@ -229,15 +242,18 @@ async def update_server(
     """Replace a server's definition live; the name is immutable."""
 
     manager = get_server_manager(request)
-    config = _new_config(name, payload)
     try:
+        current = manager.get(name)
+        if current is None:
+            raise ServerNotFound(f"Unknown MCP server '{name}'.")
+        config = _updated_config(current, payload)
         updated = await manager.update(name, config)
     except ServerNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(error),
         ) from error
-    except ValueError as error:
+    except (TypeError, ValueError) as error:
         raise _invalid_config(error) from error
     return _to_view(updated)
 

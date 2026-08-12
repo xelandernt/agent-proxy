@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 
-from proxy.providers import AuthProviderConfig
+from proxy.providers import ServerAuthProviderConfig
 from proxy.servers.models import NAME_PATTERN
 
 
@@ -11,10 +11,10 @@ class ServerCreateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(pattern=NAME_PATTERN)
-    description: str = ""
-    upstream_url: AnyHttpUrl
-    auth: AuthProviderConfig
+    name: str = Field(pattern=NAME_PATTERN, max_length=100)
+    description: str = Field(default="", max_length=255)
+    upstream_url: AnyHttpUrl = Field(max_length=2048)
+    auth: ServerAuthProviderConfig
     verify_upstream_tls: bool = True
 
 
@@ -23,9 +23,9 @@ class ServerUpdateRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    description: str = ""
-    upstream_url: AnyHttpUrl
-    auth: AuthProviderConfig
+    description: str = Field(default="", max_length=255)
+    upstream_url: AnyHttpUrl = Field(max_length=2048)
+    auth: ServerAuthProviderConfig
     verify_upstream_tls: bool = True
 
 
@@ -35,5 +35,5 @@ class ServerView(BaseModel):
     name: str
     description: str
     upstream_url: str
-    auth: AuthProviderConfig
+    auth: ServerAuthProviderConfig
     verify_upstream_tls: bool

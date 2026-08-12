@@ -8,7 +8,6 @@ import pytest
 import proxy.app.admin.auth as admin_auth_module
 import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
-from proxy.providers import AuthProviderConfig
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from tests.integration.helpers import seed_servers_async
@@ -61,7 +60,7 @@ def update_payload(
 @pytest.fixture(autouse=True)
 def use_static_auth_providers(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: AuthProviderConfig,
+        _config: object,
         *,
         base_url: str,
     ) -> StaticAuthProvider:

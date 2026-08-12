@@ -19,7 +19,7 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from proxy.providers import AuthProviderConfig, KeycloakAuthProviderConfig
+from proxy.providers import AdminAuthProviderConfig, KeycloakAuthProviderConfig
 
 CONFIG_DIRECTORY: Final = ".proxy"
 CONFIG_FILE_ENV: Final = "PROXY_CONFIG_FILE"
@@ -60,7 +60,7 @@ class AdminConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    auth: AuthProviderConfig
+    auth: AdminAuthProviderConfig
     session_cookie_samesite: Literal["strict", "lax", "none"] = Field(
         default="lax",
         description=(

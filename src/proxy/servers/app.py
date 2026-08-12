@@ -5,10 +5,9 @@ import asyncio
 from fastapi.routing import BaseRoute
 from fastmcp.server import create_proxy
 from fastmcp.server.http import StarletteWithLifespan as FastMCPApplication
-from sqlalchemy.ext.asyncio import AsyncEngine
 from starlette.types import ASGIApp
 
-from proxy.app.usage.middleware import apply_usage_tracing
+from proxy.app.usage.middleware import UsageRecorder, apply_usage_tracing
 from proxy.providers import load_auth_provider
 from proxy.servers.models import McpServerConfig, server_base_url
 from proxy.settings import GatewayConfig
@@ -41,7 +40,6 @@ class McpServerApp:
         self._lifespan_task: asyncio.Task[None] | None = None
         self._started = asyncio.Event()
         self._stopping = asyncio.Event()
-        self._finished = asyncio.Event()
         self._failure: BaseException | None = None
 
     @property
@@ -56,8 +54,9 @@ class McpServerApp:
         self._lifespan_task = asyncio.create_task(self._run_lifespan())
         await self._started.wait()
         if self._failure is not None:
-            error, self._failure = self._failure, None
-            raise error
+            self._failure = None
+            task, self._lifespan_task = self._lifespan_task, None
+            await task
 
     async def _run_lifespan(self) -> None:
         try:
@@ -68,17 +67,18 @@ class McpServerApp:
             self._failure = error
             self._started.set()
             raise
-        finally:
-            self._finished.set()
 
     async def stop(self) -> None:
         """Signal the lifespan owner task and wait for full teardown."""
 
         if self._lifespan_task is None:
             return
+        task = self._lifespan_task
         self._stopping.set()
-        await self._finished.wait()
-        self._lifespan_task = None
+        try:
+            await task
+        finally:
+            self._lifespan_task = None
 
     def get_mounted_app(self) -> ASGIApp:
         """Return the ASGI app to mount under ``/{name}``."""
@@ -92,10 +92,10 @@ class McpServerAppFactory:
     def __init__(
         self,
         config: GatewayConfig,
-        usage_engine: AsyncEngine | None,
+        usage_recorder: UsageRecorder | None,
     ) -> None:
         self._config = config
-        self._usage_engine = usage_engine
+        self._usage_recorder = usage_recorder
 
     def create(self, server: McpServerConfig) -> McpServerApp:
         """Build one app, hoisting its well-known routes out for gateway mounting."""
@@ -118,7 +118,7 @@ class McpServerAppFactory:
         traced_app = apply_usage_tracing(
             mcp_app,
             server_name=server.name,
-            engine=self._usage_engine,
+            recorder=self._usage_recorder,
         )
         return McpServerApp(
             config=server,

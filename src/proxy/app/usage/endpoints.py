@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from proxy.app.usage.repository import UsageRepository
 from proxy.app.usage.schemas import SeriesReport, UsageReport, UsageSeriesDocument
-from proxy.app.usage.service import UsageService
+from proxy.app.usage.service import UsageService, bucket_count
 from proxy.database import create_session_factory
 
 router = APIRouter(prefix="/api/servers", tags=["usage"])
@@ -16,6 +16,8 @@ router = APIRouter(prefix="/api/servers", tags=["usage"])
 DEFAULT_WINDOW = timedelta(hours=1)
 SPARKLINE_WINDOW = timedelta(hours=24)
 VALID_BUCKETS = frozenset({"minute", "hour", "day"})
+MAX_USAGE_WINDOW = timedelta(days=366)
+MAX_SERIES_POINTS = 1500
 
 
 def get_usage_service(request: Request) -> UsageService:
@@ -23,6 +25,9 @@ def get_usage_service(request: Request) -> UsageService:
 
     engine: AsyncEngine = request.app.state.usage_engine
     return UsageService(UsageRepository(create_session_factory(engine)))
+
+
+UsageServiceDependency = Annotated[UsageService, Depends(get_usage_service)]
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -48,16 +53,34 @@ def _resolve_bucket(start: datetime, end: datetime, bucket: str | None) -> str:
             detail=f"Invalid bucket '{resolved}'; expected one of "
             f"{sorted(VALID_BUCKETS)}.",
         )
+    points = bucket_count(start, end, resolved)
+    if points > MAX_SERIES_POINTS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                f"Requested series contains {points} points; the maximum is "
+                f"{MAX_SERIES_POINTS}. Use a larger bucket or shorter window."
+            ),
+        )
     return resolved
 
 
-def _window(from_: datetime | None, to: datetime | None) -> tuple[datetime, datetime]:
+def _window(
+    from_: datetime | None,
+    to: datetime | None,
+    default: timedelta = DEFAULT_WINDOW,
+) -> tuple[datetime, datetime]:
     end = _as_utc(to) if to is not None else datetime.now(UTC)
-    start = _as_utc(from_) if from_ is not None else end - DEFAULT_WINDOW
+    start = _as_utc(from_) if from_ is not None else end - default
     if start >= end:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="'from' must be earlier than 'to'.",
+        )
+    if end - start > MAX_USAGE_WINDOW:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Usage windows cannot exceed {MAX_USAGE_WINDOW.days} days.",
         )
     return start, end
 
@@ -74,20 +97,14 @@ def _require_server(request: Request, name: str) -> None:
 @router.get("/series", response_model=UsageSeriesDocument)
 async def servers_usage_series(
     request: Request,
+    service: UsageServiceDependency,
     from_: Annotated[datetime | None, Query(alias="from")] = None,
     to: datetime | None = None,
     bucket: str | None = None,
-    service: UsageService = Depends(get_usage_service),
 ) -> UsageSeriesDocument:
     """Return request totals per server over a time window."""
 
-    end = _as_utc(to) if to is not None else datetime.now(UTC)
-    start = _as_utc(from_) if from_ is not None else end - SPARKLINE_WINDOW
-    if start >= end:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="'from' must be earlier than 'to'.",
-        )
+    start, end = _window(from_, to, SPARKLINE_WINDOW)
     resolved = _resolve_bucket(start, end, bucket)
     manager = request.app.state.server_manager
     names = [server.name for server in manager.snapshot()]
@@ -100,9 +117,9 @@ async def servers_usage_series(
 async def server_usage(
     request: Request,
     name: str,
+    service: UsageServiceDependency,
     from_: Annotated[datetime | None, Query(alias="from")] = None,
     to: datetime | None = None,
-    service: UsageService = Depends(get_usage_service),
 ) -> UsageReport:
     """Return request volumes for a server over a time window."""
 
@@ -115,10 +132,10 @@ async def server_usage(
 async def server_usage_series(
     request: Request,
     name: str,
+    service: UsageServiceDependency,
     from_: Annotated[datetime | None, Query(alias="from")] = None,
     to: datetime | None = None,
     bucket: str | None = None,
-    service: UsageService = Depends(get_usage_service),
 ) -> SeriesReport:
     """Return bucketed request volumes for a server over a time window."""
 

@@ -3023,16 +3023,19 @@
         "properties": {
           "name": {
             "type": "string",
+            "maxLength": 100,
             "pattern": "^[a-z0-9][a-z0-9-]*$",
             "title": "Name"
           },
           "description": {
             "type": "string",
+            "maxLength": 255,
             "title": "Description",
             "default": ""
           },
           "upstream_url": {
             "type": "string",
+            "maxLength": 2048,
             "minLength": 1,
             "format": "uri",
             "title": "Upstream Url"
@@ -3082,9 +3085,6 @@
                 "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
               },
               {
-                "$ref": "#/components/schemas/StaticCredentialsAuthProviderConfig"
-              },
-              {
                 "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
               },
               {
@@ -3109,7 +3109,6 @@
                 "oci": "#/components/schemas/OciAuthProviderConfig",
                 "propelauth": "#/components/schemas/PropelAuthProviderConfig",
                 "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
-                "static": "#/components/schemas/StaticCredentialsAuthProviderConfig",
                 "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
                 "workos": "#/components/schemas/WorkOsAuthProviderConfig"
               }
@@ -3157,11 +3156,13 @@
         "properties": {
           "description": {
             "type": "string",
+            "maxLength": 255,
             "title": "Description",
             "default": ""
           },
           "upstream_url": {
             "type": "string",
+            "maxLength": 2048,
             "minLength": 1,
             "format": "uri",
             "title": "Upstream Url"
@@ -3211,9 +3212,6 @@
                 "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
               },
               {
-                "$ref": "#/components/schemas/StaticCredentialsAuthProviderConfig"
-              },
-              {
                 "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
               },
               {
@@ -3238,7 +3236,6 @@
                 "oci": "#/components/schemas/OciAuthProviderConfig",
                 "propelauth": "#/components/schemas/PropelAuthProviderConfig",
                 "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
-                "static": "#/components/schemas/StaticCredentialsAuthProviderConfig",
                 "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
                 "workos": "#/components/schemas/WorkOsAuthProviderConfig"
               }
@@ -3318,9 +3315,6 @@
                 "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
               },
               {
-                "$ref": "#/components/schemas/StaticCredentialsAuthProviderConfig"
-              },
-              {
                 "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
               },
               {
@@ -3345,7 +3339,6 @@
                 "oci": "#/components/schemas/OciAuthProviderConfig",
                 "propelauth": "#/components/schemas/PropelAuthProviderConfig",
                 "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
-                "static": "#/components/schemas/StaticCredentialsAuthProviderConfig",
                 "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
                 "workos": "#/components/schemas/WorkOsAuthProviderConfig"
               }
@@ -3379,44 +3372,6 @@
           "token"
         ],
         "title": "SessionRequest"
-      },
-      "StaticCredentialsAuthProviderConfig": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "const": "static",
-            "title": "Provider"
-          },
-          "username": {
-            "type": "string",
-            "title": "Username",
-            "default": "user"
-          },
-          "password": {
-            "type": "string",
-            "format": "password",
-            "title": "Password",
-            "writeOnly": true
-          },
-          "jwt_secret": {
-            "type": "string",
-            "format": "password",
-            "title": "Jwt Secret",
-            "writeOnly": true
-          },
-          "token_ttl_seconds": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Token Ttl Seconds",
-            "default": 3600
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider"
-        ],
-        "title": "StaticCredentialsAuthProviderConfig"
       },
       "SupabaseAuthProviderConfig": {
         "properties": {

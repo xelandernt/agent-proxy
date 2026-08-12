@@ -21,9 +21,9 @@ from fastmcp.server.auth.providers.workos import AuthKitProvider, WorkOSProvider
 from pydantic import TypeAdapter, ValidationError
 
 from proxy.providers import (
+    AdminAuthProviderConfig,
     Auth0AuthProviderConfig,
     AuthKitAuthProviderConfig,
-    AuthProviderConfig,
     AwsCognitoAuthProviderConfig,
     AzureAuthProviderConfig,
     DescopeAuthProviderConfig,
@@ -36,6 +36,7 @@ from proxy.providers import (
     OciAuthProviderConfig,
     PropelAuthProviderConfig,
     ScalekitAuthProviderConfig,
+    ServerAuthProviderConfig,
     StaticCredentialsAuthProvider,
     StaticCredentialsAuthProviderConfig,
     SupabaseAuthProviderConfig,
@@ -218,7 +219,7 @@ def stub_oidc_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
     ],
 )
 def test_supported_provider_builds(
-    config: AuthProviderConfig,
+    config: ServerAuthProviderConfig | AdminAuthProviderConfig,
     provider_type: type[AuthProvider],
 ) -> None:
     provider = load_auth_provider(
@@ -229,8 +230,8 @@ def test_supported_provider_builds(
     assert isinstance(provider, provider_type)
 
 
-def test_auth_schema_exposes_only_named_typed_providers() -> None:
-    schema = TypeAdapter(AuthProviderConfig).json_schema()
+def test_server_auth_schema_exposes_only_server_providers() -> None:
+    schema = TypeAdapter(ServerAuthProviderConfig).json_schema()
 
     assert set(schema["discriminator"]["mapping"]) == {
         "auth0",
@@ -247,9 +248,18 @@ def test_auth_schema_exposes_only_named_typed_providers() -> None:
         "oci",
         "propelauth",
         "scalekit",
-        "static",
         "supabase",
         "workos",
+    }
+
+
+def test_admin_auth_schema_exposes_only_admin_flows() -> None:
+    schema = TypeAdapter(AdminAuthProviderConfig).json_schema()
+
+    assert set(schema["discriminator"]["mapping"]) == {
+        "jwt",
+        "keycloak",
+        "static",
     }
 
 

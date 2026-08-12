@@ -15,120 +15,69 @@ import {
 	TooltipTrigger,
 } from "#/components/ui/tooltip";
 import {
+	type AuthProviderSchema,
+	effectiveNode,
+	formatStringMap,
+	type InputSpec,
+	initialValue,
+	inputSpec,
+	type JsonSchema,
+	parseStringMap,
+	parseTextValue,
+	resolveNode,
+} from "#/lib/auth-schema";
+import {
 	getFieldTooltip,
 	hasProviderGuide,
 } from "#/lib/provider-docs/registry";
 
-export type JsonSchema = {
-	$ref?: string;
-	type?: string;
-	const?: unknown;
-	title?: string;
-	format?: string;
-	writeOnly?: boolean;
-	default?: unknown;
-	enum?: unknown[];
-	anyOf?: JsonSchema[];
-	oneOf?: JsonSchema[];
-	items?: JsonSchema;
-	properties?: Record<string, JsonSchema>;
-	required?: string[];
-};
-
-export type AuthProviderSchema = {
-	$defs?: Record<string, JsonSchema>;
-	discriminator?: { propertyName?: string; mapping?: Record<string, string> };
-};
+export type { AuthProviderSchema } from "#/lib/auth-schema";
 
 export const SECRET_MASK = "**********";
 
 type Value = unknown;
 
-function resolveNode(node: JsonSchema, schema: AuthProviderSchema): JsonSchema {
-	if (node.$ref && schema.$defs) {
-		const name = node.$ref.split("/").pop();
-		if (name && schema.$defs[name]) return schema.$defs[name];
-	}
-	return node;
-}
-
-function effectiveNode(
-	node: JsonSchema,
-	schema: AuthProviderSchema,
-): JsonSchema {
-	const resolved = resolveNode(node, schema);
-	const union = resolved.anyOf ?? resolved.oneOf;
-	if (union) {
-		const nonNull = union.find(
-			(candidate) => resolveNode(candidate, schema).type !== "null",
-		);
-		if (nonNull) return effectiveNode(nonNull, schema);
-	}
-	return resolved;
-}
-
-function isSecret(node: JsonSchema): boolean {
-	return node.writeOnly === true || node.format === "password";
-}
-
-function inputKind(
-	node: JsonSchema,
-	schema: AuthProviderSchema,
-): "text" | "secret" | "url" | "number" | "boolean" | "list" | "object" {
-	const resolved = effectiveNode(node, schema);
-	if (resolved.type === "boolean") return "boolean";
-	if (resolved.type === "number" || resolved.type === "integer")
-		return "number";
-	if (resolved.type === "array") return "list";
-	if (resolved.type === "object") return "object";
-	if (isSecret(resolved)) return "secret";
-	if (resolved.format === "uri") return "url";
-	return "text";
-}
-
-function initialValue(
-	node: JsonSchema,
-	schema: AuthProviderSchema,
-	current?: Value,
-): Value {
-	const resolved = effectiveNode(node, schema);
-	if (current !== undefined && current !== null) return current;
-	if (resolved.default !== undefined) return resolved.default;
-	return null;
-}
-
 function isMaskedSecret(value: Value): boolean {
 	return typeof value === "string" && value === SECRET_MASK;
 }
 
-function parseValue(kind: ReturnType<typeof inputKind>, raw: string): Value {
-	if (kind === "number") {
-		if (raw === "") return null;
-		const parsed = Number(raw);
-		return Number.isNaN(parsed) ? raw : parsed;
-	}
-	if (kind === "list") {
-		const items = raw
-			.split(",")
-			.map((item) => item.trim())
-			.filter(Boolean);
-		return items.length > 0 ? items : null;
-	}
-	return raw === "" ? null : raw;
-}
-
-function FieldInput({
-	kind,
+function StringMapInput({
 	label,
 	value,
 	onChange,
 }: {
-	kind: ReturnType<typeof inputKind>;
 	label?: string;
 	value: Value;
 	onChange: (value: Value) => void;
 }) {
-	if (kind === "boolean") {
+	const [raw, setRaw] = useState(() => formatStringMap(value));
+	return (
+		<textarea
+			value={raw}
+			onChange={(event) => {
+				setRaw(event.target.value);
+				onChange(parseStringMap(event.target.value));
+			}}
+			aria-label={label}
+			placeholder="key=value"
+			rows={3}
+			className="w-full rounded-md border bg-transparent px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+		/>
+	);
+}
+
+function FieldInput({
+	spec,
+	label,
+	value,
+	onChange,
+}: {
+	spec: Exclude<InputSpec, { kind: "object" }>;
+	label?: string;
+	value: Value;
+	onChange: (value: Value) => void;
+}) {
+	if (spec.kind === "boolean") {
 		return (
 			<input
 				type="checkbox"
@@ -139,12 +88,39 @@ function FieldInput({
 			/>
 		);
 	}
+	if (spec.kind === "choice") {
+		const selected = spec.choices.some((choice) => Object.is(choice, value))
+			? JSON.stringify(value)
+			: "";
+		return (
+			<select
+				value={selected}
+				onChange={(event) =>
+					onChange(event.target.value ? JSON.parse(event.target.value) : null)
+				}
+				aria-label={label}
+				className="h-9 w-full rounded-md border bg-background px-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+			>
+				<option value="">Select a value</option>
+				{spec.choices.map((choice) => (
+					<option key={JSON.stringify(choice)} value={JSON.stringify(choice)}>
+						{String(choice)}
+					</option>
+				))}
+			</select>
+		);
+	}
+	if (spec.kind === "map") {
+		return <StringMapInput label={label} value={value} onChange={onChange} />;
+	}
 	const masked = isMaskedSecret(value);
 	const raw =
-		kind === "list"
+		spec.kind === "list" || spec.kind === "string-or-list"
 			? Array.isArray(value)
 				? value.join(", ")
-				: ""
+				: typeof value === "string"
+					? value
+					: ""
 			: masked
 				? ""
 				: typeof value === "number"
@@ -155,16 +131,18 @@ function FieldInput({
 	return (
 		<input
 			type={
-				kind === "secret"
+				spec.kind === "secret"
 					? "password"
-					: kind === "url"
+					: spec.kind === "url"
 						? "url"
-						: kind === "number"
+						: spec.kind === "number"
 							? "number"
 							: "text"
 			}
 			value={raw}
-			onChange={(event) => onChange(parseValue(kind, event.target.value))}
+			onChange={(event) =>
+				onChange(parseTextValue(spec.kind, event.target.value))
+			}
 			placeholder={masked ? "unchanged — re-enter to change" : ""}
 			className="h-9 w-full rounded-md border bg-transparent px-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 		/>
@@ -253,13 +231,13 @@ function ProviderFields({
 			{Object.entries(properties)
 				.filter(([, property]) => property.const === undefined)
 				.map(([name, property]) => {
-					const kind = inputKind(property, schema);
+					const spec = inputSpec(property, schema);
 					const propertyPath = path ? `${path}.${name}` : name;
 					const current = value[name];
 					const ownedValue = initialValue(property, schema, current);
 					const error = errorFor(name, propertyPath);
 
-					if (kind === "object") {
+					if (spec.kind === "object") {
 						const objectNode = effectiveNode(property, schema);
 						return (
 							<fieldset
@@ -287,13 +265,13 @@ function ProviderFields({
 
 					return (
 						<FieldGroup
-							key={name}
+							key={`${providerId}:${name}`}
 							label={`${property.title ?? name}${required.has(name) ? " *" : ""}`}
 							error={error}
 							help={getFieldTooltip(providerId, name)}
 						>
 							<FieldInput
-								kind={kind}
+								spec={spec}
 								label={property.title ?? name}
 								value={ownedValue}
 								onChange={(next) => onChange({ ...value, [name]: next })}

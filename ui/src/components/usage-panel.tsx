@@ -1,5 +1,5 @@
 import { ActivityIcon, RefreshCwIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "#/components/ui/button";
 import {
 	Card,
@@ -69,7 +69,7 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 	const [customTo, setCustomTo] = useState<string>("");
 	const [customActive, setCustomActive] = useState(false);
 
-	const range = useMemo(() => {
+	const range = (() => {
 		if (customActive) {
 			const from = new Date(customFrom);
 			const to = new Date(customTo);
@@ -77,9 +77,8 @@ export function UsagePanel({ serverName }: { serverName: string }) {
 				return null;
 			return { from, to };
 		}
-		const to = new Date();
-		return { from: new Date(to.getTime() - presetMinutes * 60_000), to };
-	}, [customActive, customFrom, customTo, presetMinutes]);
+		return { presetMinutes };
+	})();
 
 	const usageQuery = useServerUsage(serverName, range);
 	const seriesQuery = useServerUsageSeries(serverName, range);

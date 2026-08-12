@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
-from proxy.providers import AuthProviderConfig
+from proxy.providers import ServerAuthProviderConfig
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from tests.integration.helpers import seed_servers
@@ -20,7 +20,7 @@ RESOURCE_AUDIENCE = "https://gateway.example/calendar/mcp"
 @pytest.fixture(autouse=True)
 def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: AuthProviderConfig,
+        _config: ServerAuthProviderConfig,
         *,
         base_url: str,
     ) -> StaticAuthProvider:
@@ -53,6 +53,7 @@ def boot_admin_gateway(keycloak_realm_url: str, postgres_url: str) -> TestClient
                 "auth": {
                     "provider": "keycloak",
                     "realm_url": keycloak_realm_url,
+                    "client_id": "agent-proxy-admin-ui",
                     "audience": RESOURCE_AUDIENCE,
                     "required_scopes": ["openid"],
                 }

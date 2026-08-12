@@ -10,9 +10,9 @@ import {
 	listServersApiAdminServersGet,
 	updateServerApiAdminServersNamePut,
 } from "#/api/generated/fastAPI";
+import type { AuthProviderSchema } from "#/lib/auth-schema";
 
 export type AdminServer = ServerView;
-export type ServerPayload = ServerCreateRequest | ServerUpdateRequest;
 
 export type FieldError = {
 	field: string;
@@ -103,8 +103,8 @@ export async function deleteAdminServer(name: string): Promise<void> {
 	throw adminError(result.status, result.data);
 }
 
-export async function fetchAuthSchema(): Promise<Record<string, unknown>> {
+export async function fetchAuthSchema(): Promise<AuthProviderSchema> {
 	const result = await authSchemaApiAdminAuthSchemaGet();
-	if (result.status === 200) return result.data as Record<string, unknown>;
+	if (result.status === 200) return result.data as AuthProviderSchema;
 	throw adminError(result.status, result.data);
 }

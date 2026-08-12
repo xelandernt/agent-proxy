@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,6 +12,7 @@ from proxy.app.admin.endpoints import (
 )
 from proxy.app.admin.endpoints import router as admin_router
 from proxy.app.usage.endpoints import router as usage_router
+from proxy.app.usage.middleware import UsageRecorder
 from proxy.app.well_known import router as well_known_router
 from proxy.database import Base, create_engine, create_session_factory
 from proxy.observability import configure_observability
@@ -33,18 +34,22 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     usage_engine = create_engine(settings.database.url)
 
     @asynccontextmanager
-    async def lifespan(gateway: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(gateway: FastAPI) -> AsyncGenerator[None]:
         async with AsyncExitStack() as stack:
             async with usage_engine.begin() as connection:
                 await connection.run_sync(Base.metadata.create_all)
+            session_factory = create_session_factory(usage_engine)
+            usage_recorder = UsageRecorder(session_factory)
+            await usage_recorder.start()
+            stack.push_async_callback(usage_engine.dispose)
+            stack.push_async_callback(usage_recorder.stop)
             manager = ServerManager(
-                repository=ServersRepository(create_session_factory(usage_engine)),
-                app_factory=McpServerAppFactory(settings, usage_engine),
+                repository=ServersRepository(session_factory),
+                app_factory=McpServerAppFactory(settings, usage_recorder),
                 gateway=gateway,
             )
             await manager.start()
             gateway.state.server_manager = manager
-            stack.push_async_callback(usage_engine.dispose)
             stack.push_async_callback(manager.stop)
             yield
 

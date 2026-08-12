@@ -176,6 +176,7 @@ admin:
   auth:
     provider: keycloak
     realm_url: https://identity.example.com/realms/agents
+    client_id: agent-proxy-admin-ui
 ```
 
 MCP servers are no longer configured in YAML. They are created at runtime
@@ -245,10 +246,11 @@ Logfire remains local and does not export telemetry.
 
 ### Admin authentication and the browser login flow
 
-The admin identity boundary reuses the gateway's provider machinery: the
-`admin.auth` configuration designates one `AuthProviderConfig`. Every
-`/api/admin/*` endpoint validates `Authorization: Bearer <token>` through the
-provider.
+The admin identity boundary uses an explicit admin provider contract:
+`keycloak` for browser sign-in, `jwt` for pasted tokens, or `static` for a
+gateway-owned username and password. Every
+protected admin endpoint validates the session cookie or
+`Authorization: Bearer <token>` through the provider.
 
 For `keycloak` the admin UI runs the standard Authorization Code Flow with
 PKCE **directly against the realm**: the login screen reads the realm's
@@ -271,12 +273,10 @@ admin:
     client_id: agent-proxy-admin-ui
 ```
 
-OAuth-proxy providers such as Auth0 or Google are also supported as `admin.auth`
-providers and use the same browser flow. Providers that only verify tokens
-(such as `jwt`) have no browser sign-in; for those, obtain an access token from
-your identity provider and paste it into the admin login screen. The token is
-stored in `localStorage` and attached to admin API calls; a 401 clears it and
-returns to the login screen.
+The `jwt` provider has no browser sign-in. Obtain an access token from the
+identity provider and paste it into the admin login screen. After verification,
+the gateway stores the token in an HttpOnly session cookie; a 401 returns the
+browser to the login screen.
 
 For the browser flow, register the UI's redirect URI —
 `{ui-origin}/admin/callback` — with the provider, and include the UI origin in
@@ -285,8 +285,8 @@ For the browser flow, register the UI's redirect URI —
 Alternatively, a plain username/password admin account can be configured
 instead of an OAuth provider. The gateway checks the credentials at
 `POST /api/admin/login` (constant-time comparison) and signs a short-lived
-HS256 JWT with `jwt_secret`; the UI stores the token in `localStorage` and
-sends it as a bearer token exactly like the OAuth flow:
+HS256 JWT with `jwt_secret`; the gateway stores it in the same HttpOnly session
+cookie used by the other admin flows:
 
 ```yaml
 admin:

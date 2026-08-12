@@ -9,6 +9,7 @@
     "dev": "vite dev --port 3000",
     "generate-routes": "tsr generate",
     "build": "vite build",
+    "test": "node --test --experimental-strip-types src/lib/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

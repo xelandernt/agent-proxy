@@ -6,12 +6,12 @@ from typing import TypedDict
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
+from fastmcp.client.transports import StreamableHttpTransport
 from pydantic import AnyHttpUrl, TypeAdapter
 
-from fastmcp.client.transports import StreamableHttpTransport
 import proxy.servers.app as servers_app_module
 from proxy.app.main import MCP_PROTOCOL_VERSION, create_app
-from proxy.providers import AuthProviderConfig
+from proxy.providers import ServerAuthProviderConfig
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from proxy.transport import create_upstream_transport
@@ -112,7 +112,7 @@ def server_config(upstream_url: str = "http://127.0.0.1:9/mcp") -> McpServerConf
 @pytest.fixture(autouse=True)
 def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: AuthProviderConfig,
+        _config: ServerAuthProviderConfig,
         *,
         base_url: str,
     ) -> StaticAuthProvider:

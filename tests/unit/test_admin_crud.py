@@ -5,7 +5,6 @@ from fastapi.testclient import TestClient
 
 import proxy.app.admin.auth as admin_auth_module
 from proxy.app.main import create_app
-from proxy.providers import AuthProviderConfig
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from tests.integration.helpers import seed_servers
@@ -38,7 +37,7 @@ def boot_gateway(
     monkeypatch: pytest.MonkeyPatch,
 ) -> TestClient:
     def load_static_provider(
-        _config: AuthProviderConfig,
+        _config: object,
         *,
         base_url: str,
     ) -> StaticAuthProvider:

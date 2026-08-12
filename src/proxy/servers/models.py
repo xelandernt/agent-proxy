@@ -16,11 +16,12 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from proxy.database import Base
-from proxy.providers import AuthProviderConfig
+from proxy.providers import ServerAuthProviderConfig
 
 NAME_PATTERN: Final = r"^[a-z0-9][a-z0-9-]*$"
+SECRET_MASK: Final = "**********"
 
-AUTH_PROVIDER_ADAPTER: Final = TypeAdapter(AuthProviderConfig)
+AUTH_PROVIDER_ADAPTER: Final = TypeAdapter(ServerAuthProviderConfig)
 
 
 class McpServerConfig(BaseModel):
@@ -28,10 +29,10 @@ class McpServerConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(pattern=NAME_PATTERN)
-    description: str = ""
-    upstream_url: AnyHttpUrl
-    auth: AuthProviderConfig
+    name: str = Field(pattern=NAME_PATTERN, max_length=100)
+    description: str = Field(default="", max_length=255)
+    upstream_url: AnyHttpUrl = Field(max_length=2048)
+    auth: ServerAuthProviderConfig
     verify_upstream_tls: bool = True
 
 
@@ -71,6 +72,59 @@ def config_to_auth_payload(config: McpServerConfig) -> dict:
 
     payload = _jsonable(AUTH_PROVIDER_ADAPTER.dump_python(config.auth, mode="python"))
     return cast(dict, payload)
+
+
+def merge_masked_auth_secrets(
+    current: ServerAuthProviderConfig,
+    updated: ServerAuthProviderConfig,
+) -> ServerAuthProviderConfig:
+    """Replace secret-mask sentinels with values from the current provider."""
+
+    current_data = AUTH_PROVIDER_ADAPTER.dump_python(current, mode="python")
+    updated_data = AUTH_PROVIDER_ADAPTER.dump_python(updated, mode="python")
+    if current.provider != updated.provider and _contains_secret_mask(updated_data):
+        raise TypeError(
+            "Masked secrets can only preserve credentials from the same provider."
+        )
+    merged = _merge_masked_values(current_data, updated_data)
+    return AUTH_PROVIDER_ADAPTER.validate_python(_jsonable(merged))
+
+
+def _contains_secret_mask(value: object) -> bool:
+    if isinstance(value, SecretStr):
+        return value.get_secret_value() == SECRET_MASK
+    if isinstance(value, dict):
+        return any(_contains_secret_mask(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_secret_mask(item) for item in value)
+    return False
+
+
+def _merge_masked_values(current: object, updated: object) -> object:
+    if isinstance(updated, SecretStr):
+        if updated.get_secret_value() != SECRET_MASK:
+            return updated
+        if not isinstance(current, SecretStr):
+            raise TypeError(
+                "Masked secrets can only preserve credentials from the same provider."
+            )
+        return current
+    if isinstance(updated, dict):
+        current_items = current if isinstance(current, dict) else {}
+        return {
+            key: _merge_masked_values(current_items.get(key), value)
+            for key, value in updated.items()
+        }
+    if isinstance(updated, list):
+        current_items = current if isinstance(current, list) else []
+        return [
+            _merge_masked_values(
+                current_items[index] if index < len(current_items) else None,
+                value,
+            )
+            for index, value in enumerate(updated)
+        ]
+    return updated
 
 
 def _jsonable(value: object) -> object:

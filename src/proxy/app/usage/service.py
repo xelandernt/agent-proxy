@@ -22,6 +22,15 @@ BUCKET_STEPS: dict[str, timedelta] = {
 }
 
 
+def bucket_count(start: datetime, end: datetime, bucket: str) -> int:
+    """Return the number of aligned buckets covering an open time window."""
+
+    first = _floor_bucket(start, bucket)
+    span = end - first
+    step = BUCKET_STEPS[bucket]
+    return max(0, (span + step - timedelta(microseconds=1)) // step)
+
+
 class UsageService:
     """Build usage reports for a single MCP server."""
 
@@ -142,14 +151,14 @@ def _bucket_times(start: datetime, end: datetime, bucket: str) -> list[datetime]
     """
 
     step = BUCKET_STEPS[bucket]
-    floored = start.replace(second=0, microsecond=0)
+    floored = _floor_bucket(start, bucket)
+    return [floored + index * step for index in range(bucket_count(start, end, bucket))]
+
+
+def _floor_bucket(value: datetime, bucket: str) -> datetime:
+    floored = value.replace(second=0, microsecond=0)
     if bucket == "hour":
         floored = floored.replace(minute=0)
     elif bucket == "day":
         floored = floored.replace(minute=0, hour=0)
-    times: list[datetime] = []
-    current = floored
-    while current < end:
-        times.append(current)
-        current += step
-    return times
+    return floored

@@ -7,7 +7,7 @@ import pytest
 
 import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
-from proxy.providers import AuthProviderConfig
+from proxy.providers import ServerAuthProviderConfig
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
@@ -35,7 +35,7 @@ def keycloak_server(
 @pytest.fixture(autouse=True)
 def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: AuthProviderConfig,
+        _config: ServerAuthProviderConfig,
         *,
         base_url: str,
     ) -> StaticAuthProvider:
@@ -123,6 +123,57 @@ async def test_update_remounts_with_new_upstream(
         json=modern_request("server/discover"),
     )
     assert response.status_code == 401
+
+
+async def test_update_start_failure_leaves_persistence_and_runtime_unchanged(
+    live_client: tuple[httpx2.AsyncClient, ServerManager],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, manager = live_client
+    previous = manager.get("calendar")
+    assert previous is not None
+    replacement = keycloak_server("calendar", upstream_url="http://127.0.0.1:99/mcp")
+
+    class FailingApp:
+        def __init__(self) -> None:
+            self.name = "calendar"
+            self.well_known_routes: list = []
+
+        def get_mounted_app(self) -> object:
+            return self
+
+        async def start(self) -> None:
+            raise RuntimeError("replacement failed")
+
+        async def stop(self) -> None:
+            return None
+
+    monkeypatch.setattr(manager._factory, "create", lambda _config: FailingApp())
+
+    with pytest.raises(RuntimeError, match="replacement failed"):
+        await manager.update("calendar", replacement)
+
+    assert manager.get("calendar") == previous
+    assert await manager._repository.get("calendar") == previous
+    assert await discovery(client) == ["calendar"]
+
+
+async def test_delete_persistence_failure_leaves_runtime_mounted(
+    live_client: tuple[httpx2.AsyncClient, ServerManager],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, manager = live_client
+
+    async def fail_delete(_name: str) -> None:
+        raise RuntimeError("database failed")
+
+    monkeypatch.setattr(manager._repository, "delete", fail_delete)
+
+    with pytest.raises(RuntimeError, match="database failed"):
+        await manager.delete("calendar")
+
+    assert manager.get("calendar") is not None
+    assert await discovery(client) == ["calendar"]
 
 
 async def test_create_with_duplicate_name_raises_and_leaves_gateway_untouched(

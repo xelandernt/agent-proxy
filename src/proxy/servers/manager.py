@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from fastapi import FastAPI
 from fastapi.routing import BaseRoute, Mount
 
 from proxy.servers.app import McpServerApp, McpServerAppFactory
 from proxy.servers.models import McpServerConfig
-from proxy.servers.repository import ServerNotFound, ServersRepository
+from proxy.servers.repository import ServerNameTaken, ServerNotFound, ServersRepository
+
+logger = logging.getLogger(__name__)
 
 
 class ServerManager:
@@ -58,12 +61,17 @@ class ServerManager:
         """Persist and live-mount a new server, or raise ServerNameTaken."""
 
         async with self._lock:
-            await self._repository.create(config)
+            if config.name in self._apps:
+                raise ServerNameTaken(
+                    f"MCP server name '{config.name}' already exists."
+                )
+            app, mount_route = await self._prepare(config)
             try:
-                await self._mount(config)
+                await self._repository.create(config)
             except Exception:
-                await self._repository.delete(config.name)
+                await app.stop()
                 raise
+            self._attach(app, mount_route)
             return config
 
     async def update(
@@ -78,14 +86,18 @@ class ServerManager:
                 raise ServerNotFound(f"Unknown MCP server '{name}'.")
             if config.name != name:
                 raise ValueError("MCP server names are immutable.")
-            new_app = self._factory.create(config)
+            new_app, new_mount_route = await self._prepare(config)
             try:
                 await self._repository.update(name, config)
             except Exception:
                 await new_app.stop()
                 raise
-            await self._unmount(name)
-            await self._mount_app(new_app)
+            old_app = self._detach(name)
+            self._attach(new_app, new_mount_route)
+            try:
+                await old_app.stop()
+            except Exception:
+                logger.exception("Failed to stop replaced MCP server '%s'", name)
             return config
 
     async def delete(self, name: str) -> None:
@@ -94,38 +106,43 @@ class ServerManager:
         async with self._lock:
             if name not in self._apps:
                 raise ServerNotFound(f"Unknown MCP server '{name}'.")
-            await self._unmount(name)
             await self._repository.delete(name)
+            app = self._detach(name)
+            try:
+                await app.stop()
+            except Exception:
+                logger.exception("Failed to stop deleted MCP server '%s'", name)
 
     async def _mount(self, config: McpServerConfig) -> None:
-        app = self._factory.create(config)
-        try:
-            await self._mount_app(app)
-        except Exception:
-            await app.stop()
-            raise
+        app, mount_route = await self._prepare(config)
+        self._attach(app, mount_route)
 
-    async def _mount_app(self, app: McpServerApp) -> None:
-        await app.start()
+    async def _prepare(self, config: McpServerConfig) -> tuple[McpServerApp, Mount]:
+        app = self._factory.create(config)
+        mount_route = Mount(f"/{app.name}", app=app.get_mounted_app(), name=app.name)
         try:
-            self._gateway.router.routes.extend(app.well_known_routes)
-            mount_route = Mount(
-                f"/{app.name}", app=app.get_mounted_app(), name=app.name
-            )
-            self._gateway.router.routes.append(mount_route)
+            await app.start()
         except Exception:
             await app.stop()
             raise
+        return app, mount_route
+
+    def _attach(self, app: McpServerApp, mount_route: Mount) -> None:
+        self._gateway.router.routes.extend((*app.well_known_routes, mount_route))
         self._apps[app.name] = app
         self._mount_routes[app.name] = mount_route
 
     async def _unmount(self, name: str) -> None:
+        app = self._detach(name)
+        await app.stop()
+
+    def _detach(self, name: str) -> McpServerApp:
         app = self._apps.pop(name)
         mount_route = self._mount_routes.pop(name)
         self._remove_route(mount_route)
         for route in app.well_known_routes:
             self._remove_route(route)
-        await app.stop()
+        return app
 
     def _remove_route(self, route: BaseRoute) -> None:
         self._gateway.router.routes[:] = [

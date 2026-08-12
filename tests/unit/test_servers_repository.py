@@ -15,7 +15,6 @@ from proxy.database import Base, create_session_factory
 from proxy.providers import (
     Auth0AuthProviderConfig,
     AuthKitAuthProviderConfig,
-    AuthProviderConfig,
     AwsCognitoAuthProviderConfig,
     AzureAuthProviderConfig,
     DescopeAuthProviderConfig,
@@ -28,6 +27,7 @@ from proxy.providers import (
     OciAuthProviderConfig,
     PropelAuthProviderConfig,
     ScalekitAuthProviderConfig,
+    ServerAuthProviderConfig,
     SupabaseAuthProviderConfig,
     WorkOsAuthProviderConfig,
 )
@@ -57,7 +57,7 @@ def session_factory() -> AsyncIterator[async_sessionmaker]:
         asyncio.run(engine.dispose())
 
 
-def provider_configs() -> Iterator[AuthProviderConfig]:
+def provider_configs() -> Iterator[ServerAuthProviderConfig]:
     yield Auth0AuthProviderConfig(
         provider="auth0",
         config_url="https://tenant.auth0.com/.well-known/openid-configuration",
@@ -144,7 +144,7 @@ def provider_configs() -> Iterator[AuthProviderConfig]:
     )
 
 
-def server_config(index: int, auth: AuthProviderConfig) -> McpServerConfig:
+def server_config(index: int, auth: ServerAuthProviderConfig) -> McpServerConfig:
     return McpServerConfig(
         name=f"server-{index}",
         description=f"Server number {index}",

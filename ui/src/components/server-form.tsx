@@ -3,10 +3,14 @@ import { ArrowLeftIcon, BookOpenIcon, Loader2Icon } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type {
+	ServerCreateRequest,
+	ServerCreateRequestAuth,
+	ServerUpdateRequest,
+} from "#/api/generated/fastAPI";
 import {
 	AuthProviderForm,
 	type AuthProviderSchema,
-	SECRET_MASK,
 } from "#/components/auth-provider-form";
 import { Button } from "#/components/ui/button";
 import {
@@ -15,11 +19,7 @@ import {
 	CardFooter,
 	CardHeader,
 } from "#/components/ui/card";
-import {
-	AdminApiError,
-	type FieldError,
-	type ServerPayload,
-} from "#/lib/admin";
+import { AdminApiError, type FieldError } from "#/lib/admin";
 import {
 	useAuthSchema,
 	useCreateServer,
@@ -63,23 +63,6 @@ function TextField({
 			{error && <span className="text-xs text-destructive">{error}</span>}
 		</div>
 	);
-}
-
-function stripMaskedSecrets(
-	value: Record<string, unknown>,
-): Record<string, unknown> {
-	const cleaned: Record<string, unknown> = {};
-	for (const [key, item] of Object.entries(value)) {
-		if (item === SECRET_MASK) continue;
-		if (Array.isArray(item)) {
-			cleaned[key] = item.filter((entry) => entry !== SECRET_MASK);
-		} else if (item && typeof item === "object") {
-			cleaned[key] = stripMaskedSecrets(item as Record<string, unknown>);
-		} else {
-			cleaned[key] = item;
-		}
-	}
-	return cleaned;
 }
 
 export function ServerForm({
@@ -133,27 +116,29 @@ export function ServerForm({
 			: authSchemaQuery.isSuccess
 				? {
 						status: "ready",
-						schema: authSchemaQuery.data as AuthProviderSchema,
+						schema: authSchemaQuery.data,
 					}
 				: { status: "error", message: "Could not load the form." };
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		setFieldErrors([]);
-		const payload = {
-			...(mode === "create" ? { name } : {}),
+		// The live backend schema builds this value; the API remains the
+		// authoritative validator for provider-specific field combinations.
+		const authPayload = auth as unknown as ServerCreateRequestAuth;
+		const common = {
 			description: descriptionText,
 			upstream_url: upstreamUrl,
-			auth: stripMaskedSecrets(auth),
+			auth: authPayload,
 			verify_upstream_tls: verifyTls,
-		} as unknown as ServerPayload;
+		};
 		setSaving(true);
 		try {
 			if (mode === "create") {
-				await createMutation.mutateAsync(
-					payload as ServerPayload & { name: string },
-				);
+				const payload: ServerCreateRequest = { name, ...common };
+				await createMutation.mutateAsync(payload);
 			} else if (initial?.name) {
+				const payload: ServerUpdateRequest = common;
 				await updateMutation.mutateAsync({
 					name: initial.name,
 					payload,
