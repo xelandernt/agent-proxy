@@ -7,8 +7,18 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { FileQuestionIcon } from "lucide-react";
 import { BackgroundDither } from "#/components/background-dither";
 import { DitherToggle, ThemeToggle } from "#/components/toggles";
+import { Button } from "#/components/ui/button";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "#/components/ui/empty";
 import { Toaster } from "#/components/ui/sonner";
 import { UsagePill } from "#/components/usage-pill";
 import { patchGatewayFetch } from "#/lib/gateway";
@@ -62,6 +72,7 @@ export const Route = createRootRoute({
 		],
 	}),
 	shellComponent: RootDocument,
+	notFoundComponent: RootNotFound,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
@@ -108,5 +119,28 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<Scripts />
 			</body>
 		</html>
+	);
+}
+
+function RootNotFound() {
+	return (
+		<div className="mx-auto flex w-full max-w-2xl flex-col p-8">
+			<Empty>
+				<EmptyMedia variant="icon">
+					<FileQuestionIcon />
+				</EmptyMedia>
+				<EmptyHeader>
+					<EmptyTitle>Page not found</EmptyTitle>
+					<EmptyDescription>
+						This address does not match any page on the gateway.
+					</EmptyDescription>
+				</EmptyHeader>
+				<EmptyContent>
+					<Link to="/">
+						<Button variant="outline">Back to servers</Button>
+					</Link>
+				</EmptyContent>
+			</Empty>
+		</div>
 	);
 }

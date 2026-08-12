@@ -79,7 +79,7 @@ function AdminIndex() {
 			</div>
 			<header className="flex items-start justify-between gap-4">
 				<div className="flex flex-col gap-3">
-					<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
+					<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text pb-[0.15em] font-serif text-4xl font-bold tracking-tight text-transparent sm:text-5xl -mb-[0.15em]">
 						Manage servers
 					</h1>
 				</div>
