@@ -145,6 +145,11 @@ def test_crud_error_mappings(boot_gateway: TestClient) -> None:
         conflicting_config = client.post(
             "/api/admin/servers", headers=AUTH, json=conflicting
         )
+        forwarding = server_payload("forwarding")
+        forwarding["forward_client_credentials"] = True
+        forwarding_config = client.post(
+            "/api/admin/servers", headers=AUTH, json=forwarding
+        )
 
     assert duplicate.status_code == 409
     assert missing_put.status_code == 404
@@ -153,3 +158,29 @@ def test_crud_error_mappings(boot_gateway: TestClient) -> None:
     assert extra_field.status_code == 422
     assert conflicting_config.status_code == 422
     assert "not both" in conflicting_config.json()["detail"]
+    assert forwarding_config.status_code == 422
+    assert "forward_client_credentials" in forwarding_config.json()["detail"]
+
+
+def test_none_provider_server_with_forwarding(boot_gateway: TestClient) -> None:
+    with boot_gateway as client:
+        created = client.post(
+            "/api/admin/servers",
+            headers=AUTH,
+            json={
+                "name": "relay",
+                "description": "Authenticated upstream, no gateway auth",
+                "upstream_url": "http://127.0.0.1:9/mcp",
+                "auth": {"provider": "none"},
+                "forward_client_credentials": True,
+            },
+        )
+        assert created.status_code == 201
+        body = created.json()
+        assert body["auth"] == {"provider": "none"}
+        assert body["forward_client_credentials"] is True
+
+        listed = client.get("/api/admin/servers", headers=AUTH)
+        relay = next(server for server in listed.json() if server["name"] == "relay")
+        assert relay["auth"] == {"provider": "none"}
+        assert relay["forward_client_credentials"] is True

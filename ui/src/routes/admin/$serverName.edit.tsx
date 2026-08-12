@@ -44,6 +44,7 @@ function AdminEdit() {
 				upstream_url: server.upstream_url,
 				auth: server.auth as unknown as Record<string, unknown>,
 				verify_upstream_tls: server.verify_upstream_tls,
+				forward_client_credentials: server.forward_client_credentials,
 			}}
 			onDone={() => navigate({ to: "/admin" })}
 			onCancelHref="/admin"

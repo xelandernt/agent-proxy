@@ -82,6 +82,7 @@ export function ServerForm({
 		upstream_url: string;
 		auth: Record<string, unknown>;
 		verify_upstream_tls: boolean;
+		forward_client_credentials: boolean;
 	};
 	onDone: () => void;
 	onCancelHref: string;
@@ -93,6 +94,9 @@ export function ServerForm({
 	const [upstreamUrl, setUpstreamUrl] = useState(initial?.upstream_url ?? "");
 	const [verifyTls, setVerifyTls] = useState(
 		initial?.verify_upstream_tls ?? true,
+	);
+	const [forwardClientCredentials, setForwardClientCredentials] = useState(
+		initial?.forward_client_credentials ?? false,
 	);
 	const [auth, setAuth] = useState<Record<string, unknown>>(
 		initial?.auth ?? {},
@@ -131,6 +135,7 @@ export function ServerForm({
 			upstream_url: upstreamUrl,
 			auth: authPayload,
 			verify_upstream_tls: verifyTls,
+			forward_client_credentials: forwardClientCredentials,
 		};
 		setSaving(true);
 		try {
@@ -240,6 +245,23 @@ export function ServerForm({
 									className="font-mono text-xs text-muted-foreground"
 								>
 									verify_upstream_tls
+								</label>
+							</div>
+							<div className="flex items-center gap-2">
+								<input
+									id="forward-client-credentials"
+									type="checkbox"
+									checked={forwardClientCredentials}
+									onChange={(event) =>
+										setForwardClientCredentials(event.target.checked)
+									}
+									className="size-4 rounded border-border accent-[var(--color-primary)]"
+								/>
+								<label
+									htmlFor="forward-client-credentials"
+									className="font-mono text-xs text-muted-foreground"
+								>
+									forward_client_credentials
 								</label>
 							</div>
 						</CardContent>

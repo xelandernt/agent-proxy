@@ -2,6 +2,7 @@ export type ProviderPattern =
 	| "oauth-proxy"
 	| "remote-oauth"
 	| "token-verification"
+	| "no-auth"
 	| "gateway-internal";
 
 export type StepKind = "step" | "tip" | "warning" | "info";
@@ -29,6 +30,7 @@ export const PATTERN_LABELS: Record<ProviderPattern, string> = {
 	"oauth-proxy": "OAuth proxy",
 	"remote-oauth": "Remote OAuth",
 	"token-verification": "Token verification",
+	"no-auth": "No gateway authentication",
 	"gateway-internal": "Gateway-internal",
 };
 
@@ -36,5 +38,6 @@ export const PATTERN_ORDER: ProviderPattern[] = [
 	"oauth-proxy",
 	"remote-oauth",
 	"token-verification",
+	"no-auth",
 	"gateway-internal",
 ];

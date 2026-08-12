@@ -39,8 +39,10 @@ so this is acceptable by design.
 
 The upstream HTTP client removes `Authorization`, `Cookie`, and
 `Proxy-Authorization`, ignores FastMCP's forwarded auth object, and disables
-ambient proxy credentials. Modern MCP routing headers and request bodies are
-preserved.
+ambient proxy credentials — unless a server opts into relaying the client's
+`Authorization` header (see
+[Proxying an already-authenticated server](#proxying-an-already-authenticated-server)).
+Modern MCP routing headers and request bodies are preserved.
 
 ## Prerequisites
 
@@ -157,6 +159,32 @@ To serve a genuinely different backend, add a second service to
 [compose.yml](compose.yml) modeled on `mcp-server` and point `upstream_url` at
 it instead.
 
+### Proxying an already-authenticated server
+
+If your upstream MCP server already authenticates its clients, the gateway can
+proxy it without adding any authentication of its own. Choose the `none` auth
+provider and enable `forward_client_credentials`:
+
+| Field                        | Value                            |
+|------------------------------|----------------------------------|
+| Name                         | `{name}` — exposed at `http://localhost:8008/{name}/mcp` |
+| Upstream URL                 | the URL of your authenticated server |
+| Auth provider                | `none`                           |
+| Forward client credentials   | `true` (default `false`)         |
+
+With provider `none` the gateway publishes no OAuth routes and verifies no
+tokens: every request reaches the upstream, and the upstream's own responses —
+including its 401s — are relayed back unchanged. With `forward_client_credentials`
+enabled, the client's `Authorization` header is passed through to the upstream
+instead of being stripped, so MCP clients keep using the token they already
+have for your server. The discovery document advertises such servers with
+`"auth": "none"`.
+
+This mode is a trust decision, not a security one: the gateway adds no identity
+boundary, and `forward_client_credentials` is rejected for every other provider
+so a gateway-issued token can never leak upstream. Only use it when the
+upstream's own authentication protects the tools.
+
 ## Configure
 
 Copy [resources/config.example.yaml](resources/config.example.yaml) to
@@ -189,7 +217,8 @@ through the admin API (`/api/admin/servers`) or the admin UI at `/admin`:
 - `GET /api/admin/auth-schema` — JSON Schema for every supported auth provider
 
 A server definition carries a `name` (immutable, unique), `description`,
-`upstream_url`, `verify_upstream_tls`, and an `auth` provider configuration.
+`upstream_url`, `verify_upstream_tls`, an optional
+`forward_client_credentials` flag, and an `auth` provider configuration.
 The public endpoint for a server named `calendar` is
 `https://mcp.example.com/calendar/mcp`. The gateway supplies
 `https://mcp.example.com/calendar` as the provider's `base_url`; it is not a
@@ -213,6 +242,7 @@ provider discriminators are:
 | Hugging Face          | `huggingface` |
 | JWT/JWKS verification | `jwt`         |
 | Keycloak              | `keycloak`    |
+| No authentication     | `none`        |
 | OCI IAM               | `oci`         |
 | PropelAuth            | `propelauth`  |
 | Scalekit              | `scalekit`    |

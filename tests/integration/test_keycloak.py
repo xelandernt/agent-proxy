@@ -167,10 +167,12 @@ def test_keycloak_token_authenticates_without_reaching_upstream(
         upstream_url: str,
         *,
         verify_tls: bool = True,
+        forward_client_credentials: bool = False,
     ) -> StreamableHttpTransport:
         return create_upstream_transport(
             upstream_url,
             verify_tls=verify_tls,
+            forward_client_credentials=forward_client_credentials,
             http_transport=httpx2.MockTransport(upstream.handle_request),
         )
 

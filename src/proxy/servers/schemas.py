@@ -16,6 +16,7 @@ class ServerCreateRequest(BaseModel):
     upstream_url: AnyHttpUrl = Field(max_length=2048)
     auth: ServerAuthProviderConfig
     verify_upstream_tls: bool = True
+    forward_client_credentials: bool = False
 
 
 class ServerUpdateRequest(BaseModel):
@@ -27,6 +28,7 @@ class ServerUpdateRequest(BaseModel):
     upstream_url: AnyHttpUrl = Field(max_length=2048)
     auth: ServerAuthProviderConfig
     verify_upstream_tls: bool = True
+    forward_client_credentials: bool = False
 
 
 class ServerView(BaseModel):
@@ -37,3 +39,4 @@ class ServerView(BaseModel):
     upstream_url: str
     auth: ServerAuthProviderConfig
     verify_upstream_tls: bool
+    forward_client_credentials: bool

@@ -48,7 +48,9 @@ function DocsIndex() {
 									? "Providers with tenant-level registration"
 									: pattern === "token-verification"
 										? "Token verification only"
-										: "Gateway-internal credentials"}
+										: pattern === "no-auth"
+											? "No gateway authentication"
+											: "Gateway-internal credentials"}
 						</h2>
 						<div className="grid gap-3 sm:grid-cols-2">
 							{entries.map((guide) => (

@@ -197,10 +197,12 @@ def test_front_credentials_never_reach_upstream(
         upstream_url: str,
         *,
         verify_tls: bool = True,
+        forward_client_credentials: bool = False,
     ) -> StreamableHttpTransport:
         return create_upstream_transport(
             upstream_url,
             verify_tls=verify_tls,
+            forward_client_credentials=forward_client_credentials,
             http_transport=httpx2.MockTransport(upstream.handle_request),
         )
 
@@ -268,3 +270,121 @@ def test_well_known_document_is_public_without_auth(
         response = client.get("/.well-known/mcp-servers")
 
     assert response.status_code == 200
+
+
+def none_server() -> McpServerConfig:
+    return McpServerConfig.model_validate(
+        {
+            "name": "relay",
+            "upstream_url": "http://127.0.0.1:9/mcp",
+            "auth": {"provider": "none"},
+            "forward_client_credentials": True,
+        }
+    )
+
+
+def use_real_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    from proxy import providers as providers_module
+
+    monkeypatch.setattr(
+        servers_app_module, "load_auth_provider", providers_module.load_auth_provider
+    )
+
+
+def use_mock_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+    upstream: FakeModernUpstream,
+) -> None:
+    def in_process_transport(
+        upstream_url: str,
+        *,
+        verify_tls: bool = True,
+        forward_client_credentials: bool = False,
+    ) -> StreamableHttpTransport:
+        return create_upstream_transport(
+            upstream_url,
+            verify_tls=verify_tls,
+            forward_client_credentials=forward_client_credentials,
+            http_transport=httpx2.MockTransport(upstream.handle_request),
+        )
+
+    monkeypatch.setattr(
+        servers_app_module, "create_upstream_transport", in_process_transport
+    )
+
+
+def test_none_provider_relays_client_authorization_to_upstream(
+    monkeypatch: pytest.MonkeyPatch,
+    boot_gateway: Callable[..., TestClient],
+) -> None:
+    upstream_requests: list[dict[str, str]] = []
+    upstream = FakeModernUpstream(upstream_requests)
+    use_real_auth_provider(monkeypatch)
+    use_mock_upstream(monkeypatch, upstream)
+    with_token = modern_headers("tools/list") | {
+        "Authorization": "Bearer upstream-token"
+    }
+
+    with boot_gateway([none_server()]) as client:
+        with_authorization = client.post(
+            "/relay/mcp", headers=with_token, json=modern_request("tools/list")
+        )
+        without_authorization = client.post(
+            "/relay/mcp",
+            headers=modern_headers("tools/list"),
+            json=modern_request("tools/list"),
+        )
+
+    assert with_authorization.status_code == 200
+    assert without_authorization.status_code == 200
+    assert len(upstream_requests) == 2
+    assert upstream_requests[0].get("authorization") == "Bearer upstream-token"
+    assert "authorization" not in upstream_requests[1]
+    assert all("cookie" not in request for request in upstream_requests)
+    assert all("proxy-authorization" not in request for request in upstream_requests)
+
+
+def test_none_provider_skips_oauth_and_serves_discovery_unauthenticated(
+    monkeypatch: pytest.MonkeyPatch,
+    boot_gateway: Callable[..., TestClient],
+) -> None:
+    use_real_auth_provider(monkeypatch)
+
+    with boot_gateway([none_server()]) as client:
+        discovery = client.post(
+            "/relay/mcp",
+            headers=modern_headers("server/discover"),
+            json=modern_request("server/discover"),
+        )
+        protected_resource = client.get(
+            "/.well-known/oauth-protected-resource/relay/mcp"
+        )
+
+    assert discovery.status_code == 200
+    assert discovery.json()["result"]["supportedVersions"] == [MCP_PROTOCOL_VERSION]
+    assert "www-authenticate" not in discovery.headers
+    assert protected_resource.status_code == 404
+
+
+def test_none_provider_publishes_none_in_discovery_document(
+    monkeypatch: pytest.MonkeyPatch,
+    boot_gateway: Callable[..., TestClient],
+) -> None:
+    use_real_auth_provider(monkeypatch)
+
+    with boot_gateway(
+        [none_server()], public_base_url="https://gateway.example"
+    ) as client:
+        response = client.get("/.well-known/mcp-servers")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "servers": [
+            {
+                "name": "relay",
+                "description": "",
+                "url": "https://gateway.example/relay/mcp",
+                "auth": "none",
+            }
+        ]
+    }

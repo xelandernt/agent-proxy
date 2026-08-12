@@ -203,6 +203,7 @@ async def test_auth_schema_discriminates_on_provider(
         "huggingface",
         "jwt",
         "keycloak",
+        "none",
         "oci",
         "propelauth",
         "scalekit",

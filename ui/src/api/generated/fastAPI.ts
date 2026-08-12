@@ -500,6 +500,11 @@ export interface McpServersDocument {
   servers: McpServerListing[];
 }
 
+export const NoneAuthProviderConfigValue = {
+  provider: "none",
+} as const;
+export type NoneAuthProviderConfig = typeof NoneAuthProviderConfigValue;
+
 export type OciAuthProviderConfigResourceBaseUrl = string | null;
 
 export type OciAuthProviderConfigIssuerUrl = string | null;
@@ -651,6 +656,7 @@ export type ServerCreateRequestAuth =
   | HuggingFaceAuthProviderConfig
   | JwtAuthProviderConfig
   | KeycloakAuthProviderConfig
+  | NoneAuthProviderConfig
   | OciAuthProviderConfig
   | PropelAuthProviderConfig
   | ScalekitAuthProviderConfig
@@ -675,6 +681,7 @@ export interface ServerCreateRequest {
   upstream_url: string;
   auth: ServerCreateRequestAuth;
   verify_upstream_tls?: boolean;
+  forward_client_credentials?: boolean;
 }
 
 /**
@@ -697,6 +704,7 @@ export type ServerUpdateRequestAuth =
   | HuggingFaceAuthProviderConfig
   | JwtAuthProviderConfig
   | KeycloakAuthProviderConfig
+  | NoneAuthProviderConfig
   | OciAuthProviderConfig
   | PropelAuthProviderConfig
   | ScalekitAuthProviderConfig
@@ -716,6 +724,7 @@ export interface ServerUpdateRequest {
   upstream_url: string;
   auth: ServerUpdateRequestAuth;
   verify_upstream_tls?: boolean;
+  forward_client_credentials?: boolean;
 }
 
 export type ServerViewAuth =
@@ -730,6 +739,7 @@ export type ServerViewAuth =
   | HuggingFaceAuthProviderConfig
   | JwtAuthProviderConfig
   | KeycloakAuthProviderConfig
+  | NoneAuthProviderConfig
   | OciAuthProviderConfig
   | PropelAuthProviderConfig
   | ScalekitAuthProviderConfig
@@ -745,6 +755,7 @@ export interface ServerView {
   upstream_url: string;
   auth: ServerViewAuth;
   verify_upstream_tls: boolean;
+  forward_client_credentials: boolean;
 }
 
 export interface SessionRequest {

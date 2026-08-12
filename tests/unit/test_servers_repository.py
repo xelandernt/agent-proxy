@@ -24,6 +24,7 @@ from proxy.providers import (
     HuggingFaceAuthProviderConfig,
     JwtAuthProviderConfig,
     KeycloakAuthProviderConfig,
+    NoneAuthProviderConfig,
     OciAuthProviderConfig,
     PropelAuthProviderConfig,
     ScalekitAuthProviderConfig,
@@ -115,6 +116,7 @@ def provider_configs() -> Iterator[ServerAuthProviderConfig]:
         provider="keycloak",
         realm_url="https://identity.example/realms/agents",
     )
+    yield NoneAuthProviderConfig(provider="none")
     yield OciAuthProviderConfig(
         provider="oci",
         config_url="https://identity.example/.well-known/openid-configuration",
@@ -154,7 +156,7 @@ def server_config(index: int, auth: ServerAuthProviderConfig) -> McpServerConfig
     )
 
 
-@pytest.mark.parametrize("index", range(16), ids=lambda i: str(i))
+@pytest.mark.parametrize("index", range(17), ids=lambda i: str(i))
 async def test_every_provider_variant_round_trips(
     session_factory: async_sessionmaker,
     index: int,
@@ -244,3 +246,40 @@ async def test_update_and_delete_round_trip(
 
     await repository.delete(config.name)
     assert await repository.get(config.name) is None
+
+
+async def test_forward_client_credentials_round_trips_with_none_provider(
+    session_factory: async_sessionmaker,
+) -> None:
+    repository = ServersRepository(session_factory)
+    config = McpServerConfig(
+        name="relay",
+        upstream_url="http://127.0.0.1:8000/mcp",
+        auth=NoneAuthProviderConfig(provider="none"),
+        forward_client_credentials=True,
+    )
+
+    await repository.create(config)
+    stored = await repository.get("relay")
+
+    assert stored == config
+    assert stored is not None
+    assert stored.forward_client_credentials is True
+
+
+async def test_forward_client_credentials_rejected_without_none_provider(
+    session_factory: async_sessionmaker,
+) -> None:
+    auth = KeycloakAuthProviderConfig(
+        provider="keycloak",
+        realm_url="https://identity.example/realms/agents",
+    )
+    with pytest.raises(ValidationError, match="forward_client_credentials"):
+        McpServerConfig(
+            name="server-0",
+            description="Server number 0",
+            upstream_url="http://127.0.0.1:8000/mcp",
+            auth=auth,
+            verify_upstream_tls=False,
+            forward_client_credentials=True,
+        )

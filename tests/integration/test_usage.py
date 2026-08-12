@@ -135,10 +135,12 @@ def usage_client(
         upstream_url: str,
         *,
         verify_tls: bool = True,
+        forward_client_credentials: bool = False,
     ) -> object:
         return create_upstream_transport(
             upstream_url,
             verify_tls=verify_tls,
+            forward_client_credentials=forward_client_credentials,
             http_transport=httpx2.MockTransport(FakeUpstream().handle_request),
         )
 
@@ -199,11 +201,13 @@ def _report_window() -> dict[str, str]:
 def _fetch_report(
     client: TestClient,
     expected_total: int | None = None,
+    *,
+    server: str = "calendar",
 ) -> dict[str, object]:
     deadline = time.monotonic() + 5.0
     last: dict[str, object] = {}
     while time.monotonic() < deadline:
-        response = client.get("/api/servers/calendar/usage", params=_report_window())
+        response = client.get(f"/api/servers/{server}/usage", params=_report_window())
         assert response.status_code == 200
         last = response.json()
         if expected_total is None or last["total"] >= expected_total:
@@ -312,6 +316,50 @@ def test_usage_skips_unauthenticated_requests(usage_client: TestClient) -> None:
 
     assert report["total"] == 1
     assert report["methods"] == [{"name": "tools/list", "count": 1}]
+
+
+def test_usage_tracks_none_provider_requests(
+    postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from proxy import providers as providers_module
+
+    monkeypatch.setattr(
+        servers_app_module, "load_auth_provider", providers_module.load_auth_provider
+    )
+    server = McpServerConfig.model_validate(
+        {
+            "name": "relay",
+            "upstream_url": "http://127.0.0.1:9/mcp",
+            "auth": {"provider": "none"},
+            "forward_client_credentials": True,
+        }
+    )
+    seed_servers(postgres_url, [server])
+    config = GatewayConfig.model_validate(
+        {
+            "public_base_url": "https://gateway.example",
+            "database": {"url": postgres_url},
+        }
+    )
+    app = create_app(config)
+    with TestClient(app) as client:
+        asyncio.run(_truncate_usage_events(postgres_url))
+        tokenless_headers = {
+            name: value
+            for name, value in usage_headers("tools/list").items()
+            if name != "Authorization"
+        }
+        response = client.post(
+            "/relay/mcp",
+            headers=tokenless_headers,
+            json=usage_request("tools/list"),
+        )
+        assert response.status_code == 200
+        report = _fetch_report(client, expected_total=1, server="relay")
+        assert report["server"] == "relay"
+        assert report["total"] == 1
+        assert report["statuses"] == [{"name": "200", "count": 1}]
 
 
 def test_usage_unknown_server_returns_404(usage_client: TestClient) -> None:

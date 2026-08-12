@@ -11,7 +11,7 @@ from proxy.app.admin.auth import (
     require_admin,
     set_admin_session_cookie,
 )
-from proxy.providers import AuthProviderLoadError, ServerAuthProviderConfig
+from proxy.providers import ServerAuthProviderConfig
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig, merge_masked_auth_secrets
 from proxy.servers.repository import ServerNameTaken, ServerNotFound
@@ -162,6 +162,7 @@ def _to_view(config: McpServerConfig) -> ServerView:
         upstream_url=str(config.upstream_url),
         auth=config.auth,
         verify_upstream_tls=config.verify_upstream_tls,
+        forward_client_credentials=config.forward_client_credentials,
     )
 
 
@@ -176,6 +177,7 @@ def _new_config(
             "upstream_url": payload.upstream_url,
             "auth": payload.auth,
             "verify_upstream_tls": payload.verify_upstream_tls,
+            "forward_client_credentials": payload.forward_client_credentials,
         }
     )
 
@@ -190,6 +192,7 @@ def _updated_config(
         upstream_url=payload.upstream_url,
         auth=merge_masked_auth_secrets(current.auth, payload.auth),
         verify_upstream_tls=payload.verify_upstream_tls,
+        forward_client_credentials=payload.forward_client_credentials,
     )
 
 
@@ -220,15 +223,15 @@ async def create_server(
     """Create and live-mount a server."""
 
     manager = get_server_manager(request)
-    config = _new_config(payload.name, payload)
     try:
+        config = _new_config(payload.name, payload)
         created = await manager.create(config)
     except ServerNameTaken as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         ) from error
-    except AuthProviderLoadError as error:
+    except ValueError as error:
         raise _invalid_config(error) from error
     return _to_view(created)
 

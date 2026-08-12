@@ -33,6 +33,7 @@ from proxy.providers import (
     HuggingFaceAuthProviderConfig,
     JwtAuthProviderConfig,
     KeycloakAuthProviderConfig,
+    NoneAuthProviderConfig,
     OciAuthProviderConfig,
     PropelAuthProviderConfig,
     ScalekitAuthProviderConfig,
@@ -230,6 +231,22 @@ def test_supported_provider_builds(
     assert isinstance(provider, provider_type)
 
 
+def test_none_provider_builds_without_auth() -> None:
+    config = NoneAuthProviderConfig(provider="none")
+
+    assert config.build(base_url="https://gateway.example/calendar") is None
+    assert (
+        load_auth_provider(config, base_url="https://gateway.example/calendar") is None
+    )
+
+
+def test_none_provider_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        NoneAuthProviderConfig.model_validate(
+            {"provider": "none", "realm_url": "https://identity.example"}
+        )
+
+
 def test_server_auth_schema_exposes_only_server_providers() -> None:
     schema = TypeAdapter(ServerAuthProviderConfig).json_schema()
 
@@ -245,6 +262,7 @@ def test_server_auth_schema_exposes_only_server_providers() -> None:
         "huggingface",
         "jwt",
         "keycloak",
+        "none",
         "oci",
         "propelauth",
         "scalekit",

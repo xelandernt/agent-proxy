@@ -105,6 +105,7 @@ class McpServerAppFactory:
         transport = create_upstream_transport(
             str(server.upstream_url),
             verify_tls=server.verify_upstream_tls,
+            forward_client_credentials=server.forward_client_credentials,
         )
         proxy = create_proxy(
             transport,

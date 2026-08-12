@@ -10,8 +10,9 @@ from pydantic import (
     Field,
     SecretStr,
     TypeAdapter,
+    model_validator,
 )
-from sqlalchemy import JSON, Boolean, DateTime, String
+from sqlalchemy import JSON, Boolean, DateTime, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -34,6 +35,17 @@ class McpServerConfig(BaseModel):
     upstream_url: AnyHttpUrl = Field(max_length=2048)
     auth: ServerAuthProviderConfig
     verify_upstream_tls: bool = True
+    forward_client_credentials: bool = False
+
+    @model_validator(mode="after")
+    def validate_forward_client_credentials(self) -> McpServerConfig:
+        if self.forward_client_credentials and self.auth.provider != "none":
+            raise ValueError(
+                "forward_client_credentials requires auth provider 'none': "
+                "with gateway authentication the incoming Authorization is a "
+                "gateway-issued token and must not be relayed upstream."
+            )
+        return self
 
 
 def server_base_url(public_base_url: str, name: str) -> str:
@@ -51,6 +63,9 @@ class ServerConfig(Base):
     description: Mapped[str] = mapped_column(String(255), default="")
     upstream_url: Mapped[str] = mapped_column(String(2048))
     verify_upstream_tls: Mapped[bool] = mapped_column(Boolean, default=True)
+    forward_client_credentials: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("FALSE")
+    )
     auth: Mapped[dict] = mapped_column(JSON().with_variant(JSONB, "postgresql"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -63,6 +78,7 @@ class ServerConfig(Base):
             description=self.description,
             upstream_url=self.upstream_url,
             verify_upstream_tls=self.verify_upstream_tls,
+            forward_client_credentials=self.forward_client_credentials,
             auth=AUTH_PROVIDER_ADAPTER.validate_python(self.auth),
         )
 

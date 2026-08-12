@@ -49,6 +49,7 @@ class ServersRepository:
             description=config.description,
             upstream_url=str(config.upstream_url),
             verify_upstream_tls=config.verify_upstream_tls,
+            forward_client_credentials=config.forward_client_credentials,
             auth=config_to_auth_payload(config),
             created_at=now,
             updated_at=now,
@@ -77,6 +78,7 @@ class ServersRepository:
             row.description = config.description
             row.upstream_url = str(config.upstream_url)
             row.verify_upstream_tls = config.verify_upstream_tls
+            row.forward_client_credentials = config.forward_client_credentials
             row.auth = config_to_auth_payload(config)
             row.updated_at = datetime.now(UTC)
             await session.commit()

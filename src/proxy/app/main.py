@@ -6,6 +6,8 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import inspect, text
+
 from proxy.app.admin.auth import build_admin_provider
 from proxy.app.admin.endpoints import (
     public_router as admin_public_router,
@@ -38,6 +40,22 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         async with AsyncExitStack() as stack:
             async with usage_engine.begin() as connection:
                 await connection.run_sync(Base.metadata.create_all)
+
+                def _ensure_forwarding_column(sync_connection) -> None:
+                    columns = {
+                        column["name"]
+                        for column in inspect(sync_connection).get_columns("servers")
+                    }
+                    if "forward_client_credentials" not in columns:
+                        sync_connection.execute(
+                            text(
+                                "ALTER TABLE servers ADD COLUMN "
+                                "forward_client_credentials BOOLEAN NOT NULL "
+                                "DEFAULT FALSE"
+                            )
+                        )
+
+                await connection.run_sync(_ensure_forwarding_column)
             session_factory = create_session_factory(usage_engine)
             usage_recorder = UsageRecorder(session_factory)
             await usage_recorder.start()

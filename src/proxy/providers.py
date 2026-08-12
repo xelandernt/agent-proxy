@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 import time
-from typing import Annotated, Literal
+from typing import Annotated, Literal, overload
 
 from fastmcp.server.auth import AccessToken, AuthProvider
 from fastmcp.server.auth.providers.auth0 import Auth0Provider
@@ -44,7 +44,7 @@ class AuthProviderLoadError(ValueError):
 class _AuthProviderConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    def build(self, *, base_url: str) -> AuthProvider:
+    def build(self, *, base_url: str) -> AuthProvider | None:
         raise NotImplementedError
 
 
@@ -586,6 +586,13 @@ class WorkOsAuthProviderConfig(_OAuthProxyAuthProviderConfig):
         )
 
 
+class NoneAuthProviderConfig(_AuthProviderConfig):
+    provider: Literal["none"]
+
+    def build(self, *, base_url: str) -> AuthProvider | None:
+        return None
+
+
 class JwtAuthProviderConfig(_AuthProviderConfig):
     provider: Literal["jwt"]
     public_key: str | None = None
@@ -701,6 +708,7 @@ ServerAuthProviderConfig = Annotated[
     | HuggingFaceAuthProviderConfig
     | JwtAuthProviderConfig
     | KeycloakAuthProviderConfig
+    | NoneAuthProviderConfig
     | OciAuthProviderConfig
     | PropelAuthProviderConfig
     | ScalekitAuthProviderConfig
@@ -718,12 +726,32 @@ AdminAuthProviderConfig = Annotated[
 ]
 
 
+@overload
+def load_auth_provider(
+    config: ServerAuthProviderConfig,
+    *,
+    base_url: str,
+) -> AuthProvider | None: ...
+
+
+@overload
+def load_auth_provider(
+    config: AdminAuthProviderConfig,
+    *,
+    base_url: str,
+) -> AuthProvider: ...
+
+
 def load_auth_provider(
     config: ServerAuthProviderConfig | AdminAuthProviderConfig,
     *,
     base_url: str,
-) -> AuthProvider:
-    """Construct a FastMCP provider from a fully validated typed configuration."""
+) -> AuthProvider | None:
+    """Construct a FastMCP provider from a fully validated typed configuration.
+
+    Returns ``None`` for the ``none`` provider, which performs no
+    authentication at the gateway.
+    """
 
     try:
         return config.build(base_url=base_url)

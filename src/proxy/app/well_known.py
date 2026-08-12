@@ -44,7 +44,7 @@ def _listing(
         name=server.name,
         description=server.description,
         url=mcp_endpoint_url(public_base_url, server),
-        auth="oauth2",
+        auth="none" if server.auth.provider == "none" else "oauth2",
     )
 
 

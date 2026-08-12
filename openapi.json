@@ -2479,6 +2479,21 @@
         "title": "McpServersDocument",
         "description": "The ``/.well-known/mcp-servers`` discovery document."
       },
+      "NoneAuthProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "none",
+            "title": "Provider"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "NoneAuthProviderConfig"
+      },
       "OciAuthProviderConfig": {
         "properties": {
           "resource_base_url": {
@@ -3076,6 +3091,9 @@
                 "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
               },
               {
+                "$ref": "#/components/schemas/NoneAuthProviderConfig"
+              },
+              {
                 "$ref": "#/components/schemas/OciAuthProviderConfig"
               },
               {
@@ -3106,6 +3124,7 @@
                 "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
                 "jwt": "#/components/schemas/JwtAuthProviderConfig",
                 "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "none": "#/components/schemas/NoneAuthProviderConfig",
                 "oci": "#/components/schemas/OciAuthProviderConfig",
                 "propelauth": "#/components/schemas/PropelAuthProviderConfig",
                 "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
@@ -3118,6 +3137,11 @@
             "type": "boolean",
             "title": "Verify Upstream Tls",
             "default": true
+          },
+          "forward_client_credentials": {
+            "type": "boolean",
+            "title": "Forward Client Credentials",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -3203,6 +3227,9 @@
                 "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
               },
               {
+                "$ref": "#/components/schemas/NoneAuthProviderConfig"
+              },
+              {
                 "$ref": "#/components/schemas/OciAuthProviderConfig"
               },
               {
@@ -3233,6 +3260,7 @@
                 "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
                 "jwt": "#/components/schemas/JwtAuthProviderConfig",
                 "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "none": "#/components/schemas/NoneAuthProviderConfig",
                 "oci": "#/components/schemas/OciAuthProviderConfig",
                 "propelauth": "#/components/schemas/PropelAuthProviderConfig",
                 "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
@@ -3245,6 +3273,11 @@
             "type": "boolean",
             "title": "Verify Upstream Tls",
             "default": true
+          },
+          "forward_client_credentials": {
+            "type": "boolean",
+            "title": "Forward Client Credentials",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -3306,6 +3339,9 @@
                 "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
               },
               {
+                "$ref": "#/components/schemas/NoneAuthProviderConfig"
+              },
+              {
                 "$ref": "#/components/schemas/OciAuthProviderConfig"
               },
               {
@@ -3336,6 +3372,7 @@
                 "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
                 "jwt": "#/components/schemas/JwtAuthProviderConfig",
                 "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "none": "#/components/schemas/NoneAuthProviderConfig",
                 "oci": "#/components/schemas/OciAuthProviderConfig",
                 "propelauth": "#/components/schemas/PropelAuthProviderConfig",
                 "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
@@ -3347,6 +3384,10 @@
           "verify_upstream_tls": {
             "type": "boolean",
             "title": "Verify Upstream Tls"
+          },
+          "forward_client_credentials": {
+            "type": "boolean",
+            "title": "Forward Client Credentials"
           }
         },
         "type": "object",
@@ -3355,7 +3396,8 @@
           "description",
           "upstream_url",
           "auth",
-          "verify_upstream_tls"
+          "verify_upstream_tls",
+          "forward_client_credentials"
         ],
         "title": "ServerView",
         "description": "Admin-facing server representation with secrets masked."
