@@ -15,6 +15,8 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminCallbackRouteImport } from './routes/admin/callback'
 import { Route as AdminNewRouteImport } from './routes/admin/new'
+import { Route as DocsIndexRouteImport } from './routes/docs/index'
+import { Route as DocsProviderRouteImport } from './routes/docs/$provider'
 import { Route as AdminServerNameEditRouteImport } from './routes/admin/$serverName.edit'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +49,16 @@ const AdminNewRoute = AdminNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AdminRoute,
 } as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsProviderRoute = DocsProviderRouteImport.update({
+  id: '/docs/$provider',
+  path: '/docs/$provider',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminServerNameEditRoute = AdminServerNameEditRouteImport.update({
   id: '/$serverName/edit',
   path: '/$serverName/edit',
@@ -59,7 +71,9 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/admin/callback': typeof AdminCallbackRoute
   '/admin/new': typeof AdminNewRoute
+  '/docs/$provider': typeof DocsProviderRoute
   '/admin/': typeof AdminIndexRoute
+  '/docs/': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
 }
 export interface FileRoutesByTo {
@@ -67,7 +81,9 @@ export interface FileRoutesByTo {
   '/$serverName': typeof ServerNameRoute
   '/admin/callback': typeof AdminCallbackRoute
   '/admin/new': typeof AdminNewRoute
+  '/docs/$provider': typeof DocsProviderRoute
   '/admin': typeof AdminIndexRoute
+  '/docs': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
 }
 export interface FileRoutesById {
@@ -77,7 +93,9 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/admin/callback': typeof AdminCallbackRoute
   '/admin/new': typeof AdminNewRoute
+  '/docs/$provider': typeof DocsProviderRoute
   '/admin/': typeof AdminIndexRoute
+  '/docs/': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
 }
 export interface FileRouteTypes {
@@ -88,7 +106,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/callback'
     | '/admin/new'
+    | '/docs/$provider'
     | '/admin/'
+    | '/docs/'
     | '/admin/$serverName/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -96,7 +116,9 @@ export interface FileRouteTypes {
     | '/$serverName'
     | '/admin/callback'
     | '/admin/new'
+    | '/docs/$provider'
     | '/admin'
+    | '/docs'
     | '/admin/$serverName/edit'
   id:
     | '__root__'
@@ -105,7 +127,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/callback'
     | '/admin/new'
+    | '/docs/$provider'
     | '/admin/'
+    | '/docs/'
     | '/admin/$serverName/edit'
   fileRoutesById: FileRoutesById
 }
@@ -113,6 +137,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ServerNameRoute: typeof ServerNameRoute
   AdminRoute: typeof AdminRouteWithChildren
+  DocsProviderRoute: typeof DocsProviderRoute
+  DocsIndexRoute: typeof DocsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -159,6 +185,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNewRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/$provider': {
+      id: '/docs/$provider'
+      path: '/docs/$provider'
+      fullPath: '/docs/$provider'
+      preLoaderRoute: typeof DocsProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/$serverName/edit': {
       id: '/admin/$serverName/edit'
       path: '/$serverName/edit'
@@ -189,6 +229,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ServerNameRoute: ServerNameRoute,
   AdminRoute: AdminRouteWithChildren,
+  DocsProviderRoute: DocsProviderRoute,
+  DocsIndexRoute: DocsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

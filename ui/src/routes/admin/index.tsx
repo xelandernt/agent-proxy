@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	ArrowLeftIcon,
+	BookOpenIcon,
 	PencilIcon,
 	PlusIcon,
 	ServerIcon,
@@ -60,25 +61,27 @@ function AdminIndex() {
 
 	return (
 		<div className="mx-auto flex w-full max-w-4xl flex-col gap-8 p-8">
-			<Link
-				to="/"
-				className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-			>
-				<ArrowLeftIcon className="size-3" />
-				All servers
-			</Link>
+			<div className="flex items-center justify-between">
+				<Link
+					to="/"
+					className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+				>
+					<ArrowLeftIcon className="size-3" />
+					All servers
+				</Link>
+				<Link
+					to="/docs"
+					className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+				>
+					<BookOpenIcon className="size-3.5" />
+					Provider guides
+				</Link>
+			</div>
 			<header className="flex items-start justify-between gap-4">
 				<div className="flex flex-col gap-3">
-					<p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
-						Agent Gateway
-					</p>
 					<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
 						Manage servers
 					</h1>
-					<p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-						Servers are applied to the running gateway immediately — no restart
-						required.
-					</p>
 				</div>
 				<Link to="/admin/new">
 					<Button>

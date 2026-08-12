@@ -16,6 +16,10 @@ gen:
     npm exec -- orval
     node scripts/strip-unused-generated-exports.mjs
 
+# verify provider docs coverage against the gateway OpenAPI schema
+check-docs:
+    node scripts/check-doc-coverage.mjs ../openapi.json
+
 lint:
     npm exec -- biome check --write
     just --unstable --fmt

@@ -42,23 +42,15 @@ function Home() {
 		<div className="mx-auto flex w-full max-w-4xl flex-col gap-10 p-8">
 			<header className="flex items-start justify-between gap-4">
 				<div className="flex flex-col gap-3">
-					<p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
-						Agent Gateway
-					</p>
 					<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
 						MCP Servers
 					</h1>
-					<p className="max-w-xl text-sm leading-relaxed text-muted-foreground">
-						Discover the Model Context Protocol servers exposed by this gateway,
-						copy their endpoints, and connect them to your AI client.
-					</p>
 				</div>
-				<Link
-					to="/admin"
-					className="inline-flex items-center gap-1.5 rounded-md border px-3 py-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-				>
-					<ServerCogIcon className="size-3.5" />
-					Manage
+				<Link to="/admin">
+					<Button variant="ghost">
+						<ServerCogIcon className="size-3.5" />
+						Manage
+					</Button>
 				</Link>
 			</header>
 
@@ -97,8 +89,7 @@ function Home() {
 								className="underline underline-offset-4 hover:text-foreground"
 							>
 								admin interface
-							</Link>{" "}
-							and it goes live on the gateway immediately.
+							</Link>
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>

@@ -1,5 +1,6 @@
+import { Link } from "@tanstack/react-router";
+import { CircleHelpIcon, ExternalLinkIcon } from "lucide-react";
 import { useState } from "react";
-
 import {
 	Select,
 	SelectContent,
@@ -7,6 +8,16 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "#/components/ui/select";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "#/components/ui/tooltip";
+import {
+	getFieldTooltip,
+	hasProviderGuide,
+} from "#/lib/provider-docs/registry";
 
 export type JsonSchema = {
 	$ref?: string;
@@ -41,18 +52,19 @@ function resolveNode(node: JsonSchema, schema: AuthProviderSchema): JsonSchema {
 	return node;
 }
 
-function branchNode(node: JsonSchema): JsonSchema {
-	const union = node.anyOf ?? node.oneOf;
-	if (!union) return node;
-	const nonNull = union.find((candidate) => candidate.type !== "null");
-	return nonNull ?? node;
-}
-
 function effectiveNode(
 	node: JsonSchema,
 	schema: AuthProviderSchema,
 ): JsonSchema {
-	return branchNode(resolveNode(node, schema));
+	const resolved = resolveNode(node, schema);
+	const union = resolved.anyOf ?? resolved.oneOf;
+	if (union) {
+		const nonNull = union.find(
+			(candidate) => resolveNode(candidate, schema).type !== "null",
+		);
+		if (nonNull) return effectiveNode(nonNull, schema);
+	}
+	return resolved;
 }
 
 function isSecret(node: JsonSchema): boolean {
@@ -159,18 +171,45 @@ function FieldInput({
 	);
 }
 
+function FieldLabel({ label, help }: { label: string; help?: string }) {
+	if (!help) {
+		return (
+			<span className="font-mono text-xs text-muted-foreground">{label}</span>
+		);
+	}
+	return (
+		<span className="flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
+			{label}
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<button
+						type="button"
+						aria-label={`Help for ${label}`}
+						className="rounded-sm text-muted-foreground/60 outline-none focus-visible:ring-2 focus-visible:ring-ring hover:text-muted-foreground"
+					>
+						<CircleHelpIcon className="size-3.5" />
+					</button>
+				</TooltipTrigger>
+				<TooltipContent side="right">{help}</TooltipContent>
+			</Tooltip>
+		</span>
+	);
+}
+
 function FieldGroup({
 	label,
 	error,
+	help,
 	children,
 }: {
 	label: string;
 	error?: string;
+	help?: string;
 	children: React.ReactNode;
 }) {
 	return (
 		<div className="flex flex-col gap-1.5">
-			<span className="font-mono text-xs text-muted-foreground">{label}</span>
+			<FieldLabel label={label} help={help} />
 			{children}
 			{error && <span className="text-xs text-destructive">{error}</span>}
 		</div>
@@ -184,6 +223,7 @@ function ProviderFields({
 	onChange,
 	fieldErrors,
 	path,
+	providerId,
 }: {
 	schema: AuthProviderSchema;
 	node: JsonSchema;
@@ -191,6 +231,7 @@ function ProviderFields({
 	onChange: (value: Record<string, unknown>) => void;
 	fieldErrors: Map<string, string>;
 	path: string;
+	providerId: string;
 }) {
 	const resolved = resolveNode(node, schema);
 	const properties = resolved.properties ?? {};
@@ -225,8 +266,11 @@ function ProviderFields({
 								key={name}
 								className="flex flex-col gap-3 rounded-md border p-4"
 							>
-								<legend className="px-1 font-mono text-xs text-foreground">
-									{property.title ?? name}
+								<legend className="px-1">
+									<FieldLabel
+										label={property.title ?? name}
+										help={getFieldTooltip(providerId, name)}
+									/>
 								</legend>
 								<ProviderFields
 									schema={schema}
@@ -235,6 +279,7 @@ function ProviderFields({
 									onChange={(nested) => onChange({ ...value, [name]: nested })}
 									fieldErrors={fieldErrors}
 									path={propertyPath}
+									providerId={providerId}
 								/>
 							</fieldset>
 						);
@@ -245,6 +290,7 @@ function ProviderFields({
 							key={name}
 							label={`${property.title ?? name}${required.has(name) ? " *" : ""}`}
 							error={error}
+							help={getFieldTooltip(providerId, name)}
 						>
 							<FieldInput
 								kind={kind}
@@ -291,31 +337,48 @@ export function AuthProviderForm({
 	const providerNode = ref ? { $ref: ref } : undefined;
 
 	return (
-		<div className="flex flex-col gap-4">
-			<FieldGroup label="Provider *" error={errorMap.get("auth.provider")}>
-				<Select value={provider ?? ""} onValueChange={selectProvider}>
-					<SelectTrigger className="w-full">
-						<SelectValue placeholder="Select provider" />
-					</SelectTrigger>
-					<SelectContent>
-						{providers.map((name) => (
-							<SelectItem key={name} value={name}>
-								<span className="font-mono">{name}</span>
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</FieldGroup>
-			{providerNode && (
-				<ProviderFields
-					schema={schema}
-					node={providerNode}
-					value={value}
-					onChange={onChange}
-					fieldErrors={errorMap}
-					path="auth"
-				/>
-			)}
-		</div>
+		<TooltipProvider delayDuration={250}>
+			<div className="flex flex-col gap-4">
+				<FieldGroup
+					label="Provider *"
+					error={errorMap.get("auth.provider")}
+					help="Which identity provider issues the tokens your MCP clients will present. Each provider needs its own console setup — the setup guide linked below walks through it."
+				>
+					<Select value={provider ?? ""} onValueChange={selectProvider}>
+						<SelectTrigger className="w-full">
+							<SelectValue placeholder="Select provider" />
+						</SelectTrigger>
+						<SelectContent>
+							{providers.map((name) => (
+								<SelectItem key={name} value={name}>
+									<span className="font-mono">{name}</span>
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+					{provider && hasProviderGuide(provider) && (
+						<Link
+							to="/docs/$provider"
+							params={{ provider }}
+							className="inline-flex w-fit items-center gap-1 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+						>
+							View setup guide
+							<ExternalLinkIcon className="size-3" />
+						</Link>
+					)}
+				</FieldGroup>
+				{providerNode && (
+					<ProviderFields
+						schema={schema}
+						node={providerNode}
+						value={value}
+						onChange={onChange}
+						fieldErrors={errorMap}
+						path="auth"
+						providerId={provider ?? ""}
+					/>
+				)}
+			</div>
+		</TooltipProvider>
 	);
 }

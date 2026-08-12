@@ -1,6 +1,11 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import {
+	createRootRoute,
+	HeadContent,
+	Link,
+	Scripts,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { BackgroundDither } from "#/components/background-dither";
 import { DitherToggle, ThemeToggle } from "#/components/toggles";
@@ -69,10 +74,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 				<BackgroundDither />
 				<QueryClientProvider client={queryClient}>
 					<ThemeProvider>
-						<header className="relative z-40 flex items-center justify-end gap-1 px-8 pt-6">
-							<UsagePill />
-							<DitherToggle />
-							<ThemeToggle />
+						<header className="relative z-40 flex items-center justify-between px-8 pt-6">
+							<Link
+								to="/"
+								aria-label="Agent Gateway home"
+								className="group inline-flex items-center no-underline"
+							>
+								<span className="display-title text-lg font-bold tracking-tight text-[var(--sea-ink-soft)] transition-colors group-hover:text-[var(--sea-ink)]">
+									Agent Gateway
+								</span>
+							</Link>
+							<div className="flex items-center gap-1">
+								<UsagePill />
+								<DitherToggle />
+								<ThemeToggle />
+							</div>
 						</header>
 						{children}
 					</ThemeProvider>

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
+import { ArrowLeftIcon, BookOpenIcon, Loader2Icon } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -180,19 +180,25 @@ export function ServerForm({
 			onSubmit={submit}
 			className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8"
 		>
-			<Link
-				to="/admin"
-				className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-			>
-				<ArrowLeftIcon className="size-3" />
-				Back to servers
-			</Link>
+			<div className="flex items-center justify-between">
+				<Link
+					to="/admin"
+					className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+				>
+					<ArrowLeftIcon className="size-3" />
+					Back to servers
+				</Link>
+				<Link
+					to="/docs"
+					className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+				>
+					<BookOpenIcon className="size-3.5" />
+					Provider guides
+				</Link>
+			</div>
 
 			<Card>
 				<CardHeader className="flex flex-col items-start gap-2">
-					<p className="font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
-						Agent Gateway
-					</p>
 					<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-3xl font-bold tracking-tight text-transparent">
 						{title}
 					</h1>
