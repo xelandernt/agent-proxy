@@ -193,7 +193,7 @@ export function ServerForm({
 					className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
 				>
 					<BookOpenIcon className="size-3.5" />
-					Provider guides
+					Provider Docs
 				</Link>
 			</div>
 
@@ -272,11 +272,11 @@ export function ServerForm({
 						</div>
 
 						<CardFooter className="justify-end gap-2">
-							<a href={onCancelHref}>
+							<Link to={onCancelHref}>
 								<Button type="button" variant="ghost">
 									Cancel
 								</Button>
-							</a>
+							</Link>
 							<Button type="submit" disabled={saving}>
 								{saving && <Loader2Icon className="size-4 animate-spin" />}
 								{mode === "create" ? "Create server" : "Save changes"}

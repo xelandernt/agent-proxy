@@ -74,7 +74,7 @@ function AdminIndex() {
 					className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
 				>
 					<BookOpenIcon className="size-3.5" />
-					Provider guides
+					Provider Docs
 				</Link>
 			</div>
 			<header className="flex items-start justify-between gap-4">

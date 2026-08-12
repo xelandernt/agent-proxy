@@ -26,14 +26,6 @@ function DocsIndex() {
 					<h1 className="display-title mb-3 text-4xl font-bold tracking-tight">
 						Provider setup guides
 					</h1>
-					<p className="max-w-2xl text-[var(--sea-ink-soft)]">
-						How to configure each identity provider and how to fill in the
-						gateway's server form for it. Open{" "}
-						<Link to="/admin/new" className="underline underline-offset-2">
-							New server
-						</Link>{" "}
-						and pick the matching provider.
-					</p>
 				</div>
 				<Link to="/admin">
 					<Button variant="ghost">
