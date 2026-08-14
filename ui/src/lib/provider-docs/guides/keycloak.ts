@@ -31,18 +31,14 @@ export const guide: ProviderGuide = {
 		},
 		{
 			title: "Copy the realm URL",
-			body: "The gateway needs the realm URL itself, not the discovery document: e.g. http://keycloak.localhost:8080/realms/<realm-name>. It is shown on the realm's settings page, and the gateway uses it to validate the token's iss claim and fetch signing keys.",
+			body: "The gateway needs the realm URL itself, not the discovery document: e.g. https://<host>/realms/<realm-name>. It is shown on the realm's settings page, and the gateway uses it to validate the token's iss claim and fetch signing keys.",
 			kind: "tip",
-		},
-		{
-			title: "Test against the local dev Keycloak",
-			body: "This repo runs a local Keycloak for development via Docker Compose. Start it, and a realm is ready at http://keycloak.localhost:8080/realms/agent-proxy with pre-created clients such as mcp-inspector and agent-proxy-admin-ui. Point Realm URL at it to try the setup end-to-end.",
 		},
 	],
 	fields: [
 		{
 			key: "realm_url",
-			text: "Your Keycloak realm URL, e.g. https://<host>/realms/<realm-name>. Use the realm URL itself, without a trailing /.well-known path — e.g. http://keycloak.localhost:8080/realms/agent-proxy for the local dev realm.",
+			text: "Your Keycloak realm URL, e.g. https://<host>/realms/<realm-name>. Use the realm URL itself, without a trailing /.well-known path.",
 		},
 		{ key: "required_scopes", shared: true },
 		{

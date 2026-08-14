@@ -1,6 +1,5 @@
 {
   "realm": "agent-proxy",
-  "displayName": "Agent Proxy",
   "enabled": true,
   "keycloakVersion": "26.6.0",
   "registrationAllowed": true,
@@ -8,9 +7,6 @@
   "defaultDefaultClientScopes": [
     "openid",
     "mcp-audience"
-  ],
-  "defaultOptionalClientScopes": [
-    "offline_access"
   ],
   "components": {
     "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
@@ -66,12 +62,12 @@
       },
       "protocolMappers": [
         {
-          "name": "example-mcp-audience",
+          "name": "mcp",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.custom.audience": "http://localhost:8008/example/mcp",
+            "included.custom.audience": "mcp",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
@@ -112,10 +108,8 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "fullScopeAllowed": true,
       "defaultClientScopes": [
-        "openid",
-        "mcp-audience"
+        "openid"
       ],
       "optionalClientScopes": [
         "offline_access"
@@ -136,52 +130,6 @@
       ]
     },
     {
-      "clientId": "example-client",
-      "name": "Compose Example Client",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": true,
-      "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": true,
-      "serviceAccountsEnabled": false,
-      "fullScopeAllowed": true,
-      "defaultClientScopes": [
-        "openid",
-        "mcp-audience"
-      ],
-      "optionalClientScopes": [
-        "offline_access"
-      ]
-    },
-    {
-      "clientId": "mcp-inspector",
-      "name": "MCP Inspector",
-      "enabled": true,
-      "protocol": "openid-connect",
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
-      "fullScopeAllowed": true,
-      "redirectUris": [
-        "http://localhost:6274/oauth/callback",
-        "http://localhost:6274/oauth/callback/debug"
-      ],
-      "webOrigins": [
-        "http://localhost:6274"
-      ],
-      "attributes": {
-        "pkce.code.challenge.method": "S256"
-      },
-      "defaultClientScopes": [
-        "openid",
-        "mcp-audience"
-      ],
-      "optionalClientScopes": [
-        "offline_access"
-      ]
-    },
-    {
       "clientId": "agent-proxy-admin-ui",
       "name": "Agent Proxy Admin UI",
       "enabled": true,
@@ -190,7 +138,6 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "fullScopeAllowed": true,
       "redirectUris": [
         "http://localhost:3000/admin/callback"
       ],
@@ -203,51 +150,10 @@
       "defaultClientScopes": [
         "openid",
         "admin-audience"
-      ],
-      "optionalClientScopes": [
-        "offline_access"
       ]
     }
   ],
   "users": [
-    {
-      "username": "testuser",
-      "email": "testuser@example.com",
-      "firstName": "Test",
-      "lastName": "User",
-      "enabled": true,
-      "emailVerified": true,
-      "requiredActions": [],
-      "realmRoles": [
-        "offline_access"
-      ],
-      "credentials": [
-        {
-          "type": "password",
-          "value": "password123",
-          "temporary": false
-        }
-      ]
-    },
-    {
-      "username": "example",
-      "email": "example@example.com",
-      "firstName": "Example",
-      "lastName": "User",
-      "enabled": true,
-      "emailVerified": true,
-      "requiredActions": [],
-      "realmRoles": [
-        "offline_access"
-      ],
-      "credentials": [
-        {
-          "type": "password",
-          "value": "example",
-          "temporary": false
-        }
-      ]
-    },
     {
       "username": "user",
       "email": "user@example.com",

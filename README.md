@@ -95,15 +95,16 @@ gateway separately with `uv run proxy run --reload`. Stopping `just dev` stops
 the local gateway process but leaves its dependencies available for the next
 run.
 
-The deterministic smoke-test user is `example` / `example`; the Keycloak admin
+The deterministic smoke-test user is `user` / `password`; the Keycloak admin
 login is `admin` / `admin`. These credentials and Keycloak's development mode
 are for local use only.
 
-Native MCP clients use Keycloak Dynamic Client Registration automatically.
-Browser-based MCP Inspector cannot use open DCR because Keycloak does not add
-the required CORS headers. In Inspector's OAuth 2.0 settings, use Client ID
-`mcp-inspector` and leave Client Secret empty. The shared realm registers its
-localhost callback URLs, web origin, and required PKCE S256 policy.
+Native MCP clients use Keycloak Dynamic Client Registration automatically: the
+realm admits anonymous registrations from localhost hosts, and every token
+carries the shared `mcp` audience through the realm's default `mcp-audience`
+scope. Browser-based clients cannot use open DCR because Keycloak does not add
+the required CORS headers — register a public client for them manually, as the
+realm does for the admin UI.
 
 Stop and remove the two dependency containers with:
 
@@ -116,26 +117,19 @@ just stop
 Every server can be protected by the Compose Keycloak. The imported realm is
 `agent-proxy` at `http://keycloak.localhost:8080/realms/agent-proxy`; its admin
 console is `http://keycloak.localhost:8080/admin` (`admin` / `admin`), and the
-deterministic smoke-test user is `example` / `example`.
+deterministic smoke-test user is `user` / `password`.
 
 Keycloak only hands an access token to the gateway when the token's `aud`
-claim matches the server's `audience`. The realm attaches this claim through
-the `mcp-audience` client scope, which ships with one audience mapper for the
-example server. Each additional server needs its own audience:
-
-1. Open the Keycloak admin console and go to **Client scopes → mcp-audience →
-   Mappers → Add mapper**.
-2. Add an audience mapper (`Mapper type` = `Audience`) with
-   `Included custom audience` set to the new server's public URL —
-   `http://localhost:8008/{name}/mcp` — and save.
-3. Sign in again if you already held a token: the audience is granted when the
-   token is issued, not before.
-
-Native MCP clients register themselves through Dynamic Client Registration and
-inherit the realm's default scopes, so the same mapper covers them.
+claim matches the server's `audience`. The realm's default `mcp-audience`
+scope stamps the fixed audience `mcp` into every access token, so every
+gateway server in this realm simply sets `audience: mcp` — no per-server
+mapper is needed. Native MCP clients registered through Dynamic Client
+Registration inherit the realm's default scopes, so their tokens carry the
+same audience. Sign in again if you already held a token: the audience is
+granted when the token is issued, not before.
 
 Create the server in the admin UI at `http://localhost:3000/admin` (authenticate
-as `example` / `example`):
+as `user` / `password`):
 
 | Field         | Value                                                                 |
 |---------------|-----------------------------------------------------------------------|
@@ -143,17 +137,13 @@ as `example` / `example`):
 | Upstream URL  | `http://127.0.0.1:8000/mcp` to reuse the Compose example backend      |
 | Auth provider | `keycloak`                                                            |
 | `realm_url`   | `http://keycloak.localhost:8080/realms/agent-proxy`                   |
-| `audience`    | `http://localhost:8008/{name}/mcp`                                    |
+| `audience`    | `mcp` (the realm-wide audience)                                       |
 
-Setting `client_id` to an existing Keycloak client instead is equivalent —
-Keycloak always includes the requesting client's ID in `aud` — but the audience
-mapper keeps each server independent of a specific client.
-
-Verify with MCP Inspector: connect to `http://localhost:8008/{name}/mcp`, use
-client ID `mcp-inspector` with no client secret (the imported realm configures
-its callback, web origin, and PKCE S256), and sign in as `example` / `example`.
-Once a tool call succeeds, the gateway is proxying authenticated MCP requests
-to the upstream.
+Verify with a native MCP client: connect to `http://localhost:8008/{name}/mcp`
+and sign in as `user` / `password`. The client registers itself through DCR
+and inherits the realm's default scopes, so its token carries the `mcp`
+audience. Once a tool call succeeds, the gateway is proxying authenticated
+MCP requests to the upstream.
 
 To serve a genuinely different backend, add a second service to
 [compose.yml](compose.yml) modeled on `mcp-server` and point `upstream_url` at
