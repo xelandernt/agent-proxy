@@ -66,7 +66,7 @@ def boot_gateway(
                 "auth": {
                     "provider": "keycloak",
                     "realm_url": "https://identity.example/realms/test",
-                    "client_id": "agent-proxy-admin-ui",
+                    "client_id": "admin",
                 }
             },
         }

@@ -10,7 +10,7 @@ from proxy.settings import GatewayConfig
 from tests.support import StaticAuthProvider
 
 REALM_URL = "https://identity.example/realms/test"
-UI_CLIENT_ID = "agent-proxy-admin-ui"
+UI_CLIENT_ID = "admin"
 STATIC_USERNAME = "admin"
 STATIC_PASSWORD = "hunter2"
 STATIC_SECRET = "a-very-long-random-secret-at-least-32-bytes"

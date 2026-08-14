@@ -53,7 +53,7 @@ def boot_admin_gateway(keycloak_realm_url: str, postgres_url: str) -> TestClient
                 "auth": {
                     "provider": "keycloak",
                     "realm_url": keycloak_realm_url,
-                    "client_id": "agent-proxy-admin-ui",
+                    "client_id": "admin",
                     "audience": RESOURCE_AUDIENCE,
                     "required_scopes": ["openid"],
                 }

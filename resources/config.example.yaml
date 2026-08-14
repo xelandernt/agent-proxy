@@ -25,7 +25,7 @@ admin:
     # Required: public client the admin UI uses for the browser Authorization
     # Code flow with PKCE. Register {ui-origin}/admin/callback as a redirect
     # URI on this client in the realm.
-    client_id: agent-proxy-admin-ui
+    client_id: admin
 # Or a plain username/password account instead of an OAuth provider. The
 # gateway signs a short-lived HS256 JWT with jwt_secret after a successful
 # login. jwt_secret defaults to a public development-only value — always set

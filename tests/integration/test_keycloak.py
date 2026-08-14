@@ -37,7 +37,7 @@ def keycloak_access_token(realm_url: str) -> str:
             f"{realm_url}/protocol/openid-connect/token",
             data={
                 "grant_type": "password",
-                "client_id": "gateway-integration-test",
+                "client_id": "mcp",
                 "username": "user",
                 "password": "password",
                 "scope": "openid offline_access",

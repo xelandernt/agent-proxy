@@ -54,7 +54,7 @@ def test_admin_accepts_auth_provider() -> None:
                 "auth": {
                     "provider": "keycloak",
                     "realm_url": "https://identity.example/realms/test",
-                    "client_id": "agent-proxy-admin-ui",
+                    "client_id": "admin",
                 }
             },
         }
@@ -104,7 +104,7 @@ def test_admin_rejects_unknown_fields() -> None:
                     "auth": {
                         "provider": "keycloak",
                         "realm_url": "https://identity.example/realms/test",
-                        "client_id": "agent-proxy-admin-ui",
+                        "client_id": "admin",
                     },
                     "settings": {},
                 },
@@ -149,7 +149,7 @@ admin:
   auth:
     provider: keycloak
     realm_url: https://identity.example/realms/test
-    client_id: agent-proxy-admin-ui
+    client_id: admin
 """.lstrip()
     )
     monkeypatch.setenv(CONFIG_FILE_ENV, str(config_file))

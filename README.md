@@ -101,7 +101,7 @@ are for local use only.
 
 Native MCP clients use Keycloak Dynamic Client Registration automatically: the
 realm admits anonymous registrations from localhost hosts, and every token
-carries the shared `mcp` audience through the realm's default `mcp-audience`
+carries the shared `mcp` audience through the realm's default `mcp`
 scope. Browser-based clients cannot use open DCR because Keycloak does not add
 the required CORS headers — register a public client for them manually, as the
 realm does for the admin UI.
@@ -120,7 +120,7 @@ console is `http://keycloak.localhost:8080/admin` (`admin` / `admin`), and the
 deterministic smoke-test user is `user` / `password`.
 
 Keycloak only hands an access token to the gateway when the token's `aud`
-claim matches the server's `audience`. The realm's default `mcp-audience`
+claim matches the server's `audience`. The realm's default `mcp`
 scope stamps the fixed audience `mcp` into every access token, so every
 gateway server in this realm simply sets `audience: mcp` — no per-server
 mapper is needed. Native MCP clients registered through Dynamic Client
@@ -194,7 +194,7 @@ admin:
   auth:
     provider: keycloak
     realm_url: https://identity.example.com/realms/agents
-    client_id: agent-proxy-admin-ui
+    client_id: admin
 ```
 
 MCP servers are no longer configured in YAML. They are created at runtime
@@ -290,7 +290,7 @@ admin:
     # Register {ui-origin}/admin/callback as a redirect URI on this client and
     # enable PKCE (S256). The gateway rejects the config without it — without
     # an audience check it would accept any token from the realm.
-    client_id: agent-proxy-admin-ui
+    client_id: admin
 ```
 
 The `jwt` provider has no browser sign-in. Obtain an access token from the

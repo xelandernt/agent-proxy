@@ -6,7 +6,7 @@
   "sslRequired": "none",
   "defaultDefaultClientScopes": [
     "openid",
-    "mcp-audience"
+    "mcp"
   ],
   "components": {
     "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
@@ -54,7 +54,7 @@
       ]
     },
     {
-      "name": "mcp-audience",
+      "name": "mcp",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -62,7 +62,7 @@
       },
       "protocolMappers": [
         {
-          "name": "mcp",
+          "name": "audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
@@ -76,7 +76,7 @@
       ]
     },
     {
-      "name": "admin-audience",
+      "name": "admin",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -84,12 +84,12 @@
       },
       "protocolMappers": [
         {
-          "name": "admin-ui-audience",
+          "name": "audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "agent-proxy-admin-ui",
+            "included.client.audience": "admin",
             "access.token.claim": "true",
             "id.token.claim": "false",
             "introspection.token.claim": "true"
@@ -100,8 +100,8 @@
   ],
   "clients": [
     {
-      "clientId": "gateway-integration-test",
-      "name": "Gateway Integration Test",
+      "clientId": "mcp",
+      "name": "MCP",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -116,7 +116,7 @@
       ],
       "protocolMappers": [
         {
-          "name": "gateway-audience",
+          "name": "audience",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
@@ -130,8 +130,8 @@
       ]
     },
     {
-      "clientId": "agent-proxy-admin-ui",
-      "name": "Agent Proxy Admin UI",
+      "clientId": "admin",
+      "name": "Admin",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
@@ -149,7 +149,7 @@
       },
       "defaultClientScopes": [
         "openid",
-        "admin-audience"
+        "admin"
       ]
     }
   ],
