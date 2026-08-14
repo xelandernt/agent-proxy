@@ -183,9 +183,14 @@ Copy [resources/config.example.yaml](resources/config.example.yaml) to
 ```yaml
 public_base_url: https://mcp.example.com
 
-# Required: server configuration and usage tracing live in PostgreSQL.
-database:
-  url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
+# Server configuration and usage tracing live in PostgreSQL. Each part
+# defaults to the local development values shown below.
+postgresql:
+  address: localhost
+  port: 5432
+  username: proxy
+  password: proxy
+  db_name: proxy
 
 # Optional: the identity provider that may log in to the admin API and UI.
 # Any user authenticated against this provider is an administrator. When
@@ -300,7 +305,7 @@ browser to the login screen.
 
 For the browser flow, register the UI's redirect URI —
 `{ui-origin}/admin/callback` — with the provider, and include the UI origin in
-`cors_origins`.
+`middleware.cors.origins`.
 
 Alternatively, a plain username/password admin account can be configured
 instead of an OAuth provider. The gateway checks the credentials at
@@ -325,11 +330,15 @@ admin:
 
 The gateway records request volumes per MCP server, tool, and client app, and
 exposes them in the UI (server detail page, filterable by time window). The
-required PostgreSQL database doubles as usage storage:
+PostgreSQL database doubles as usage storage:
 
 ```yaml
-database:
-  url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
+postgresql:
+  address: localhost
+  port: 5432
+  username: proxy
+  password: proxy
+  db_name: proxy
 ```
 
 Tables are created automatically on startup. Only authenticated requests are

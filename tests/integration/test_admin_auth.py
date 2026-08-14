@@ -29,9 +29,13 @@ def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(servers_app_module, "load_auth_provider", load_static_provider)
 
 
-def boot_admin_gateway(keycloak_realm_url: str, postgres_url: str) -> TestClient:
+def boot_admin_gateway(
+    keycloak_realm_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
+) -> TestClient:
     seed_servers(
-        postgres_url,
+        postgresql_url,
         [
             McpServerConfig.model_validate(
                 {
@@ -48,7 +52,7 @@ def boot_admin_gateway(keycloak_realm_url: str, postgres_url: str) -> TestClient
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": postgres_url},
+            "postgresql": postgresql,
             "admin": {
                 "auth": {
                     "provider": "keycloak",
@@ -65,11 +69,12 @@ def boot_admin_gateway(keycloak_realm_url: str, postgres_url: str) -> TestClient
 
 def test_keycloak_token_grants_admin_access(
     keycloak_realm_url: str,
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
 ) -> None:
     token = keycloak_access_token(keycloak_realm_url)
 
-    with boot_admin_gateway(keycloak_realm_url, postgres_url) as client:
+    with boot_admin_gateway(keycloak_realm_url, postgresql_url, postgresql) as client:
         accepted = client.get(
             "/api/admin/me", headers={"Authorization": f"Bearer {token}"}
         )

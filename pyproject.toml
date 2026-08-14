@@ -32,7 +32,6 @@ proxy = "proxy.cli.cli:cli"
 
 [dependency-groups]
 dev = [
-    "aiosqlite>=0.21.0",
     "prek>=0.4.3",
     "pyrefly>=1.0.0",
     "pytest>=9.0.3",

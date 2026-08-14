@@ -7,11 +7,9 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     async_sessionmaker,
-    create_async_engine,
 )
-from sqlalchemy.pool import StaticPool
 
-from proxy.database import Base, create_session_factory
+from proxy.database import Base, create_engine, create_session_factory
 from proxy.providers import (
     Auth0AuthProviderConfig,
     AuthKitAuthProviderConfig,
@@ -40,22 +38,16 @@ from proxy.servers.repository import (
 
 
 @pytest.fixture()
-def session_factory() -> AsyncIterator[async_sessionmaker]:
-    engine: AsyncEngine = create_async_engine(
-        "sqlite+aiosqlite://",
-        poolclass=StaticPool,
-    )
-    import asyncio
-
-    async def _create() -> None:
-        async with engine.begin() as connection:
-            await connection.run_sync(Base.metadata.create_all)
-
-    asyncio.run(_create())
+async def session_factory(
+    postgresql_url: str,
+) -> AsyncIterator[async_sessionmaker]:
+    engine: AsyncEngine = create_engine(postgresql_url)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
     try:
         yield create_session_factory(engine)
     finally:
-        asyncio.run(engine.dispose())
+        await engine.dispose()
 
 
 def provider_configs() -> Iterator[ServerAuthProviderConfig]:
@@ -186,7 +178,7 @@ async def test_corrupt_auth_payload_fails_loudly(
                     (name, description, upstream_url, verify_upstream_tls,
                      auth, created_at, updated_at)
                 VALUES
-                    ('broken', '', 'http://upstream/mcp', 1, :auth,
+                    ('broken', '', 'http://upstream/mcp', TRUE, :auth,
                      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """
             ),

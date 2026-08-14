@@ -46,13 +46,14 @@ def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture()
 async def live_client(
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
 ) -> AsyncIterator[tuple[httpx2.AsyncClient, ServerManager]]:
-    await seed_servers_async(postgres_url, [keycloak_server("calendar")])
+    await seed_servers_async(postgresql_url, [keycloak_server("calendar")])
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": postgres_url},
+            "postgresql": postgresql,
         }
     )
     app = create_app(config)

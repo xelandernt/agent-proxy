@@ -13,43 +13,51 @@ from proxy.settings import (
 )
 
 
-def test_gateway_requires_database() -> None:
-    with pytest.raises(ValidationError, match="database"):
-        GatewayConfig.model_validate({})
+def test_postgresql_defaults_to_local_development_connection() -> None:
+    config = GatewayConfig.model_validate({})
+
+    assert (
+        config.postgresql.connection_url
+        == "postgresql+asyncpg://user:password@127.0.0.1:5432/proxy"
+    )
 
 
-def test_gateway_rejects_servers_key() -> None:
-    with pytest.raises(ValidationError, match="servers"):
-        GatewayConfig.model_validate(
-            {
-                "database": {
-                    "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
-                },
-                "servers": [],
-            }
-        )
-
-
-def test_database_round_trips() -> None:
+def test_postgresql_connection_parts_round_trip() -> None:
     config = GatewayConfig.model_validate(
         {
-            "database": {
-                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
+            "postgresql": {
+                "address": "db.example",
+                "port": 6432,
+                "username": "proxy",
+                "password": "proxy",
+                "db_name": "proxy",
             },
         }
     )
 
     assert (
-        config.database.url == "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy"
+        config.postgresql.connection_url
+        == "postgresql+asyncpg://proxy:proxy@db.example:6432/proxy"
     )
+
+
+def test_middleware_defaults_to_local_development_cors() -> None:
+    config = GatewayConfig.model_validate({})
+
+    assert config.middleware.cors.origins == ["http://localhost:3000"]
+    assert config.middleware.cors.allow_credentials is True
+    assert config.middleware.cors.allow_methods == ["*"]
+    assert config.middleware.cors.allow_headers == ["*"]
+
+
+def test_gateway_rejects_servers_key() -> None:
+    with pytest.raises(ValidationError, match="servers"):
+        GatewayConfig.model_validate({"servers": []})
 
 
 def test_admin_accepts_auth_provider() -> None:
     config = GatewayConfig.model_validate(
         {
-            "database": {
-                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
-            },
             "admin": {
                 "auth": {
                     "provider": "keycloak",
@@ -68,9 +76,6 @@ def test_admin_rejects_keycloak_without_client_id() -> None:
     with pytest.raises(ValidationError, match="client_id is required"):
         GatewayConfig.model_validate(
             {
-                "database": {
-                    "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
-                },
                 "admin": {
                     "auth": {
                         "provider": "keycloak",
@@ -82,13 +87,7 @@ def test_admin_rejects_keycloak_without_client_id() -> None:
 
 
 def test_admin_defaults_to_absent() -> None:
-    config = GatewayConfig.model_validate(
-        {
-            "database": {
-                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
-            },
-        }
-    )
+    config = GatewayConfig.model_validate({})
 
     assert config.admin is None
 
@@ -97,9 +96,6 @@ def test_admin_rejects_unknown_fields() -> None:
     with pytest.raises(ValidationError, match="settings"):
         GatewayConfig.model_validate(
             {
-                "database": {
-                    "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
-                },
                 "admin": {
                     "auth": {
                         "provider": "keycloak",
@@ -115,9 +111,6 @@ def test_admin_rejects_unknown_fields() -> None:
 def test_gateway_accepts_logfire_configuration() -> None:
     config = GatewayConfig.model_validate(
         {
-            "database": {
-                "url": "postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy",
-            },
             "logfire": {
                 "token": "secret-token",
                 "environment": "production",
@@ -143,8 +136,16 @@ def test_load_config_from_selected_yaml(
     config_file.write_text(
         """
 public_base_url: https://gateway.example
-database:
-  url: postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy
+postgresql:
+  address: db.example
+  port: 6432
+  username: proxy
+  password: proxy
+  db_name: proxy
+middleware:
+  cors:
+    origins:
+      - https://ui.example.com
 admin:
   auth:
     provider: keycloak
@@ -156,5 +157,10 @@ admin:
 
     config = load_config()
 
+    assert (
+        config.postgresql.connection_url
+        == "postgresql+asyncpg://proxy:proxy@db.example:6432/proxy"
+    )
+    assert config.middleware.cors.origins == ["https://ui.example.com"]
     assert config.admin is not None
     assert config.admin.auth.provider == "keycloak"

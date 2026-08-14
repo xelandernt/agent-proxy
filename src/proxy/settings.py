@@ -45,14 +45,50 @@ class LogfireConfig(BaseModel):
     service_name: str = "proxy"
 
 
-class DatabaseConfig(BaseModel):
-    """PostgreSQL persistence for server configuration and usage tracing."""
+class DatabaseConfig(HostConfig):
+    """Connection settings shared by database backends."""
+
+    port: int = Field(default=5432, ge=1, le=65535)
+    username: SecretStr = SecretStr("user")
+    password: SecretStr = SecretStr("password")
+
+
+class PostgresqlConfig(DatabaseConfig):
+    """Configuration for the PostgreSQL database."""
+
+    db_name: str = "proxy"
+
+    @property
+    def connection_url(self) -> str:
+        """Build the async PostgreSQL DSN from the configured parts."""
+        username = self.username.get_secret_value()
+        password = self.password.get_secret_value()
+        return (
+            f"postgresql+asyncpg://{username}:{password}@"
+            f"{self.address}:{self.port}/{self.db_name}"
+        )
+
+
+class CorsConfig(BaseModel):
+    """Cors configuration."""
 
     model_config = ConfigDict(extra="forbid")
 
-    url: str = Field(
-        description="Async PostgreSQL DSN (for example postgresql+asyncpg://...)."
+    origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    allow_credentials: bool = Field(
+        default=True,
+        description="If this is true, then `*` in origins will be ignored as per CORS spec.",
     )
+    allow_methods: list[str] = Field(default_factory=lambda: ["*"])
+    allow_headers: list[str] = Field(default_factory=lambda: ["*"])
+
+
+class MiddlewareConfig(BaseModel):
+    """Middleware configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cors: CorsConfig = Field(default_factory=CorsConfig)
 
 
 class AdminConfig(BaseModel):
@@ -95,9 +131,9 @@ class GatewayConfig(BaseModel):
 
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
-    database: DatabaseConfig
+    postgresql: PostgresqlConfig = Field(default_factory=PostgresqlConfig)
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
-    cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
+    middleware: MiddlewareConfig = Field(default_factory=MiddlewareConfig)
     admin: AdminConfig | None = None
 
 
@@ -113,9 +149,9 @@ class _GatewaySettings(BaseSettings):
 
     host: HostConfig = Field(default_factory=HostConfig)
     logfire: LogfireConfig = Field(default_factory=LogfireConfig)
-    database: DatabaseConfig
+    postgresql: PostgresqlConfig = Field(default_factory=PostgresqlConfig)
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
-    cors_origins: list[AnyHttpUrl] = Field(default_factory=list)
+    middleware: MiddlewareConfig = Field(default_factory=MiddlewareConfig)
     admin: AdminConfig | None = None
 
     @classmethod

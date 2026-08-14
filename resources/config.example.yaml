@@ -12,8 +12,12 @@ logfire:
 
 # MCP servers now live in PostgreSQL and are managed at runtime through the
 # admin API and UI, not through this file.
-database:
-  url: postgresql+asyncpg://proxy:proxy@localhost:5432/proxy
+postgresql:
+  address: localhost
+  port: 5432
+  username: proxy
+  password: proxy
+  db_name: proxy
 
 # Optional: the identity provider that may log in to the admin API and UI.
 # Any user authenticated against this provider is an administrator. When

@@ -5,7 +5,6 @@ from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from sqlalchemy import inspect, text
 
 from proxy.app.admin.auth import build_admin_provider
@@ -33,7 +32,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     """
 
     settings = config or load_config()
-    usage_engine = create_engine(settings.database.url)
+    usage_engine = create_engine(settings.postgresql.connection_url)
 
     @asynccontextmanager
     async def lifespan(gateway: FastAPI) -> AsyncGenerator[None]:
@@ -75,15 +74,14 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         openapi_url=None,
         lifespan=lifespan,
     )
-    cors_origins = [str(origin).rstrip("/") for origin in settings.cors_origins]
-    if cors_origins:
-        gateway.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            allow_headers=["*"],
-        )
+    cors = settings.middleware.cors
+    gateway.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors.origins,
+        allow_credentials=cors.allow_credentials,
+        allow_methods=cors.allow_methods,
+        allow_headers=cors.allow_headers,
+    )
     gateway.include_router(well_known_router)
     gateway.include_router(usage_router)
     gateway.include_router(admin_public_router)

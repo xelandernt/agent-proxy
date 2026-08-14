@@ -66,13 +66,14 @@ def keycloak_server_config(realm_url: str) -> McpServerConfig:
 
 def boot_keycloak_gateway(
     keycloak_realm_url: str,
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
 ) -> TestClient:
-    seed_servers(postgres_url, [keycloak_server_config(keycloak_realm_url)])
+    seed_servers(postgresql_url, [keycloak_server_config(keycloak_realm_url)])
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": postgres_url},
+            "postgresql": postgresql,
         }
     )
     return TestClient(create_app(config))
@@ -80,7 +81,8 @@ def boot_keycloak_gateway(
 
 def test_keycloak_token_authenticates_without_reaching_upstream(
     keycloak_realm_url: str,
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     upstream_requests: list[dict[str, str]] = []
@@ -104,7 +106,9 @@ def test_keycloak_token_authenticates_without_reaching_upstream(
     )
     token = keycloak_access_token(keycloak_realm_url)
 
-    with boot_keycloak_gateway(keycloak_realm_url, postgres_url) as client:
+    with boot_keycloak_gateway(
+        keycloak_realm_url, postgresql_url, postgresql
+    ) as client:
         invalid_response = client.post(
             "/calendar/mcp",
             headers=modern_headers("tools/list")
@@ -126,9 +130,12 @@ def test_keycloak_token_authenticates_without_reaching_upstream(
 
 def test_keycloak_is_advertised_by_protected_resource_metadata(
     keycloak_realm_url: str,
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
 ) -> None:
-    with boot_keycloak_gateway(keycloak_realm_url, postgres_url) as client:
+    with boot_keycloak_gateway(
+        keycloak_realm_url, postgresql_url, postgresql
+    ) as client:
         response = client.get("/.well-known/oauth-protected-resource/calendar/mcp")
 
     assert response.status_code == 200

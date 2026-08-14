@@ -4,10 +4,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 import proxy.app.admin.auth as admin_auth_module
+import proxy.app.main as main_module
 from proxy.app.main import create_app
+from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
+from proxy.servers.repository import ServerNameTaken, ServerNotFound
 from proxy.settings import GatewayConfig
-from tests.integration.helpers import seed_servers
 from tests.support import StaticAuthProvider
 
 AUTH = {"Authorization": "Bearer valid-token"}
@@ -26,16 +28,42 @@ def server_payload(name: str) -> dict[str, object]:
     }
 
 
-@pytest.fixture()
-def sqlite_url(tmp_path) -> str:
-    return f"sqlite+aiosqlite:///{tmp_path / 'gateway.db'}"
+class InMemoryServersRepository:
+    """Dict-backed stand-in for ServersRepository."""
+
+    def __init__(self, servers: list[McpServerConfig] | None = None) -> None:
+        self._servers = {server.name: server for server in servers or []}
+
+    async def list(self) -> list[McpServerConfig]:
+        return sorted(self._servers.values(), key=lambda server: server.name)
+
+    async def get(self, name: str) -> McpServerConfig | None:
+        return self._servers.get(name)
+
+    async def create(self, config: McpServerConfig) -> McpServerConfig:
+        if config.name in self._servers:
+            raise ServerNameTaken(f"MCP server name '{config.name}' already exists.")
+        self._servers[config.name] = config
+        return config
+
+    async def update(
+        self,
+        name: str,
+        config: McpServerConfig,
+    ) -> McpServerConfig:
+        if name not in self._servers:
+            raise ServerNotFound(f"Unknown MCP server '{name}'.")
+        self._servers[name] = config
+        return config
+
+    async def delete(self, name: str) -> None:
+        if name not in self._servers:
+            raise ServerNotFound(f"Unknown MCP server '{name}'.")
+        del self._servers[name]
 
 
 @pytest.fixture()
-def boot_gateway(
-    sqlite_url: str,
-    monkeypatch: pytest.MonkeyPatch,
-) -> TestClient:
+def boot_gateway(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     def load_static_provider(
         _config: object,
         *,
@@ -44,8 +72,7 @@ def boot_gateway(
         return StaticAuthProvider(base_url=base_url, required_scopes=["mcp"])
 
     monkeypatch.setattr(admin_auth_module, "load_auth_provider", load_static_provider)
-    seed_servers(
-        sqlite_url,
+    repository = InMemoryServersRepository(
         [
             McpServerConfig.model_validate(
                 {
@@ -57,11 +84,12 @@ def boot_gateway(
                     },
                 }
             )
-        ],
+        ]
     )
+    monkeypatch.setattr(main_module, "ServersRepository", lambda _factory: repository)
+    monkeypatch.setattr(main_module, "ServerManager", ServerManager)
     config = GatewayConfig.model_validate(
         {
-            "database": {"url": sqlite_url},
             "admin": {
                 "auth": {
                     "provider": "keycloak",

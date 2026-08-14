@@ -71,12 +71,15 @@ def use_static_auth_providers(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture()
-async def admin_client(postgres_url: str) -> AsyncIterator[httpx2.AsyncClient]:
-    await seed_servers_async(postgres_url, [keycloak_server("calendar")])
+async def admin_client(
+    postgresql_url: str,
+    postgresql: dict[str, object],
+) -> AsyncIterator[httpx2.AsyncClient]:
+    await seed_servers_async(postgresql_url, [keycloak_server("calendar")])
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": postgres_url},
+            "postgresql": postgresql,
             "admin": {
                 "auth": {
                     "provider": "keycloak",

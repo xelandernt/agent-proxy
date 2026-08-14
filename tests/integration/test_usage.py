@@ -128,7 +128,8 @@ def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture()
 def usage_client(
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
     def in_process_transport(
@@ -167,21 +168,21 @@ def usage_client(
             },
         }
     )
-    seed_servers(postgres_url, [server, quiet])
+    seed_servers(postgresql_url, [server, quiet])
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": postgres_url},
+            "postgresql": postgresql,
         }
     )
     app = create_app(config)
     with TestClient(app) as client:
-        asyncio.run(_truncate_usage_events(postgres_url))
+        asyncio.run(_truncate_usage_events(postgresql_url))
         yield client
 
 
-async def _truncate_usage_events(postgres_url: str) -> None:
-    engine = create_engine(postgres_url)
+async def _truncate_usage_events(postgresql_url: str) -> None:
+    engine = create_engine(postgresql_url)
     try:
         async with engine.begin() as connection:
             await connection.execute(text("TRUNCATE usage_events"))
@@ -319,7 +320,8 @@ def test_usage_skips_unauthenticated_requests(usage_client: TestClient) -> None:
 
 
 def test_usage_tracks_none_provider_requests(
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from proxy import providers as providers_module
@@ -335,16 +337,16 @@ def test_usage_tracks_none_provider_requests(
             "forward_client_credentials": True,
         }
     )
-    seed_servers(postgres_url, [server])
+    seed_servers(postgresql_url, [server])
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": postgres_url},
+            "postgresql": postgresql,
         }
     )
     app = create_app(config)
     with TestClient(app) as client:
-        asyncio.run(_truncate_usage_events(postgres_url))
+        asyncio.run(_truncate_usage_events(postgresql_url))
         tokenless_headers = {
             name: value
             for name, value in usage_headers("tools/list").items()

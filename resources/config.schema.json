@@ -44,20 +44,39 @@
       "title": "AdminConfig",
       "type": "object"
     },
-    "DatabaseConfig": {
+    "CorsConfig": {
       "additionalProperties": false,
-      "description": "PostgreSQL persistence for server configuration and usage tracing.",
+      "description": "Cors configuration.",
       "properties": {
-        "url": {
-          "description": "Async PostgreSQL DSN (for example postgresql+asyncpg://...).",
-          "title": "Url",
-          "type": "string"
+        "origins": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Origins",
+          "type": "array"
+        },
+        "allow_credentials": {
+          "default": true,
+          "description": "If this is true, then `*` in origins will be ignored as per CORS spec.",
+          "title": "Allow Credentials",
+          "type": "boolean"
+        },
+        "allow_methods": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allow Methods",
+          "type": "array"
+        },
+        "allow_headers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allow Headers",
+          "type": "array"
         }
       },
-      "required": [
-        "url"
-      ],
-      "title": "DatabaseConfig",
+      "title": "CorsConfig",
       "type": "object"
     },
     "HostConfig": {
@@ -288,6 +307,56 @@
       "title": "LogfireConfig",
       "type": "object"
     },
+    "MiddlewareConfig": {
+      "additionalProperties": false,
+      "description": "Middleware configuration.",
+      "properties": {
+        "cors": {
+          "$ref": "#/$defs/CorsConfig"
+        }
+      },
+      "title": "MiddlewareConfig",
+      "type": "object"
+    },
+    "PostgresqlConfig": {
+      "additionalProperties": false,
+      "description": "Configuration for the PostgreSQL database.",
+      "properties": {
+        "address": {
+          "default": "127.0.0.1",
+          "title": "Address",
+          "type": "string"
+        },
+        "port": {
+          "default": 5432,
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "username": {
+          "default": "**********",
+          "format": "password",
+          "title": "Username",
+          "type": "string",
+          "writeOnly": true
+        },
+        "password": {
+          "default": "**********",
+          "format": "password",
+          "title": "Password",
+          "type": "string",
+          "writeOnly": true
+        },
+        "db_name": {
+          "default": "proxy",
+          "title": "Db Name",
+          "type": "string"
+        }
+      },
+      "title": "PostgresqlConfig",
+      "type": "object"
+    },
     "StaticCredentialsAuthProviderConfig": {
       "additionalProperties": false,
       "properties": {
@@ -336,8 +405,8 @@
     "logfire": {
       "$ref": "#/$defs/LogfireConfig"
     },
-    "database": {
-      "$ref": "#/$defs/DatabaseConfig"
+    "postgresql": {
+      "$ref": "#/$defs/PostgresqlConfig"
     },
     "public_base_url": {
       "default": "http://127.0.0.1:8008/",
@@ -346,14 +415,8 @@
       "title": "Public Base Url",
       "type": "string"
     },
-    "cors_origins": {
-      "items": {
-        "format": "uri",
-        "minLength": 1,
-        "type": "string"
-      },
-      "title": "Cors Origins",
-      "type": "array"
+    "middleware": {
+      "$ref": "#/$defs/MiddlewareConfig"
     },
     "admin": {
       "anyOf": [
@@ -367,9 +430,6 @@
       "default": null
     }
   },
-  "required": [
-    "database"
-  ],
   "title": "GatewayConfig",
   "type": "object"
 }

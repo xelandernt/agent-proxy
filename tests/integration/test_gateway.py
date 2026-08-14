@@ -7,7 +7,7 @@ import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from fastmcp.client.transports import StreamableHttpTransport
-from pydantic import AnyHttpUrl, TypeAdapter
+from pydantic import TypeAdapter
 
 import proxy.servers.app as servers_app_module
 from proxy.app.main import MCP_PROTOCOL_VERSION, create_app
@@ -123,17 +123,16 @@ def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture()
 def boot_gateway(
-    postgres_url: str,
+    postgresql_url: str,
+    postgresql: dict[str, object],
 ) -> Callable[[list[McpServerConfig] | None, dict[str, object]], TestClient]:
     def build(
         servers: list[McpServerConfig] | None = None,
         **extra: object,
     ) -> TestClient:
         servers = servers or [server_config()]
-        seed_servers(postgres_url, servers)
-        config = GatewayConfig.model_validate(
-            {"database": {"url": postgres_url}, **extra}
-        )
+        seed_servers(postgresql_url, servers)
+        config = GatewayConfig.model_validate({"postgresql": postgresql, **extra})
         return TestClient(create_app(config))
 
     return build
@@ -253,7 +252,9 @@ def test_well_known_mcp_servers_publishes_public_endpoints(
 def test_well_known_document_serves_cors_headers_for_configured_origins(
     boot_gateway: Callable[..., TestClient],
 ) -> None:
-    with boot_gateway(cors_origins=[AnyHttpUrl("http://localhost:3000")]) as client:
+    with boot_gateway(
+        middleware={"cors": {"origins": ["http://localhost:3000"]}}
+    ) as client:
         response = client.get(
             "/.well-known/mcp-servers",
             headers={"Origin": "http://localhost:3000"},

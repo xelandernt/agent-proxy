@@ -17,16 +17,10 @@ STATIC_SECRET = "a-very-long-random-secret-at-least-32-bytes"
 
 
 @pytest.fixture()
-def sqlite_url(tmp_path) -> str:
-    return f"sqlite+aiosqlite:///{tmp_path / 'gateway.db'}"
-
-
-@pytest.fixture()
-def static_config(sqlite_url: str) -> GatewayConfig:
+def static_config() -> GatewayConfig:
     return GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": sqlite_url},
             "admin": {
                 "auth": {
                     "provider": "static",
@@ -40,11 +34,10 @@ def static_config(sqlite_url: str) -> GatewayConfig:
 
 
 @pytest.fixture()
-def keycloak_config(sqlite_url: str) -> GatewayConfig:
+def keycloak_config() -> GatewayConfig:
     return GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": sqlite_url},
             "admin": {
                 "auth": {
                     "provider": "keycloak",
@@ -104,8 +97,8 @@ def test_me_rejects_missing_and_invalid_tokens(
     assert bad_scheme.status_code == 401
 
 
-def test_admin_endpoints_return_503_when_not_configured(sqlite_url: str) -> None:
-    config = GatewayConfig.model_validate({"database": {"url": sqlite_url}})
+def test_admin_endpoints_return_503_when_not_configured() -> None:
+    config = GatewayConfig.model_validate({})
     with boot(config) as client:
         response = client.get(
             "/api/admin/me", headers={"Authorization": "Bearer valid-token"}
@@ -127,11 +120,10 @@ def test_auth_status_describes_keycloak_browser_flow(
     }
 
 
-def test_auth_status_for_token_only_provider_is_null(sqlite_url: str) -> None:
+def test_auth_status_for_token_only_provider_is_null() -> None:
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": sqlite_url},
             "admin": {
                 "auth": {
                     "provider": "jwt",
@@ -148,8 +140,8 @@ def test_auth_status_for_token_only_provider_is_null(sqlite_url: str) -> None:
     assert response.json() == {"provider": "jwt", "oauth": None}
 
 
-def test_auth_status_returns_503_when_not_configured(sqlite_url: str) -> None:
-    config = GatewayConfig.model_validate({"database": {"url": sqlite_url}})
+def test_auth_status_returns_503_when_not_configured() -> None:
+    config = GatewayConfig.model_validate({})
     with boot(config) as client:
         response = client.get("/api/admin/auth-status")
 
@@ -212,11 +204,10 @@ def test_static_token_rejects_tampering(static_config: GatewayConfig) -> None:
     assert me.status_code == 401
 
 
-def test_static_auth_works_with_default_credentials(sqlite_url: str) -> None:
+def test_static_auth_works_with_default_credentials() -> None:
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": sqlite_url},
             "admin": {
                 "auth": {
                     "provider": "static",
@@ -308,14 +299,12 @@ def test_logout_clears_session_cookie(
 
 
 def test_cookie_mutation_blocks_cross_site_origin_when_samesite_none(
-    sqlite_url: str,
     use_static_admin_provider: None,
 ) -> None:
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",
-            "database": {"url": sqlite_url},
-            "cors_origins": ["https://ui.example.com"],
+            "middleware": {"cors": {"origins": ["https://ui.example.com"]}},
             "admin": {
                 "auth": {
                     "provider": "keycloak",

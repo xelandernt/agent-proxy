@@ -185,7 +185,7 @@ def _origin_allowed(request: Request) -> bool:
     if origin is None:
         return True
     settings = request.app.state.config
-    allowed = {str(cors_origin).rstrip("/") for cors_origin in settings.cors_origins}
+    allowed = {origin.rstrip("/") for origin in settings.middleware.cors.origins}
     allowed.add(str(settings.public_base_url).rstrip("/"))
     return origin.rstrip("/") in allowed
 

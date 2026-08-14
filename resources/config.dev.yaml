@@ -4,11 +4,17 @@ host:
 
 public_base_url: http://localhost:8008
 
-cors_origins:
-  - http://localhost:3000
+middleware:
+  cors:
+    origins:
+      - http://localhost:3000
 
-database:
-  url: postgresql+asyncpg://proxy:proxy@127.0.0.1:5433/proxy
+postgresql:
+  address: 127.0.0.1
+  port: 5433
+  username: proxy
+  password: proxy
+  db_name: proxy
 
 logfire:
   environment: development
