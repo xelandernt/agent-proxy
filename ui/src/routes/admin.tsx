@@ -55,7 +55,9 @@ function AdminLayout() {
 		);
 	}
 
-	if (status === "authenticated") return <Outlet />;
+	if (status === "authenticated") {
+		return <Outlet />;
+	}
 
 	if (status === "unauthenticated") {
 		return <AdminLogin onAuthenticated={() => setStatus("authenticated")} />;
@@ -69,7 +71,7 @@ function AdminLayout() {
 						<ServerCogIcon />
 					</EmptyMedia>
 					<EmptyHeader>
-						<EmptyTitle>Admin interface is not configured</EmptyTitle>
+						<EmptyTitle>Server management is not configured</EmptyTitle>
 						<EmptyDescription>
 							Add an <code className="font-mono">admin.auth</code> section to
 							your gateway configuration and restart to enable server

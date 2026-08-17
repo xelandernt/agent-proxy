@@ -7,7 +7,7 @@ import pytest
 
 import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
-from proxy.providers import ServerAuthProviderConfig
+from proxy.providers import ManagedAuthProviderConfig
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
@@ -24,10 +24,7 @@ def keycloak_server(
         {
             "name": name,
             "upstream_url": upstream_url,
-            "auth": {
-                "provider": "keycloak",
-                "realm_url": "https://identity.example/realms/test",
-            },
+            "auth_provider": "keycloak",
         }
     )
 
@@ -35,7 +32,7 @@ def keycloak_server(
 @pytest.fixture(autouse=True)
 def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: ServerAuthProviderConfig,
+        _config: ManagedAuthProviderConfig,
         *,
         base_url: str,
     ) -> StaticAuthProvider:

@@ -33,13 +33,7 @@ import {
 
 export type { AuthProviderSchema } from "#/lib/auth-schema";
 
-export const SECRET_MASK = "**********";
-
 type Value = unknown;
-
-function isMaskedSecret(value: Value): boolean {
-	return typeof value === "string" && value === SECRET_MASK;
-}
 
 function StringMapInput({
 	label,
@@ -69,16 +63,18 @@ function StringMapInput({
 function FieldInput({
 	spec,
 	label,
+	help,
 	value,
 	onChange,
 }: {
 	spec: Exclude<InputSpec, { kind: "object" }>;
 	label?: string;
+	help?: string;
 	value: Value;
 	onChange: (value: Value) => void;
 }) {
 	if (spec.kind === "boolean") {
-		return (
+		const checkbox = (
 			<input
 				type="checkbox"
 				checked={value === true}
@@ -86,6 +82,16 @@ function FieldInput({
 				aria-label={label}
 				className="size-4 rounded border-border accent-[var(--color-primary)]"
 			/>
+		);
+		return help ? (
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<span className="inline-flex w-fit">{checkbox}</span>
+				</TooltipTrigger>
+				<TooltipContent side="right">{help}</TooltipContent>
+			</Tooltip>
+		) : (
+			checkbox
 		);
 	}
 	if (spec.kind === "choice") {
@@ -113,7 +119,6 @@ function FieldInput({
 	if (spec.kind === "map") {
 		return <StringMapInput label={label} value={value} onChange={onChange} />;
 	}
-	const masked = isMaskedSecret(value);
 	const raw =
 		spec.kind === "list" || spec.kind === "string-or-list"
 			? Array.isArray(value)
@@ -121,13 +126,11 @@ function FieldInput({
 				: typeof value === "string"
 					? value
 					: ""
-			: masked
-				? ""
-				: typeof value === "number"
-					? String(value)
-					: typeof value === "string"
-						? value
-						: "";
+			: typeof value === "number"
+				? String(value)
+				: typeof value === "string"
+					? value
+					: "";
 	return (
 		<input
 			type={
@@ -143,16 +146,37 @@ function FieldInput({
 			onChange={(event) =>
 				onChange(parseTextValue(spec.kind, event.target.value))
 			}
-			placeholder={masked ? "unchanged — re-enter to change" : ""}
+			placeholder={spec.kind === "secret" ? "enter a new value" : ""}
 			className="h-9 w-full rounded-md border bg-transparent px-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 		/>
 	);
 }
 
-function FieldLabel({ label, help }: { label: string; help?: string }) {
+function FieldLabel({
+	label,
+	help,
+	hoverHelp = false,
+}: {
+	label: string;
+	help?: string;
+	hoverHelp?: boolean;
+}) {
 	if (!help) {
 		return (
 			<span className="font-mono text-xs text-muted-foreground">{label}</span>
+		);
+	}
+	if (hoverHelp) {
+		return (
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<span className="flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground">
+						{label}
+						<CircleHelpIcon className="size-3.5" />
+					</span>
+				</TooltipTrigger>
+				<TooltipContent side="right">{help}</TooltipContent>
+			</Tooltip>
 		);
 	}
 	return (
@@ -179,15 +203,17 @@ function FieldGroup({
 	error,
 	help,
 	children,
+	hoverHelp,
 }: {
 	label: string;
 	error?: string;
 	help?: string;
 	children: React.ReactNode;
+	hoverHelp?: boolean;
 }) {
 	return (
 		<div className="flex flex-col gap-1.5">
-			<FieldLabel label={label} help={help} />
+			<FieldLabel label={label} help={help} hoverHelp={hoverHelp} />
 			{children}
 			{error && <span className="text-xs text-destructive">{error}</span>}
 		</div>
@@ -269,10 +295,12 @@ function ProviderFields({
 							label={`${property.title ?? name}${required.has(name) ? " *" : ""}`}
 							error={error}
 							help={getFieldTooltip(providerId, name)}
+							hoverHelp={spec.kind === "boolean"}
 						>
 							<FieldInput
 								spec={spec}
 								label={property.title ?? name}
+								help={getFieldTooltip(providerId, name)}
 								value={ownedValue}
 								onChange={(next) => onChange({ ...value, [name]: next })}
 							/>
@@ -288,11 +316,13 @@ export function AuthProviderForm({
 	value,
 	onChange,
 	fieldErrors = [],
+	fieldPath,
 }: {
 	schema: AuthProviderSchema;
 	value: Record<string, unknown>;
 	onChange: (value: Record<string, unknown>) => void;
 	fieldErrors?: Array<{ field: string; message: string }>;
+	fieldPath: string;
 }) {
 	const mapping = schema.discriminator?.mapping ?? {};
 	const providers = Object.keys(mapping).sort();
@@ -319,7 +349,7 @@ export function AuthProviderForm({
 			<div className="flex flex-col gap-4">
 				<FieldGroup
 					label="Provider *"
-					error={errorMap.get("auth.provider")}
+					error={errorMap.get(fieldPath ? `${fieldPath}.provider` : "provider")}
 					help="Which identity provider issues the tokens your MCP clients will present. Each provider needs its own console setup — the setup guide linked below walks through it."
 				>
 					<Select value={provider ?? ""} onValueChange={selectProvider}>
@@ -352,7 +382,7 @@ export function AuthProviderForm({
 						value={value}
 						onChange={onChange}
 						fieldErrors={errorMap}
-						path="auth"
+						path={fieldPath}
 						providerId={provider ?? ""}
 					/>
 				)}

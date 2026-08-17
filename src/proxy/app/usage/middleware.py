@@ -68,7 +68,7 @@ def extract_usage_event(payload: bytes) -> UsageEventData | None:
     return UsageEventData(
         method=method[:METHOD_MAX_LENGTH],
         item=_extract_item(method, params),
-        client_app=_extract_client_app(params),
+        client_app=_extract_client_app(method, params),
     )
 
 
@@ -86,11 +86,13 @@ def _extract_item(method: str, params: dict[str, Any]) -> str | None:
     return value[:ITEM_MAX_LENGTH] if isinstance(value, str) and value else None
 
 
-def _extract_client_app(params: dict[str, Any]) -> str | None:
-    meta = params.get("_meta")
-    if not isinstance(meta, dict):
-        return None
-    client_info = meta.get(CLIENT_INFO_META_KEY)
+def _extract_client_app(method: str, params: dict[str, Any]) -> str | None:
+    client_info = params.get("clientInfo") if method == "initialize" else None
+    if not isinstance(client_info, dict):
+        meta = params.get("_meta")
+        if not isinstance(meta, dict):
+            return None
+        client_info = meta.get(CLIENT_INFO_META_KEY)
     if not isinstance(client_info, dict):
         return None
     name = client_info.get("name")

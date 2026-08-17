@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict
 
 import proxy.servers.app as servers_app_module
 from proxy.app.main import create_app
+from proxy.auth_providers.models import AuthProviderDefinition
+from proxy.providers import KeycloakAuthProviderConfig
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from proxy.transport import create_upstream_transport
@@ -54,12 +56,7 @@ def keycloak_server_config(realm_url: str) -> McpServerConfig:
         {
             "name": "calendar",
             "upstream_url": "http://upstream.internal/mcp",
-            "auth": {
-                "provider": "keycloak",
-                "realm_url": realm_url,
-                "audience": RESOURCE_AUDIENCE,
-                "required_scopes": ["openid"],
-            },
+            "auth_provider": "keycloak",
         }
     )
 
@@ -69,7 +66,20 @@ def boot_keycloak_gateway(
     postgresql_url: str,
     postgresql: dict[str, object],
 ) -> TestClient:
-    seed_servers(postgresql_url, [keycloak_server_config(keycloak_realm_url)])
+    provider = AuthProviderDefinition(
+        name="keycloak",
+        auth=KeycloakAuthProviderConfig(
+            provider="keycloak",
+            realm_url=keycloak_realm_url,
+            audience=RESOURCE_AUDIENCE,
+            required_scopes=["openid"],
+        ),
+    )
+    seed_servers(
+        postgresql_url,
+        [keycloak_server_config(keycloak_realm_url)],
+        [provider],
+    )
     config = GatewayConfig.model_validate(
         {
             "public_base_url": "https://gateway.example",

@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
+import { PencilIcon, Trash2Icon } from "lucide-react";
 import { HarnessPanel } from "#/components/harness-panel";
 import { Sparkline } from "#/components/sparkline";
 import { Badge } from "#/components/ui/badge";
+import { Button } from "#/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -18,11 +20,16 @@ export function ServerCard({
 	harnessId,
 	onHarnessIdChange,
 	sparkline,
+	management,
 }: {
 	server: McpServerListing;
 	harnessId: string;
 	onHarnessIdChange: (harnessId: string) => void;
 	sparkline?: SeriesPoint[];
+	management?: {
+		deleting: boolean;
+		onDelete: () => void;
+	};
 }) {
 	return (
 		<Card className="flex h-full flex-col transition-colors hover:border-lagoon/40">
@@ -74,8 +81,31 @@ export function ServerCard({
 					onHarnessIdChange={onHarnessIdChange}
 				/>
 			</CardContent>
-			<CardFooter>
+			<CardFooter className="flex-col items-stretch gap-3">
 				<CopyUrlRow server={server} />
+				{management && (
+					<div className="flex justify-end gap-2">
+						<Link
+							to="/admin/$serverName/edit"
+							params={{ serverName: server.name }}
+						>
+							<Button variant="outline" size="sm">
+								<PencilIcon className="size-3.5" />
+								Edit
+							</Button>
+						</Link>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={management.deleting}
+							onClick={management.onDelete}
+							className="text-destructive"
+						>
+							<Trash2Icon className="size-3.5" />
+							{management.deleting ? "Deleting…" : "Delete"}
+						</Button>
+					</div>
+				)}
 			</CardFooter>
 		</Card>
 	);

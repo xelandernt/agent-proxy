@@ -161,7 +161,7 @@ def get_admin_provider(request: Request) -> AdminAuthProvider:
     if provider is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Admin interface is not configured.",
+            detail="Server management is not configured.",
         )
     return provider
 

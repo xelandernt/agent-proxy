@@ -4,12 +4,12 @@ export const guide: ProviderGuide = {
 	id: "none",
 	name: "No authentication",
 	tagline:
-		"Proxy an already-authenticated MCP server with no gateway authentication — the gateway relays the client's bearer token to the upstream unchanged.",
+		"Leave the server unlinked from an authentication provider when the upstream owns authentication.",
 	pattern: "no-auth",
 	providerSteps: [
 		{
 			title: "Point the gateway at your authenticated upstream",
-			body: "Choose No authentication when your upstream MCP server already requires credentials and you only want the gateway to route traffic to it. The gateway performs no token verification of its own: any request reaches the upstream, and whatever the upstream rejects is relayed back unchanged.",
+			body: "Leave Gateway authentication set to No gateway authentication when your upstream MCP server already requires credentials. The gateway performs no token verification of its own: any request reaches the upstream, and whatever the upstream rejects is relayed back unchanged.",
 		},
 		{
 			title: "Relay the client's token",
@@ -22,7 +22,7 @@ export const guide: ProviderGuide = {
 		},
 		{
 			title: "Understand the trust boundary",
-			body: "With No authentication the gateway adds no identity boundary: anyone who can reach the gateway URL can call the server, and the gateway cannot tell authenticated from unauthenticated traffic. Only use this mode when your upstream's own authentication protects the tools.",
+			body: "With no provider link the gateway adds no identity boundary: anyone who can reach the gateway URL can call the server, and the gateway cannot tell authenticated from unauthenticated traffic. Only use this mode when your upstream's own authentication protects the tools.",
 			kind: "warning",
 		},
 	],

@@ -12,17 +12,18 @@ from proxy.app.usage.schemas import (
     ServerSeries,
     UsageReport,
 )
+from proxy.app.usage.types import UsageBucket
 
 UNKNOWN_CLIENT: str = "unknown"
 
-BUCKET_STEPS: dict[str, timedelta] = {
+BUCKET_STEPS: dict[UsageBucket, timedelta] = {
     "minute": timedelta(minutes=1),
     "hour": timedelta(hours=1),
     "day": timedelta(days=1),
 }
 
 
-def bucket_count(start: datetime, end: datetime, bucket: str) -> int:
+def bucket_count(start: datetime, end: datetime, bucket: UsageBucket) -> int:
     """Return the number of aligned buckets covering an open time window."""
 
     first = _floor_bucket(start, bucket)
@@ -77,7 +78,7 @@ class UsageService:
         server_name: str,
         start: datetime,
         end: datetime,
-        bucket: str,
+        bucket: UsageBucket,
     ) -> SeriesReport:
         rows = await self._repository.series_by_bucket(server_name, start, end, bucket)
         totals: dict[datetime, int] = {}
@@ -116,7 +117,7 @@ class UsageService:
         self,
         start: datetime,
         end: datetime,
-        bucket: str,
+        bucket: UsageBucket,
         server_names: list[str],
     ) -> list[ServerSeries]:
         rows = await self._repository.counts_by_server(start, end, bucket)
@@ -142,7 +143,9 @@ def _sorted_counts(counts: Counter[str] | None) -> list[ItemCount]:
     return [ItemCount(name=name, count=count) for name, count in ordered]
 
 
-def _bucket_times(start: datetime, end: datetime, bucket: str) -> list[datetime]:
+def _bucket_times(
+    start: datetime, end: datetime, bucket: UsageBucket
+) -> list[datetime]:
     """Bucket boundaries from ``start`` to ``end``, aligned to the bucket unit.
 
     ``date_trunc`` truncates timestamps to the bucket boundary, so the first
@@ -155,7 +158,7 @@ def _bucket_times(start: datetime, end: datetime, bucket: str) -> list[datetime]
     return [floored + index * step for index in range(bucket_count(start, end, bucket))]
 
 
-def _floor_bucket(value: datetime, bucket: str) -> datetime:
+def _floor_bucket(value: datetime, bucket: UsageBucket) -> datetime:
     floored = value.replace(second=0, microsecond=0)
     if bucket == "hour":
         floored = floored.replace(minute=0)

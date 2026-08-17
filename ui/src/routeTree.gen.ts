@@ -18,6 +18,9 @@ import { Route as AdminNewRouteImport } from './routes/admin/new'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsProviderRouteImport } from './routes/docs/$provider'
 import { Route as AdminServerNameEditRouteImport } from './routes/admin/$serverName.edit'
+import { Route as AdminAuthProvidersIndexRouteImport } from './routes/admin/auth-providers/index'
+import { Route as AdminAuthProvidersNewRouteImport } from './routes/admin/auth-providers/new'
+import { Route as AdminAuthProvidersProviderNameEditRouteImport } from './routes/admin/auth-providers/$providerName.edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +67,22 @@ const AdminServerNameEditRoute = AdminServerNameEditRouteImport.update({
   path: '/$serverName/edit',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuthProvidersIndexRoute = AdminAuthProvidersIndexRouteImport.update({
+  id: '/auth-providers/',
+  path: '/auth-providers/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAuthProvidersNewRoute = AdminAuthProvidersNewRouteImport.update({
+  id: '/auth-providers/new',
+  path: '/auth-providers/new',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAuthProvidersProviderNameEditRoute =
+  AdminAuthProvidersProviderNameEditRouteImport.update({
+    id: '/auth-providers/$providerName/edit',
+    path: '/auth-providers/$providerName/edit',
+    getParentRoute: () => AdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +94,9 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
+  '/admin/auth-providers/new': typeof AdminAuthProvidersNewRoute
+  '/admin/auth-providers/': typeof AdminAuthProvidersIndexRoute
+  '/admin/auth-providers/$providerName/edit': typeof AdminAuthProvidersProviderNameEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -85,6 +107,9 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/docs': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
+  '/admin/auth-providers/new': typeof AdminAuthProvidersNewRoute
+  '/admin/auth-providers': typeof AdminAuthProvidersIndexRoute
+  '/admin/auth-providers/$providerName/edit': typeof AdminAuthProvidersProviderNameEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,6 +122,9 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
+  '/admin/auth-providers/new': typeof AdminAuthProvidersNewRoute
+  '/admin/auth-providers/': typeof AdminAuthProvidersIndexRoute
+  '/admin/auth-providers/$providerName/edit': typeof AdminAuthProvidersProviderNameEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,6 +138,9 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/docs/'
     | '/admin/$serverName/edit'
+    | '/admin/auth-providers/new'
+    | '/admin/auth-providers/'
+    | '/admin/auth-providers/$providerName/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -120,6 +151,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/docs'
     | '/admin/$serverName/edit'
+    | '/admin/auth-providers/new'
+    | '/admin/auth-providers'
+    | '/admin/auth-providers/$providerName/edit'
   id:
     | '__root__'
     | '/'
@@ -131,6 +165,9 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/docs/'
     | '/admin/$serverName/edit'
+    | '/admin/auth-providers/new'
+    | '/admin/auth-providers/'
+    | '/admin/auth-providers/$providerName/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -206,6 +243,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminServerNameEditRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/auth-providers/': {
+      id: '/admin/auth-providers/'
+      path: '/auth-providers'
+      fullPath: '/admin/auth-providers/'
+      preLoaderRoute: typeof AdminAuthProvidersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/auth-providers/new': {
+      id: '/admin/auth-providers/new'
+      path: '/auth-providers/new'
+      fullPath: '/admin/auth-providers/new'
+      preLoaderRoute: typeof AdminAuthProvidersNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/auth-providers/$providerName/edit': {
+      id: '/admin/auth-providers/$providerName/edit'
+      path: '/auth-providers/$providerName/edit'
+      fullPath: '/admin/auth-providers/$providerName/edit'
+      preLoaderRoute: typeof AdminAuthProvidersProviderNameEditRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
@@ -214,6 +272,9 @@ interface AdminRouteChildren {
   AdminNewRoute: typeof AdminNewRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminServerNameEditRoute: typeof AdminServerNameEditRoute
+  AdminAuthProvidersNewRoute: typeof AdminAuthProvidersNewRoute
+  AdminAuthProvidersIndexRoute: typeof AdminAuthProvidersIndexRoute
+  AdminAuthProvidersProviderNameEditRoute: typeof AdminAuthProvidersProviderNameEditRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -221,6 +282,10 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminNewRoute: AdminNewRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminServerNameEditRoute: AdminServerNameEditRoute,
+  AdminAuthProvidersNewRoute: AdminAuthProvidersNewRoute,
+  AdminAuthProvidersIndexRoute: AdminAuthProvidersIndexRoute,
+  AdminAuthProvidersProviderNameEditRoute:
+    AdminAuthProvidersProviderNameEditRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

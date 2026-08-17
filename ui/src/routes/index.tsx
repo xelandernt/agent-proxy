@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ServerCogIcon, ServerIcon } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { PlusIcon, ServerIcon } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
 import { ServerCard } from "#/components/server-card";
 import { ServerGridSkeleton } from "#/components/server-grid-skeleton";
 import { Button } from "#/components/ui/button";
@@ -12,6 +13,9 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "#/components/ui/empty";
+import { AdminApiError } from "#/lib/admin";
+import { useDeleteServer } from "#/lib/admin-queries";
+import { checkAdminAuth } from "#/lib/auth";
 import {
 	HARNESSES,
 	selectedHarnessId,
@@ -30,6 +34,36 @@ function Home() {
 	);
 	const serversQuery = useMcpServers();
 	const seriesQuery = useUsageSeriesAll();
+	const deleteMutation = useDeleteServer();
+	const [isAdmin, setIsAdmin] = useState(false);
+	const [deleting, setDeleting] = useState<string | null>(null);
+
+	useEffect(() => {
+		let active = true;
+		checkAdminAuth().then((status) => {
+			if (active) setIsAdmin(status === "authenticated");
+		});
+		return () => {
+			active = false;
+		};
+	}, []);
+
+	const remove = async (name: string) => {
+		if (!window.confirm(`Delete server "${name}"?`)) return;
+		setDeleting(name);
+		try {
+			await deleteMutation.mutateAsync(name);
+			toast.success(`Deleted ${name}`);
+		} catch (error) {
+			toast.error(
+				error instanceof AdminApiError
+					? error.message
+					: "Failed to delete server.",
+			);
+		} finally {
+			setDeleting(null);
+		}
+	};
 
 	const byServer = new Map(
 		(seriesQuery.data?.servers ?? []).map((entry) => [
@@ -46,12 +80,14 @@ function Home() {
 						MCP Servers
 					</h1>
 				</div>
-				<Link to="/admin">
-					<Button variant="ghost">
-						<ServerCogIcon className="size-3.5" />
-						Manage
-					</Button>
-				</Link>
+				{isAdmin && (
+					<Link to="/admin/new">
+						<Button>
+							<PlusIcon className="size-4" />
+							New server
+						</Button>
+					</Link>
+				)}
 			</header>
 
 			{serversQuery.isLoading && <ServerGridSkeleton />}
@@ -83,12 +119,12 @@ function Home() {
 					<EmptyHeader>
 						<EmptyTitle>No MCP servers configured</EmptyTitle>
 						<EmptyDescription>
-							Add a server through the{" "}
+							Add a server after{" "}
 							<Link
 								to="/admin"
 								className="underline underline-offset-4 hover:text-foreground"
 							>
-								admin interface
+								signing in
 							</Link>
 						</EmptyDescription>
 					</EmptyHeader>
@@ -103,6 +139,14 @@ function Home() {
 							harnessId={harnessId}
 							onHarnessIdChange={setSelectedHarnessId}
 							sparkline={byServer.get(server.name)}
+							management={
+								isAdmin
+									? {
+											deleting: deleting === server.name,
+											onDelete: () => void remove(server.name),
+										}
+									: undefined
+							}
 						/>
 					))}
 				</div>

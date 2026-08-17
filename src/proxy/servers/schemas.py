@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 
-from proxy.providers import ServerAuthProviderConfig
 from proxy.servers.models import NAME_PATTERN
 
 
@@ -14,7 +13,11 @@ class ServerCreateRequest(BaseModel):
     name: str = Field(pattern=NAME_PATTERN, max_length=100)
     description: str = Field(default="", max_length=255)
     upstream_url: AnyHttpUrl = Field(max_length=2048)
-    auth: ServerAuthProviderConfig
+    auth_provider: str | None = Field(
+        default=None,
+        pattern=NAME_PATTERN,
+        max_length=100,
+    )
     verify_upstream_tls: bool = True
     forward_client_credentials: bool = False
 
@@ -26,17 +29,21 @@ class ServerUpdateRequest(BaseModel):
 
     description: str = Field(default="", max_length=255)
     upstream_url: AnyHttpUrl = Field(max_length=2048)
-    auth: ServerAuthProviderConfig
+    auth_provider: str | None = Field(
+        default=None,
+        pattern=NAME_PATTERN,
+        max_length=100,
+    )
     verify_upstream_tls: bool = True
     forward_client_credentials: bool = False
 
 
 class ServerView(BaseModel):
-    """Admin-facing server representation with secrets masked."""
+    """Admin-facing server representation."""
 
     name: str
     description: str
     upstream_url: str
-    auth: ServerAuthProviderConfig
+    auth_provider: str | None
     verify_upstream_tls: bool
     forward_client_credentials: bool

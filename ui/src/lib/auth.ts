@@ -41,11 +41,12 @@ export async function establishAdminSession(token: string): Promise<boolean> {
 }
 
 /** Clear the gateway's HttpOnly session cookie. */
-export async function endAdminSession(): Promise<void> {
+export async function endAdminSession(): Promise<boolean> {
 	try {
-		await endSessionApiAdminSessionDelete();
+		const result = await endSessionApiAdminSessionDelete();
+		return result.status === 204;
 	} catch {
-		// the cookie expires with the browser session anyway
+		return false;
 	}
 }
 

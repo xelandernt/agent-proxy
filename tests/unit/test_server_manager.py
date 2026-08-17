@@ -5,6 +5,7 @@ from typing import cast
 import pytest
 from fastapi import FastAPI
 
+from proxy.auth_providers.models import AuthProviderDefinition
 from proxy.servers.app import McpServerAppFactory
 from proxy.servers.manager import ServerManager
 from proxy.servers.models import McpServerConfig
@@ -16,10 +17,7 @@ def server(upstream_url: str = "http://127.0.0.1:9/mcp") -> McpServerConfig:
         {
             "name": "calendar",
             "upstream_url": upstream_url,
-            "auth": {
-                "provider": "keycloak",
-                "realm_url": "https://identity.example/realms/test",
-            },
+            "auth_provider": "keycloak",
         }
     )
 
@@ -51,7 +49,7 @@ class FakeFactory:
         self.created: list[FakeApp] = []
         self.fail_next_start = False
 
-    def create(self, config: McpServerConfig) -> FakeApp:
+    def create(self, config: McpServerConfig, _auth: object) -> FakeApp:
         app = FakeApp(config, start_fails=self.fail_next_start)
         self.fail_next_start = False
         self.created.append(app)
@@ -79,11 +77,29 @@ class FakeRepository:
         self.config = None
 
 
+class FakeAuthProviderRepository:
+    def __init__(self) -> None:
+        self.definition = AuthProviderDefinition.model_validate(
+            {
+                "name": "keycloak",
+                "auth": {
+                    "provider": "keycloak",
+                    "realm_url": "https://identity.example/realms/test",
+                },
+            }
+        )
+
+    async def get(self, name: str) -> AuthProviderDefinition | None:
+        return self.definition if name == self.definition.name else None
+
+
 async def manager_fixture() -> tuple[ServerManager, FakeRepository, FakeFactory]:
     repository = FakeRepository(server())
     factory = FakeFactory()
+    auth_repository = FakeAuthProviderRepository()
     manager = ServerManager(
         repository=cast(ServersRepository, repository),
+        auth_provider_repository=cast(object, auth_repository),
         app_factory=cast(McpServerAppFactory, factory),
         gateway=FastAPI(),
     )

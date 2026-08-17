@@ -25,10 +25,7 @@ def keycloak_server(
         {
             "name": name,
             "upstream_url": upstream_url,
-            "auth": {
-                "provider": "keycloak",
-                "realm_url": "https://identity.example/realms/test",
-            },
+            "auth_provider": "keycloak",
         }
     )
 
@@ -42,10 +39,7 @@ def server_payload(
         "description": f"Server {name}",
         "upstream_url": upstream_url,
         "verify_upstream_tls": True,
-        "auth": {
-            "provider": "keycloak",
-            "realm_url": "https://identity.example/realms/test",
-        },
+        "auth_provider": "keycloak",
     }
 
 
@@ -173,18 +167,15 @@ async def test_unknown_update_and_delete_return_404(
     assert deleted.status_code == 404
 
 
-async def test_invalid_auth_config_returns_422(
+async def test_unknown_auth_provider_returns_404(
     admin_client: httpx2.AsyncClient,
 ) -> None:
     payload = server_payload("broken")
-    payload["auth"] = {
-        "provider": "keycloak",
-        "realm_url": "not-a-url",
-    }
+    payload["auth_provider"] = "missing"
     response = await admin_client.post("/api/admin/servers", headers=AUTH, json=payload)
 
-    assert response.status_code == 422
-    assert "realm_url" in response.text
+    assert response.status_code == 404
+    assert "missing" in response.text
 
 
 async def test_auth_schema_discriminates_on_provider(
@@ -206,7 +197,6 @@ async def test_auth_schema_discriminates_on_provider(
         "huggingface",
         "jwt",
         "keycloak",
-        "none",
         "oci",
         "propelauth",
         "scalekit",

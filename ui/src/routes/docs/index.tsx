@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpenIcon, ServerCogIcon } from "lucide-react";
+import { BookOpenIcon } from "lucide-react";
 
 import { Button } from "#/components/ui/button";
 import { PROVIDER_GUIDES } from "#/lib/provider-docs/registry";
@@ -27,11 +27,8 @@ function DocsIndex() {
 						Provider setup guides
 					</h1>
 				</div>
-				<Link to="/admin">
-					<Button variant="ghost">
-						<ServerCogIcon className="size-3.5" />
-						Manage servers
-					</Button>
+				<Link to="/admin/auth-providers">
+					<Button variant="ghost">Manage providers</Button>
 				</Link>
 			</header>
 

@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from proxy.app.usage.types import UsageBucket
+
 
 class ItemCount(BaseModel):
     """One labeled usage count."""
@@ -42,7 +44,7 @@ class SeriesReport(BaseModel):
     server: str
     start: datetime
     end: datetime
-    bucket: str
+    bucket: UsageBucket
     points: list[SeriesBucket]
 
 

@@ -72,6 +72,65 @@ export interface AuthKitAuthProviderConfig {
   resource_base_url?: AuthKitAuthProviderConfigResourceBaseUrl;
 }
 
+export type AuthProviderCreateRequestAuth =
+  | Auth0AuthProviderConfig
+  | AuthKitAuthProviderConfig
+  | AwsCognitoAuthProviderConfig
+  | AzureAuthProviderConfig
+  | DescopeAuthProviderConfig
+  | DiscordAuthProviderConfig
+  | GitHubAuthProviderConfig
+  | GoogleAuthProviderConfig
+  | HuggingFaceAuthProviderConfig
+  | JwtAuthProviderConfig
+  | KeycloakAuthProviderConfig
+  | OciAuthProviderConfig
+  | PropelAuthProviderConfig
+  | ScalekitAuthProviderConfig
+  | SupabaseAuthProviderConfig
+  | WorkOsAuthProviderConfig;
+
+export interface AuthProviderCreateRequest {
+  /**
+   * @maxLength 100
+   * @pattern ^[a-z0-9][a-z0-9-]*$
+   */
+  name: string;
+  auth: AuthProviderCreateRequestAuth;
+}
+
+export type AuthProviderUpdateRequestAuth =
+  | Auth0AuthProviderConfig
+  | AuthKitAuthProviderConfig
+  | AwsCognitoAuthProviderConfig
+  | AzureAuthProviderConfig
+  | DescopeAuthProviderConfig
+  | DiscordAuthProviderConfig
+  | GitHubAuthProviderConfig
+  | GoogleAuthProviderConfig
+  | HuggingFaceAuthProviderConfig
+  | JwtAuthProviderConfig
+  | KeycloakAuthProviderConfig
+  | OciAuthProviderConfig
+  | PropelAuthProviderConfig
+  | ScalekitAuthProviderConfig
+  | SupabaseAuthProviderConfig
+  | WorkOsAuthProviderConfig;
+
+export interface AuthProviderUpdateRequest {
+  auth: AuthProviderUpdateRequestAuth;
+}
+
+export type AuthProviderViewAuth = { [key: string]: unknown };
+
+/**
+ * Admin representation with credential fields omitted.
+ */
+export interface AuthProviderView {
+  name: string;
+  auth: AuthProviderViewAuth;
+}
+
 export type AwsCognitoAuthProviderConfigResourceBaseUrl = string | null;
 
 export type AwsCognitoAuthProviderConfigIssuerUrl = string | null;
@@ -478,7 +537,7 @@ export type McpServerListingAuth =
   (typeof McpServerListingAuth)[keyof typeof McpServerListingAuth];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-const McpServerListingAuth = {
+export const McpServerListingAuth = {
   oauth2: "oauth2",
   none: "none",
 } as const;
@@ -499,11 +558,6 @@ export interface McpServerListing {
 export interface McpServersDocument {
   servers: McpServerListing[];
 }
-
-export const NoneAuthProviderConfigValue = {
-  provider: "none",
-} as const;
-export type NoneAuthProviderConfig = typeof NoneAuthProviderConfigValue;
 
 export type OciAuthProviderConfigResourceBaseUrl = string | null;
 
@@ -640,28 +694,11 @@ export interface SeriesReport {
   server: string;
   start: string;
   end: string;
-  bucket: string;
+  bucket: "minute" | "hour" | "day";
   points: SeriesBucket[];
 }
 
-export type ServerCreateRequestAuth =
-  | Auth0AuthProviderConfig
-  | AuthKitAuthProviderConfig
-  | AwsCognitoAuthProviderConfig
-  | AzureAuthProviderConfig
-  | DescopeAuthProviderConfig
-  | DiscordAuthProviderConfig
-  | GitHubAuthProviderConfig
-  | GoogleAuthProviderConfig
-  | HuggingFaceAuthProviderConfig
-  | JwtAuthProviderConfig
-  | KeycloakAuthProviderConfig
-  | NoneAuthProviderConfig
-  | OciAuthProviderConfig
-  | PropelAuthProviderConfig
-  | ScalekitAuthProviderConfig
-  | SupabaseAuthProviderConfig
-  | WorkOsAuthProviderConfig;
+export type ServerCreateRequestAuthProvider = string | null;
 
 /**
  * Payload for creating a server.
@@ -679,7 +716,7 @@ export interface ServerCreateRequest {
    * @maxLength 2048
    */
   upstream_url: string;
-  auth: ServerCreateRequestAuth;
+  auth_provider?: ServerCreateRequestAuthProvider;
   verify_upstream_tls?: boolean;
   forward_client_credentials?: boolean;
 }
@@ -692,24 +729,7 @@ export interface ServerSeries {
   points: SeriesPoint[];
 }
 
-export type ServerUpdateRequestAuth =
-  | Auth0AuthProviderConfig
-  | AuthKitAuthProviderConfig
-  | AwsCognitoAuthProviderConfig
-  | AzureAuthProviderConfig
-  | DescopeAuthProviderConfig
-  | DiscordAuthProviderConfig
-  | GitHubAuthProviderConfig
-  | GoogleAuthProviderConfig
-  | HuggingFaceAuthProviderConfig
-  | JwtAuthProviderConfig
-  | KeycloakAuthProviderConfig
-  | NoneAuthProviderConfig
-  | OciAuthProviderConfig
-  | PropelAuthProviderConfig
-  | ScalekitAuthProviderConfig
-  | SupabaseAuthProviderConfig
-  | WorkOsAuthProviderConfig;
+export type ServerUpdateRequestAuthProvider = string | null;
 
 /**
  * Payload for updating a server; the name is immutable.
@@ -722,38 +742,21 @@ export interface ServerUpdateRequest {
    * @maxLength 2048
    */
   upstream_url: string;
-  auth: ServerUpdateRequestAuth;
+  auth_provider?: ServerUpdateRequestAuthProvider;
   verify_upstream_tls?: boolean;
   forward_client_credentials?: boolean;
 }
 
-export type ServerViewAuth =
-  | Auth0AuthProviderConfig
-  | AuthKitAuthProviderConfig
-  | AwsCognitoAuthProviderConfig
-  | AzureAuthProviderConfig
-  | DescopeAuthProviderConfig
-  | DiscordAuthProviderConfig
-  | GitHubAuthProviderConfig
-  | GoogleAuthProviderConfig
-  | HuggingFaceAuthProviderConfig
-  | JwtAuthProviderConfig
-  | KeycloakAuthProviderConfig
-  | NoneAuthProviderConfig
-  | OciAuthProviderConfig
-  | PropelAuthProviderConfig
-  | ScalekitAuthProviderConfig
-  | SupabaseAuthProviderConfig
-  | WorkOsAuthProviderConfig;
+export type ServerViewAuthProvider = string | null;
 
 /**
- * Admin-facing server representation with secrets masked.
+ * Admin-facing server representation.
  */
 export interface ServerView {
   name: string;
   description: string;
   upstream_url: string;
-  auth: ServerViewAuth;
+  auth_provider: ServerViewAuthProvider;
   verify_upstream_tls: boolean;
   forward_client_credentials: boolean;
 }
@@ -774,7 +777,7 @@ export type SupabaseAuthProviderConfigAlgorithm =
   (typeof SupabaseAuthProviderConfigAlgorithm)[keyof typeof SupabaseAuthProviderConfigAlgorithm];
 
 // eslint-disable-next-line @typescript-eslint/no-redeclare
-const SupabaseAuthProviderConfigAlgorithm = {
+export const SupabaseAuthProviderConfigAlgorithm = {
   RS256: "RS256",
   ES256: "ES256",
 } as const;
@@ -885,7 +888,7 @@ export interface WorkOsAuthProviderConfig {
 export type ServersUsageSeriesApiServersSeriesGetParams = {
   from?: string | null;
   to?: string | null;
-  bucket?: string | null;
+  bucket?: "minute" | "hour" | "day" | null;
 };
 
 export type ServerUsageApiServersNameUsageGetParams = {
@@ -896,7 +899,7 @@ export type ServerUsageApiServersNameUsageGetParams = {
 export type ServerUsageSeriesApiServersNameUsageSeriesGetParams = {
   from?: string | null;
   to?: string | null;
-  bucket?: string | null;
+  bucket?: "minute" | "hour" | "day" | null;
 };
 
 export type AuthStatusApiAdminAuthStatusGet200 = { [key: string]: unknown };
@@ -1632,4 +1635,209 @@ export const deleteServerApiAdminServersNameDelete = async (
     status: res.status,
     headers: res.headers,
   } as deleteServerApiAdminServersNameDeleteResponse;
+};
+
+/**
+ * @summary List Auth Providers
+ */
+export type listAuthProvidersApiAdminAuthProvidersGetResponse200 = {
+  data: AuthProviderView[];
+  status: 200;
+};
+
+export type listAuthProvidersApiAdminAuthProvidersGetResponseSuccess =
+  listAuthProvidersApiAdminAuthProvidersGetResponse200 & {
+    headers: Headers;
+  };
+export type listAuthProvidersApiAdminAuthProvidersGetResponse =
+  listAuthProvidersApiAdminAuthProvidersGetResponseSuccess;
+
+export const getListAuthProvidersApiAdminAuthProvidersGetUrl = () => {
+  return `/api/admin/auth-providers`;
+};
+
+export const listAuthProvidersApiAdminAuthProvidersGet = async (
+  options?: RequestInit,
+): Promise<listAuthProvidersApiAdminAuthProvidersGetResponse> => {
+  const res = await fetch(getListAuthProvidersApiAdminAuthProvidersGetUrl(), {
+    ...options,
+    method: "GET",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: listAuthProvidersApiAdminAuthProvidersGetResponse["data"] = body
+    ? JSON.parse(body)
+    : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as listAuthProvidersApiAdminAuthProvidersGetResponse;
+};
+
+/**
+ * @summary Create Auth Provider
+ */
+export type createAuthProviderApiAdminAuthProvidersPostResponse201 = {
+  data: AuthProviderView;
+  status: 201;
+};
+
+export type createAuthProviderApiAdminAuthProvidersPostResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type createAuthProviderApiAdminAuthProvidersPostResponseSuccess =
+  createAuthProviderApiAdminAuthProvidersPostResponse201 & {
+    headers: Headers;
+  };
+export type createAuthProviderApiAdminAuthProvidersPostResponseError =
+  createAuthProviderApiAdminAuthProvidersPostResponse422 & {
+    headers: Headers;
+  };
+
+export type createAuthProviderApiAdminAuthProvidersPostResponse =
+  | createAuthProviderApiAdminAuthProvidersPostResponseSuccess
+  | createAuthProviderApiAdminAuthProvidersPostResponseError;
+
+export const getCreateAuthProviderApiAdminAuthProvidersPostUrl = () => {
+  return `/api/admin/auth-providers`;
+};
+
+export const createAuthProviderApiAdminAuthProvidersPost = async (
+  authProviderCreateRequest: AuthProviderCreateRequest,
+  options?: RequestInit,
+): Promise<createAuthProviderApiAdminAuthProvidersPostResponse> => {
+  const res = await fetch(getCreateAuthProviderApiAdminAuthProvidersPostUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(authProviderCreateRequest),
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: createAuthProviderApiAdminAuthProvidersPostResponse["data"] = body
+    ? JSON.parse(body)
+    : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as createAuthProviderApiAdminAuthProvidersPostResponse;
+};
+
+/**
+ * @summary Update Auth Provider
+ */
+export type updateAuthProviderApiAdminAuthProvidersNamePutResponse200 = {
+  data: AuthProviderView;
+  status: 200;
+};
+
+export type updateAuthProviderApiAdminAuthProvidersNamePutResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type updateAuthProviderApiAdminAuthProvidersNamePutResponseSuccess =
+  updateAuthProviderApiAdminAuthProvidersNamePutResponse200 & {
+    headers: Headers;
+  };
+export type updateAuthProviderApiAdminAuthProvidersNamePutResponseError =
+  updateAuthProviderApiAdminAuthProvidersNamePutResponse422 & {
+    headers: Headers;
+  };
+
+export type updateAuthProviderApiAdminAuthProvidersNamePutResponse =
+  | updateAuthProviderApiAdminAuthProvidersNamePutResponseSuccess
+  | updateAuthProviderApiAdminAuthProvidersNamePutResponseError;
+
+export const getUpdateAuthProviderApiAdminAuthProvidersNamePutUrl = (
+  name: string,
+) => {
+  return `/api/admin/auth-providers/${name}`;
+};
+
+export const updateAuthProviderApiAdminAuthProvidersNamePut = async (
+  name: string,
+  authProviderUpdateRequest: AuthProviderUpdateRequest,
+  options?: RequestInit,
+): Promise<updateAuthProviderApiAdminAuthProvidersNamePutResponse> => {
+  const res = await fetch(
+    getUpdateAuthProviderApiAdminAuthProvidersNamePutUrl(name),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(authProviderUpdateRequest),
+    },
+  );
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: updateAuthProviderApiAdminAuthProvidersNamePutResponse["data"] =
+    body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as updateAuthProviderApiAdminAuthProvidersNamePutResponse;
+};
+
+/**
+ * @summary Delete Auth Provider
+ */
+export type deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse204 = {
+  data: void;
+  status: 204;
+};
+
+export type deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse422 = {
+  data: HTTPValidationError;
+  status: 422;
+};
+
+export type deleteAuthProviderApiAdminAuthProvidersNameDeleteResponseSuccess =
+  deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse204 & {
+    headers: Headers;
+  };
+export type deleteAuthProviderApiAdminAuthProvidersNameDeleteResponseError =
+  deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse422 & {
+    headers: Headers;
+  };
+
+export type deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse =
+  | deleteAuthProviderApiAdminAuthProvidersNameDeleteResponseSuccess
+  | deleteAuthProviderApiAdminAuthProvidersNameDeleteResponseError;
+
+export const getDeleteAuthProviderApiAdminAuthProvidersNameDeleteUrl = (
+  name: string,
+) => {
+  return `/api/admin/auth-providers/${name}`;
+};
+
+export const deleteAuthProviderApiAdminAuthProvidersNameDelete = async (
+  name: string,
+  options?: RequestInit,
+): Promise<deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse> => {
+  const res = await fetch(
+    getDeleteAuthProviderApiAdminAuthProvidersNameDeleteUrl(name),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse["data"] =
+    body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as deleteAuthProviderApiAdminAuthProvidersNameDeleteResponse;
 };

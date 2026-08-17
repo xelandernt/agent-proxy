@@ -4,11 +4,10 @@ from collections.abc import AsyncIterator, Iterator
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    async_sessionmaker,
-)
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
+from proxy.auth_providers.models import AuthProviderDefinition
+from proxy.auth_providers.repository import AuthProvidersRepository
 from proxy.database import Base, create_engine, create_session_factory
 from proxy.providers import (
     Auth0AuthProviderConfig,
@@ -22,16 +21,16 @@ from proxy.providers import (
     HuggingFaceAuthProviderConfig,
     JwtAuthProviderConfig,
     KeycloakAuthProviderConfig,
-    NoneAuthProviderConfig,
+    ManagedAuthProviderConfig,
     OciAuthProviderConfig,
     PropelAuthProviderConfig,
     ScalekitAuthProviderConfig,
-    ServerAuthProviderConfig,
     SupabaseAuthProviderConfig,
     WorkOsAuthProviderConfig,
 )
 from proxy.servers.models import McpServerConfig
 from proxy.servers.repository import (
+    ServerAuthProviderNotFound,
     ServerNameTaken,
     ServersRepository,
 )
@@ -50,7 +49,7 @@ async def session_factory(
         await engine.dispose()
 
 
-def provider_configs() -> Iterator[ServerAuthProviderConfig]:
+def provider_configs() -> Iterator[ManagedAuthProviderConfig]:
     yield Auth0AuthProviderConfig(
         provider="auth0",
         config_url="https://tenant.auth0.com/.well-known/openid-configuration",
@@ -59,8 +58,7 @@ def provider_configs() -> Iterator[ServerAuthProviderConfig]:
         audience="https://api.example",
     )
     yield AuthKitAuthProviderConfig(
-        provider="authkit",
-        authkit_domain="https://example.authkit.app",
+        provider="authkit", authkit_domain="https://example.authkit.app"
     )
     yield AwsCognitoAuthProviderConfig(
         provider="aws-cognito",
@@ -80,35 +78,23 @@ def provider_configs() -> Iterator[ServerAuthProviderConfig]:
         config_url="https://api.descope.com/v1/apps/P123/.well-known/openid-configuration",
     )
     yield DiscordAuthProviderConfig(
-        provider="discord",
-        client_id="client-id",
-        client_secret="client-secret",
+        provider="discord", client_id="client-id", client_secret="client-secret"
     )
     yield GitHubAuthProviderConfig(
-        provider="github",
-        client_id="client-id",
-        client_secret="client-secret",
+        provider="github", client_id="client-id", client_secret="client-secret"
     )
     yield GoogleAuthProviderConfig(
-        provider="google",
-        client_id="client-id",
-        client_secret="client-secret",
+        provider="google", client_id="client-id", client_secret="client-secret"
     )
     yield HuggingFaceAuthProviderConfig(
-        provider="huggingface",
-        client_id="client-id",
-        client_secret="client-secret",
+        provider="huggingface", client_id="client-id", client_secret="client-secret"
     )
     yield JwtAuthProviderConfig(
-        provider="jwt",
-        public_key="test-public-key",
-        algorithm="RS256",
+        provider="jwt", public_key="test-public-key", algorithm="RS256"
     )
     yield KeycloakAuthProviderConfig(
-        provider="keycloak",
-        realm_url="https://identity.example/realms/agents",
+        provider="keycloak", realm_url="https://identity.example/realms/agents"
     )
-    yield NoneAuthProviderConfig(provider="none")
     yield OciAuthProviderConfig(
         provider="oci",
         config_url="https://identity.example/.well-known/openid-configuration",
@@ -127,8 +113,7 @@ def provider_configs() -> Iterator[ServerAuthProviderConfig]:
         resource_id="resource-id",
     )
     yield SupabaseAuthProviderConfig(
-        provider="supabase",
-        project_url="https://project.supabase.co",
+        provider="supabase", project_url="https://project.supabase.co"
     )
     yield WorkOsAuthProviderConfig(
         provider="workos",
@@ -138,34 +123,36 @@ def provider_configs() -> Iterator[ServerAuthProviderConfig]:
     )
 
 
-def server_config(index: int, auth: ServerAuthProviderConfig) -> McpServerConfig:
+def server_config(index: int, provider_name: str | None = None) -> McpServerConfig:
     return McpServerConfig(
         name=f"server-{index}",
         description=f"Server number {index}",
         upstream_url="http://127.0.0.1:8000/mcp",
-        auth=auth,
+        auth_provider=provider_name,
         verify_upstream_tls=False,
     )
 
 
-@pytest.mark.parametrize("index", range(17), ids=lambda i: str(i))
-async def test_every_provider_variant_round_trips(
+@pytest.mark.parametrize("index", range(16), ids=lambda i: str(i))
+async def test_server_reference_round_trips(
     session_factory: async_sessionmaker,
     index: int,
 ) -> None:
     auth = list(provider_configs())[index]
-    expected = server_config(index, auth)
+    provider_name = f"provider-{index}"
+    await AuthProvidersRepository(session_factory).create(
+        AuthProviderDefinition(name=provider_name, auth=auth)
+    )
+    expected = server_config(index, provider_name)
     repository = ServersRepository(session_factory)
 
     await repository.create(expected)
-    stored = await repository.get(expected.name)
-    listed = await repository.list()
 
-    assert stored == expected
-    assert listed == [expected]
+    assert await repository.get(expected.name) == expected
+    assert await repository.list() == [expected]
 
 
-async def test_corrupt_auth_payload_fails_loudly(
+async def test_corrupt_provider_payload_fails_loudly(
     session_factory: async_sessionmaker,
 ) -> None:
     from sqlalchemy import text
@@ -174,65 +161,54 @@ async def test_corrupt_auth_payload_fails_loudly(
         await session.execute(
             text(
                 """
-                INSERT INTO servers
-                    (name, description, upstream_url, verify_upstream_tls,
-                     auth, created_at, updated_at)
+                INSERT INTO auth_providers
+                    (name, auth, created_at, updated_at)
                 VALUES
-                    ('broken', '', 'http://upstream/mcp', TRUE, :auth,
-                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ('broken', :auth, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """
             ),
             {"auth": '{"provider": "keycloak", "realm_url": "not-a-url"}'},
         )
         await session.commit()
 
-    repository = ServersRepository(session_factory)
     with pytest.raises(ValidationError, match="realm_url"):
-        await repository.list()
+        await AuthProvidersRepository(session_factory).get("broken")
 
 
 async def test_create_rejects_duplicate_names(
     session_factory: async_sessionmaker,
 ) -> None:
     repository = ServersRepository(session_factory)
-    config = server_config(
-        0,
-        KeycloakAuthProviderConfig(
-            provider="keycloak",
-            realm_url="https://identity.example/realms/agents",
-        ),
-    )
+    config = server_config(0)
 
     await repository.create(config)
     with pytest.raises(ServerNameTaken, match="already exists"):
         await repository.create(config)
 
 
+async def test_create_rejects_unknown_provider(
+    session_factory: async_sessionmaker,
+) -> None:
+    config = server_config(0).model_copy(update={"auth_provider": "missing"})
+
+    with pytest.raises(ServerAuthProviderNotFound, match="missing"):
+        await ServersRepository(session_factory).create(config)
+
+
 async def test_get_returns_none_for_unknown_names(
     session_factory: async_sessionmaker,
 ) -> None:
-    repository = ServersRepository(session_factory)
-
-    assert await repository.get("missing") is None
+    assert await ServersRepository(session_factory).get("missing") is None
 
 
 async def test_update_and_delete_round_trip(
     session_factory: async_sessionmaker,
 ) -> None:
     repository = ServersRepository(session_factory)
-    auth = KeycloakAuthProviderConfig(
-        provider="keycloak",
-        realm_url="https://identity.example/realms/agents",
-    )
-    config = server_config(0, auth)
+    config = server_config(0)
     await repository.create(config)
 
-    updated = config.model_copy(
-        update={
-            "description": "Renamed purpose",
-            "verify_upstream_tls": True,
-        }
-    )
+    updated = config.model_copy(update={"description": "Renamed purpose"})
     await repository.update(config.name, updated)
     assert await repository.get(config.name) == updated
 
@@ -240,38 +216,25 @@ async def test_update_and_delete_round_trip(
     assert await repository.get(config.name) is None
 
 
-async def test_forward_client_credentials_round_trips_with_none_provider(
+async def test_forward_client_credentials_round_trips_without_provider(
     session_factory: async_sessionmaker,
 ) -> None:
-    repository = ServersRepository(session_factory)
     config = McpServerConfig(
         name="relay",
         upstream_url="http://127.0.0.1:8000/mcp",
-        auth=NoneAuthProviderConfig(provider="none"),
+        auth_provider=None,
         forward_client_credentials=True,
     )
 
-    await repository.create(config)
-    stored = await repository.get("relay")
-
-    assert stored == config
-    assert stored is not None
-    assert stored.forward_client_credentials is True
+    await ServersRepository(session_factory).create(config)
+    assert await ServersRepository(session_factory).get("relay") == config
 
 
-async def test_forward_client_credentials_rejected_without_none_provider(
-    session_factory: async_sessionmaker,
-) -> None:
-    auth = KeycloakAuthProviderConfig(
-        provider="keycloak",
-        realm_url="https://identity.example/realms/agents",
-    )
+async def test_forward_client_credentials_rejected_with_provider() -> None:
     with pytest.raises(ValidationError, match="forward_client_credentials"):
         McpServerConfig(
             name="server-0",
-            description="Server number 0",
             upstream_url="http://127.0.0.1:8000/mcp",
-            auth=auth,
-            verify_upstream_tls=False,
+            auth_provider="keycloak",
             forward_client_credentials=True,
         )

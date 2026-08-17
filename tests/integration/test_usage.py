@@ -152,20 +152,14 @@ def usage_client(
         {
             "name": "calendar",
             "upstream_url": "http://127.0.0.1:9/mcp",
-            "auth": {
-                "provider": "keycloak",
-                "realm_url": "https://identity.example/realms/test",
-            },
+            "auth_provider": "keycloak",
         }
     )
     quiet = McpServerConfig.model_validate(
         {
             "name": "notes",
             "upstream_url": "http://127.0.0.1:9/mcp",
-            "auth": {
-                "provider": "keycloak",
-                "realm_url": "https://identity.example/realms/test",
-            },
+            "auth_provider": "keycloak",
         }
     )
     seed_servers(postgresql_url, [server, quiet])
@@ -333,7 +327,7 @@ def test_usage_tracks_none_provider_requests(
         {
             "name": "relay",
             "upstream_url": "http://127.0.0.1:9/mcp",
-            "auth": {"provider": "none"},
+            "auth_provider": None,
             "forward_client_credentials": True,
         }
     )

@@ -11,9 +11,10 @@ from proxy.app.admin.auth import (
     require_admin,
     set_admin_session_cookie,
 )
-from proxy.providers import ServerAuthProviderConfig
+from proxy.auth_providers.repository import AuthProviderNotFound
+from proxy.providers import ManagedAuthProviderConfig
 from proxy.servers.manager import ServerManager
-from proxy.servers.models import McpServerConfig, merge_masked_auth_secrets
+from proxy.servers.models import McpServerConfig
 from proxy.servers.repository import ServerNameTaken, ServerNotFound
 from proxy.servers.schemas import (
     ServerCreateRequest,
@@ -29,7 +30,7 @@ router = APIRouter(
 
 public_router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-AUTH_SCHEMA: dict = TypeAdapter(ServerAuthProviderConfig).json_schema()
+AUTH_SCHEMA: dict = TypeAdapter(ManagedAuthProviderConfig).json_schema()
 
 
 @public_router.get("/auth-status")
@@ -46,7 +47,7 @@ def auth_status(request: Request) -> dict:
     if provider is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Admin interface is not configured.",
+            detail="Server management is not configured.",
         )
     admin = request.app.state.config.admin
     flow = provider.oauth_browser_flow()
@@ -160,7 +161,7 @@ def _to_view(config: McpServerConfig) -> ServerView:
         name=config.name,
         description=config.description,
         upstream_url=str(config.upstream_url),
-        auth=config.auth,
+        auth_provider=config.auth_provider,
         verify_upstream_tls=config.verify_upstream_tls,
         forward_client_credentials=config.forward_client_credentials,
     )
@@ -175,7 +176,7 @@ def _new_config(
             "name": name,
             "description": payload.description,
             "upstream_url": payload.upstream_url,
-            "auth": payload.auth,
+            "auth_provider": payload.auth_provider,
             "verify_upstream_tls": payload.verify_upstream_tls,
             "forward_client_credentials": payload.forward_client_credentials,
         }
@@ -190,7 +191,7 @@ def _updated_config(
         name=current.name,
         description=payload.description,
         upstream_url=payload.upstream_url,
-        auth=merge_masked_auth_secrets(current.auth, payload.auth),
+        auth_provider=payload.auth_provider,
         verify_upstream_tls=payload.verify_upstream_tls,
         forward_client_credentials=payload.forward_client_credentials,
     )
@@ -226,12 +227,17 @@ async def create_server(
     try:
         config = _new_config(payload.name, payload)
         created = await manager.create(config)
+    except AuthProviderNotFound as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
     except ServerNameTaken as error:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(error),
         ) from error
-    except ValueError as error:
+    except (ValueError, KeyError) as error:
         raise _invalid_config(error) from error
     return _to_view(created)
 
@@ -251,12 +257,17 @@ async def update_server(
             raise ServerNotFound(f"Unknown MCP server '{name}'.")
         config = _updated_config(current, payload)
         updated = await manager.update(name, config)
+    except AuthProviderNotFound as error:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(error),
+        ) from error
     except ServerNotFound as error:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(error),
         ) from error
-    except (TypeError, ValueError) as error:
+    except (TypeError, ValueError, KeyError) as error:
         raise _invalid_config(error) from error
     return _to_view(updated)
 

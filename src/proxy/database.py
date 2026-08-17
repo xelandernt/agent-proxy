@@ -25,3 +25,16 @@ def create_session_factory(
     """Create a session factory bound to the given engine."""
 
     return async_sessionmaker(engine, expire_on_commit=False)
+
+
+async def create_all_tables(engine: AsyncEngine) -> None:
+    """Create all gateway tables after registering every persistence model."""
+
+    # Model imports are intentionally local: importing the database module
+    # should define the shared metadata without importing every feature.
+    import proxy.app.usage.models
+    import proxy.auth_providers.persistence
+    import proxy.servers.models  # noqa: F401
+
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)

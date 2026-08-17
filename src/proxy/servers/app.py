@@ -8,7 +8,7 @@ from fastmcp.server.http import StarletteWithLifespan as FastMCPApplication
 from starlette.types import ASGIApp
 
 from proxy.app.usage.middleware import UsageRecorder, apply_usage_tracing
-from proxy.providers import load_auth_provider
+from proxy.providers import ManagedAuthProviderConfig, load_auth_provider
 from proxy.servers.models import McpServerConfig, server_base_url
 from proxy.settings import GatewayConfig
 from proxy.transport import create_upstream_transport
@@ -97,11 +97,17 @@ class McpServerAppFactory:
         self._config = config
         self._usage_recorder = usage_recorder
 
-    def create(self, server: McpServerConfig) -> McpServerApp:
+    def create(
+        self,
+        server: McpServerConfig,
+        auth: ManagedAuthProviderConfig | None,
+    ) -> McpServerApp:
         """Build one app, hoisting its well-known routes out for gateway mounting."""
 
         base_url = server_base_url(str(self._config.public_base_url), server.name)
-        auth = load_auth_provider(server.auth, base_url=base_url)
+        loaded_auth = (
+            load_auth_provider(auth, base_url=base_url) if auth is not None else None
+        )
         transport = create_upstream_transport(
             str(server.upstream_url),
             verify_tls=server.verify_upstream_tls,
@@ -111,7 +117,7 @@ class McpServerAppFactory:
             transport,
             mode=MCP_PROTOCOL_VERSION,
             name=server.name,
-            auth=auth,
+            auth=loaded_auth,
             provider_error_strategy="raise",
         )
         mcp_app = proxy.http_app(path="/mcp", stateless_http=True)

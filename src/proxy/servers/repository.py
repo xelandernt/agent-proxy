@@ -6,11 +6,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from proxy.servers.models import (
-    McpServerConfig,
-    ServerConfig,
-    config_to_auth_payload,
-)
+from proxy.auth_providers.repository import AuthProviderRecord  # noqa: F401
+from proxy.servers.models import McpServerConfig, ServerConfig
 
 
 class ServerNotFound(KeyError):
@@ -19,6 +16,10 @@ class ServerNotFound(KeyError):
 
 class ServerNameTaken(ValueError):
     """Raised when creating a server whose name already exists."""
+
+
+class ServerAuthProviderNotFound(ValueError):
+    """Raised when persistence rejects a dangling provider reference."""
 
 
 class ServersRepository:
@@ -50,7 +51,7 @@ class ServersRepository:
             upstream_url=str(config.upstream_url),
             verify_upstream_tls=config.verify_upstream_tls,
             forward_client_credentials=config.forward_client_credentials,
-            auth=config_to_auth_payload(config),
+            auth_provider=config.auth_provider,
             created_at=now,
             updated_at=now,
         )
@@ -60,6 +61,10 @@ class ServersRepository:
                 await session.commit()
             except IntegrityError as error:
                 await session.rollback()
+                if _is_foreign_key_violation(error):
+                    raise ServerAuthProviderNotFound(
+                        f"Unknown authentication provider '{config.auth_provider}'."
+                    ) from error
                 raise ServerNameTaken(
                     f"MCP server name '{config.name}' already exists."
                 ) from error
@@ -79,7 +84,7 @@ class ServersRepository:
             row.upstream_url = str(config.upstream_url)
             row.verify_upstream_tls = config.verify_upstream_tls
             row.forward_client_credentials = config.forward_client_credentials
-            row.auth = config_to_auth_payload(config)
+            row.auth_provider = config.auth_provider
             row.updated_at = datetime.now(UTC)
             await session.commit()
         return config
@@ -91,3 +96,11 @@ class ServersRepository:
             if result.rowcount == 0:
                 raise ServerNotFound(f"Unknown MCP server '{name}'.")
             await session.commit()
+
+
+def _is_foreign_key_violation(error: IntegrityError) -> bool:
+    original = error.orig
+    return bool(
+        getattr(original, "sqlstate", None) == "23503"
+        or "foreign key" in str(original).lower()
+    )

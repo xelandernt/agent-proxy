@@ -7,6 +7,7 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from proxy.app.usage.models import UsageEvent
+from proxy.app.usage.types import UsageBucket
 
 RowT = TypeVar("RowT")
 
@@ -116,7 +117,7 @@ class UsageRepository:
         server_name: str,
         start: datetime,
         end: datetime,
-        bucket: str,
+        bucket: UsageBucket,
     ) -> list[tuple[datetime, str, str | None, str | None, int, int]]:
         """Per-bucket counts grouped by every tracking dimension.
 
@@ -158,7 +159,7 @@ class UsageRepository:
         self,
         start: datetime,
         end: datetime,
-        bucket: str,
+        bucket: UsageBucket,
     ) -> list[tuple[str, datetime, int]]:
         """Per-bucket totals for every server with events in the window.
 

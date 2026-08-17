@@ -1,17 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, BookOpenIcon, Loader2Icon } from "lucide-react";
+import { ArrowLeftIcon, Loader2Icon } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type {
 	ServerCreateRequest,
-	ServerCreateRequestAuth,
 	ServerUpdateRequest,
 } from "#/api/generated/fastAPI";
-import {
-	AuthProviderForm,
-	type AuthProviderSchema,
-} from "#/components/auth-provider-form";
+import { ProviderSelect } from "#/components/provider-select";
 import { Button } from "#/components/ui/button";
 import {
 	Card,
@@ -19,18 +15,19 @@ import {
 	CardFooter,
 	CardHeader,
 } from "#/components/ui/card";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "#/components/ui/tooltip";
 import { AdminApiError, type FieldError } from "#/lib/admin";
 import {
-	useAuthSchema,
+	useAdminAuthProviders,
 	useCreateServer,
 	useUpdateServer,
 } from "#/lib/admin-queries";
 import { cn } from "#/lib/utils";
-
-type FormState =
-	| { status: "loading" }
-	| { status: "error"; message: string }
-	| { status: "ready"; schema: AuthProviderSchema };
 
 function TextField({
 	label,
@@ -80,7 +77,7 @@ export function ServerForm({
 		name?: string;
 		description: string;
 		upstream_url: string;
-		auth: Record<string, unknown>;
+		auth_provider: string | null;
 		verify_upstream_tls: boolean;
 		forward_client_credentials: boolean;
 	};
@@ -98,42 +95,22 @@ export function ServerForm({
 	const [forwardClientCredentials, setForwardClientCredentials] = useState(
 		initial?.forward_client_credentials ?? false,
 	);
-	const [auth, setAuth] = useState<Record<string, unknown>>(
-		initial?.auth ?? {},
+	const [authProvider, setAuthProvider] = useState<string | null>(
+		initial?.auth_provider ?? null,
 	);
 	const [fieldErrors, setFieldErrors] = useState<FieldError[]>([]);
 	const [saving, setSaving] = useState(false);
-	const authSchemaQuery = useAuthSchema();
+	const providersQuery = useAdminAuthProviders();
 	const createMutation = useCreateServer();
 	const updateMutation = useUpdateServer();
-
-	const state: FormState = authSchemaQuery.isLoading
-		? { status: "loading" }
-		: authSchemaQuery.isError
-			? {
-					status: "error",
-					message:
-						authSchemaQuery.error instanceof Error
-							? authSchemaQuery.error.message
-							: String(authSchemaQuery.error),
-				}
-			: authSchemaQuery.isSuccess
-				? {
-						status: "ready",
-						schema: authSchemaQuery.data,
-					}
-				: { status: "error", message: "Could not load the form." };
 
 	const submit = async (event: FormEvent) => {
 		event.preventDefault();
 		setFieldErrors([]);
-		// The live backend schema builds this value; the API remains the
-		// authoritative validator for provider-specific field combinations.
-		const authPayload = auth as unknown as ServerCreateRequestAuth;
 		const common = {
 			description: descriptionText,
 			upstream_url: upstreamUrl,
-			auth: authPayload,
+			auth_provider: authProvider,
 			verify_upstream_tls: verifyTls,
 			forward_client_credentials: forwardClientCredentials,
 		};
@@ -166,132 +143,140 @@ export function ServerForm({
 		fieldErrors.find((entry) => entry.field === path)?.message;
 
 	return (
-		<form
-			onSubmit={submit}
-			className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8"
-		>
-			<div className="flex items-center justify-between">
-				<Link
-					to="/admin"
-					className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-				>
-					<ArrowLeftIcon className="size-3" />
-					Back to servers
-				</Link>
-				<Link
-					to="/docs"
-					className="inline-flex items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
-				>
-					<BookOpenIcon className="size-3.5" />
-					Provider Docs
-				</Link>
-			</div>
+		<TooltipProvider delayDuration={250}>
+			<form
+				onSubmit={submit}
+				className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-8"
+			>
+				<div className="flex items-center justify-between">
+					<Link
+						to="/admin"
+						className="inline-flex w-fit items-center gap-1.5 font-mono text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+					>
+						<ArrowLeftIcon className="size-3" />
+						Back to servers
+					</Link>
+				</div>
 
-			<Card>
-				<CardHeader className="flex flex-col items-start gap-2">
-					<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-3xl font-bold tracking-tight text-transparent">
-						{title}
-					</h1>
-					<p className="text-sm text-muted-foreground">{description}</p>
-				</CardHeader>
+				<Card>
+					<CardHeader className="flex flex-col items-start gap-2">
+						<h1 className="bg-gradient-to-b from-foreground to-foreground/55 bg-clip-text font-serif text-3xl font-bold tracking-tight text-transparent">
+							{title}
+						</h1>
+						<p className="text-sm text-muted-foreground">{description}</p>
+					</CardHeader>
 
-				{state.status === "loading" && (
-					<CardContent>
-						<p className="text-sm text-muted-foreground">Loading…</p>
-					</CardContent>
-				)}
-				{state.status === "error" && (
-					<CardContent>
-						<p className="text-sm text-destructive">{state.message}</p>
-					</CardContent>
-				)}
-				{state.status === "ready" && (
-					<>
-						<CardContent className="flex flex-col gap-4">
-							{mode === "create" && (
-								<TextField
-									label="Name *"
-									value={name}
-									onChange={setName}
-									placeholder="calendar"
-									error={errorFor("name")}
-								/>
-							)}
-							<TextField
-								label="Description"
-								value={descriptionText}
-								onChange={setDescriptionText}
-								placeholder="What does this server expose?"
-								error={errorFor("description")}
-							/>
-							<TextField
-								label="Upstream URL *"
-								type="url"
-								value={upstreamUrl}
-								onChange={setUpstreamUrl}
-								placeholder="http://calendar.internal:8000/mcp"
-								error={errorFor("upstream_url")}
-							/>
-							<div className="flex items-center gap-2">
-								<input
-									id="verify-tls"
-									type="checkbox"
-									checked={verifyTls}
-									onChange={(event) => setVerifyTls(event.target.checked)}
-									className="size-4 rounded border-border accent-[var(--color-primary)]"
-								/>
-								<label
-									htmlFor="verify-tls"
-									className="font-mono text-xs text-muted-foreground"
-								>
-									verify_upstream_tls
-								</label>
-							</div>
-							<div className="flex items-center gap-2">
-								<input
-									id="forward-client-credentials"
-									type="checkbox"
-									checked={forwardClientCredentials}
-									onChange={(event) =>
-										setForwardClientCredentials(event.target.checked)
-									}
-									className="size-4 rounded border-border accent-[var(--color-primary)]"
-								/>
-								<label
-									htmlFor="forward-client-credentials"
-									className="font-mono text-xs text-muted-foreground"
-								>
-									forward_client_credentials
-								</label>
-							</div>
+					{providersQuery.isLoading && (
+						<CardContent>
+							<p className="text-sm text-muted-foreground">Loading…</p>
 						</CardContent>
-
-						<div className="rounded-md border p-4">
-							<p className="mb-3 font-mono text-xs font-medium uppercase tracking-[0.2em] text-kicker">
-								Authentication
+					)}
+					{providersQuery.isError && (
+						<CardContent>
+							<p className="text-sm text-destructive">
+								{providersQuery.error instanceof Error
+									? providersQuery.error.message
+									: String(providersQuery.error)}
 							</p>
-							<AuthProviderForm
-								schema={state.schema}
-								value={auth}
-								onChange={setAuth}
-								fieldErrors={fieldErrors}
-							/>
-						</div>
+						</CardContent>
+					)}
+					{providersQuery.isSuccess && (
+						<>
+							<CardContent className="flex flex-col gap-4">
+								{mode === "create" && (
+									<TextField
+										label="Name *"
+										value={name}
+										onChange={setName}
+										placeholder="calendar"
+										error={errorFor("name")}
+									/>
+								)}
+								<TextField
+									label="Description"
+									value={descriptionText}
+									onChange={setDescriptionText}
+									placeholder="What does this server expose?"
+									error={errorFor("description")}
+								/>
+								<TextField
+									label="Upstream URL *"
+									type="url"
+									value={upstreamUrl}
+									onChange={setUpstreamUrl}
+									placeholder="http://calendar.internal:8000/mcp"
+									error={errorFor("upstream_url")}
+								/>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<label
+											htmlFor="verify-tls"
+											className="flex w-fit items-center gap-2 font-mono text-xs text-muted-foreground"
+										>
+											<input
+												id="verify-tls"
+												type="checkbox"
+												checked={verifyTls}
+												onChange={(event) => setVerifyTls(event.target.checked)}
+												className="size-4 rounded border-border accent-[var(--color-primary)]"
+											/>
+											verify_upstream_tls
+										</label>
+									</TooltipTrigger>
+									<TooltipContent side="right">
+										Verify the upstream server's TLS certificate and hostname.
+									</TooltipContent>
+								</Tooltip>
+								<ProviderSelect
+									providers={providersQuery.data}
+									value={authProvider}
+									onChange={(next) => {
+										setAuthProvider(next);
+										if (next !== null) setForwardClientCredentials(false);
+									}}
+								/>
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<label
+											htmlFor="forward-client-credentials"
+											className="flex w-fit items-center gap-2 font-mono text-xs text-muted-foreground"
+										>
+											<input
+												id="forward-client-credentials"
+												type="checkbox"
+												checked={forwardClientCredentials}
+												disabled={authProvider !== null}
+												onChange={(event) =>
+													setForwardClientCredentials(event.target.checked)
+												}
+												className="size-4 rounded border-border accent-[var(--color-primary)]"
+											/>
+											forward_client_credentials
+										</label>
+									</TooltipTrigger>
+									<TooltipContent side="right">
+										Pass the incoming Authorization header through to the
+										upstream server. This requires gateway authentication to be
+										disabled.
+									</TooltipContent>
+								</Tooltip>
+							</CardContent>
 
-						<CardFooter className="justify-end gap-2">
-							<Link to={onCancelHref}>
-								<Button type="button" variant="ghost">
-									Cancel
+							<CardFooter className="justify-end gap-2">
+								<Link to={onCancelHref}>
+									<Button type="button" variant="ghost">
+										Cancel
+									</Button>
+								</Link>
+								<Button type="submit" disabled={saving}>
+									{saving && <Loader2Icon className="size-4 animate-spin" />}
+									{mode === "create" ? "Create server" : "Save changes"}
 								</Button>
-							</Link>
-							<Button type="submit" disabled={saving}>
-								{saving && <Loader2Icon className="size-4 animate-spin" />}
-								{mode === "create" ? "Create server" : "Save changes"}
-							</Button>
-						</CardFooter>
-					</>
-				)}
-			</Card>
-		</form>
+							</CardFooter>
+						</>
+					)}
+				</Card>
+			</form>
+		</TooltipProvider>
 	);
 }

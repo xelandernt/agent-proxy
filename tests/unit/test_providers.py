@@ -35,11 +35,10 @@ from proxy.providers import (
     HuggingFaceAuthProviderConfig,
     JwtAuthProviderConfig,
     KeycloakAuthProviderConfig,
-    NoneAuthProviderConfig,
+    ManagedAuthProviderConfig,
     OciAuthProviderConfig,
     PropelAuthProviderConfig,
     ScalekitAuthProviderConfig,
-    ServerAuthProviderConfig,
     StaticCredentialsAuthProvider,
     StaticCredentialsAuthProviderConfig,
     SupabaseAuthProviderConfig,
@@ -222,7 +221,7 @@ def stub_oidc_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
     ],
 )
 def test_supported_provider_builds(
-    config: ServerAuthProviderConfig | AdminAuthProviderConfig,
+    config: ManagedAuthProviderConfig | AdminAuthProviderConfig,
     provider_type: type[AuthProvider],
 ) -> None:
     provider = load_auth_provider(
@@ -233,24 +232,16 @@ def test_supported_provider_builds(
     assert isinstance(provider, provider_type)
 
 
-def test_none_provider_builds_without_auth() -> None:
-    config = NoneAuthProviderConfig(provider="none")
-
-    assert config.build(base_url="https://gateway.example/calendar") is None
-    assert (
-        load_auth_provider(config, base_url="https://gateway.example/calendar") is None
-    )
-
-
-def test_none_provider_rejects_unknown_fields() -> None:
-    with pytest.raises(ValidationError, match="extra_forbidden"):
-        NoneAuthProviderConfig.model_validate(
-            {"provider": "none", "realm_url": "https://identity.example"}
-        )
+def test_managed_auth_schema_rejects_none_and_static() -> None:
+    adapter = TypeAdapter(ManagedAuthProviderConfig)
+    with pytest.raises(ValidationError, match="union_tag_invalid"):
+        adapter.validate_python({"provider": "none"})
+    with pytest.raises(ValidationError, match="union_tag_invalid"):
+        adapter.validate_python({"provider": "static", "credentials": {}})
 
 
-def test_server_auth_schema_exposes_only_server_providers() -> None:
-    schema = TypeAdapter(ServerAuthProviderConfig).json_schema()
+def test_managed_auth_schema_exposes_only_managed_providers() -> None:
+    schema = TypeAdapter(ManagedAuthProviderConfig).json_schema()
 
     assert set(schema["discriminator"]["mapping"]) == {
         "auth0",
@@ -264,7 +255,6 @@ def test_server_auth_schema_exposes_only_server_providers() -> None:
         "huggingface",
         "jwt",
         "keycloak",
-        "none",
         "oci",
         "propelauth",
         "scalekit",

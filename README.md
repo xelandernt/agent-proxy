@@ -25,8 +25,10 @@ was checked on 7 August 2026:
 
 ## How it works
 
-MCP servers are managed at runtime from PostgreSQL and stored in a `servers`
-table. On startup the gateway loads them, builds one isolated FastMCP proxy
+MCP servers and reusable authentication providers are managed at runtime from
+PostgreSQL and stored in `servers` and `auth_providers` tables. A server stores
+only an optional provider name; the provider definition is shared by every
+linked server. On startup the gateway loads providers first, builds one isolated FastMCP proxy
 application per server, and mounts it. The configured FastMCP `AuthProvider`
 validates the client and publishes its OAuth routes. FastMCP then forwards the
 MCP request to the configured upstream.
@@ -128,14 +130,15 @@ Registration inherit the realm's default scopes, so their tokens carry the
 same audience. Sign in again if you already held a token: the audience is
 granted when the token is issued, not before.
 
-Create the server in the admin UI at `http://localhost:3000/admin` (authenticate
-as `user` / `password`):
+Create a reusable provider in the admin UI at
+`http://localhost:3000/admin/auth-providers` (authenticate as `user` /
+`password`), then create the server at `/admin` and select that provider:
 
 | Field         | Value                                                                 |
 |---------------|-----------------------------------------------------------------------|
 | Name          | `{name}` — exposed at `http://localhost:8008/{name}/mcp`              |
 | Upstream URL  | `http://127.0.0.1:8000/mcp` to reuse the Compose example backend      |
-| Auth provider | `keycloak`                                                            |
+| Provider name | `keycloak`                                                            |
 | `realm_url`   | `http://keycloak.localhost:8080/realms/agent-proxy`                   |
 | `audience`    | `mcp` (the realm-wide audience)                                       |
 
@@ -151,18 +154,18 @@ it instead.
 
 ### Proxying an already-authenticated server
 
-If your upstream MCP server already authenticates its clients, the gateway can
-proxy it without adding any authentication of its own. Choose the `none` auth
-provider and enable `forward_client_credentials`:
+If your upstream MCP server already authenticates its clients, leave the
+server's authentication-provider link empty and enable
+`forward_client_credentials`:
 
 | Field                        | Value                            |
 |------------------------------|----------------------------------|
 | Name                         | `{name}` — exposed at `http://localhost:8008/{name}/mcp` |
 | Upstream URL                 | the URL of your authenticated server |
-| Auth provider                | `none`                           |
+| Auth provider                | absent / No gateway authentication |
 | Forward client credentials   | `true` (default `false`)         |
 
-With provider `none` the gateway publishes no OAuth routes and verifies no
+With no provider link the gateway publishes no OAuth routes and verifies no
 tokens: every request reaches the upstream, and the upstream's own responses —
 including its 401s — are relayed back unchanged. With `forward_client_credentials`
 enabled, the client's `Authorization` header is passed through to the upstream
@@ -194,7 +197,7 @@ postgresql:
 
 # Optional: the identity provider that may log in to the admin API and UI.
 # Any user authenticated against this provider is an administrator. When
-# omitted, the admin interface returns HTTP 503.
+# omitted, server management returns HTTP 503.
 admin:
   auth:
     provider: keycloak
@@ -209,19 +212,28 @@ through the admin API (`/api/admin/servers`) or the admin UI at `/admin`:
 - `PUT /api/admin/servers/{name}` — replace a server's definition live
 - `DELETE /api/admin/servers/{name}` — unmount and delete a server
 - `GET /api/admin/servers` — list mounted servers
-- `GET /api/admin/auth-schema` — JSON Schema for every supported auth provider
+- `GET /api/admin/auth-providers` — list reusable authentication providers
+- `POST /api/admin/auth-providers` — create a provider definition
+- `PUT /api/admin/auth-providers/{name}` — update a provider and all linked mounts
+- `DELETE /api/admin/auth-providers/{name}` — delete an unused provider
+- `GET /api/admin/auth-schema` — JSON Schema for creatable MCP providers
 
 A server definition carries a `name` (immutable, unique), `description`,
 `upstream_url`, `verify_upstream_tls`, an optional
-`forward_client_credentials` flag, and an `auth` provider configuration.
+`forward_client_credentials` flag, and an optional `auth_provider` name. A
+null `auth_provider` means no gateway authentication; it is the only mode that
+can enable credential forwarding.
 The public endpoint for a server named `calendar` is
 `https://mcp.example.com/calendar/mcp`. The gateway supplies
 `https://mcp.example.com/calendar` as the provider's `base_url`; it is not a
 configurable authentication field.
 
-`auth` is a discriminated union of fully typed provider configurations.
+Provider resources carry `auth`, a discriminated union of fully typed provider
+configurations. Server payloads never carry inline provider configuration.
 Provider-specific required fields and secrets are validated on every write, so
-the API cannot accept a configuration that would fail at mount time. Supported
+the API cannot accept a configuration that would fail at mount time. Credential
+fields are write-only: provider responses omit them, and editing a provider
+requires entering replacement values. Supported
 provider discriminators are:
 
 | Integration           | `provider`    |
@@ -237,7 +249,6 @@ provider discriminators are:
 | Hugging Face          | `huggingface` |
 | JWT/JWKS verification | `jwt`         |
 | Keycloak              | `keycloak`    |
-| No authentication     | `none`        |
 | OCI IAM               | `oci`         |
 | PropelAuth            | `propelauth`  |
 | Scalekit              | `scalekit`    |
@@ -250,6 +261,12 @@ fields and OAuth behavior. Keycloak 26.6.0 or newer supports the remote OAuth
 pattern with Dynamic Client Registration, so native interactive clients can
 register without manual client configuration. Other providers may require a
 gateway OAuth client as documented by FastMCP.
+
+This breaking release has no database migration or compatibility layer.
+Existing databases containing `servers.auth` must be recreated so the fresh
+schema can create `auth_providers` and the nullable `servers.auth_provider`
+foreign key. Provider names are immutable, and a provider linked to any server
+cannot be deleted.
 
 Configuration is loaded from `.proxy/config.yaml`. Set `PROXY_CONFIG_FILE` to
 use another file. Environment variables use the `PROXY__` prefix and `__` as

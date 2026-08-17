@@ -11,7 +11,7 @@ from pydantic import TypeAdapter
 
 import proxy.servers.app as servers_app_module
 from proxy.app.main import MCP_PROTOCOL_VERSION, create_app
-from proxy.providers import ServerAuthProviderConfig
+from proxy.providers import ManagedAuthProviderConfig
 from proxy.servers.models import McpServerConfig
 from proxy.settings import GatewayConfig
 from proxy.transport import create_upstream_transport
@@ -100,11 +100,7 @@ def server_config(upstream_url: str = "http://127.0.0.1:9/mcp") -> McpServerConf
         {
             "name": "calendar",
             "upstream_url": upstream_url,
-            "auth": {
-                "provider": "keycloak",
-                "realm_url": "https://identity.example/realms/test",
-                "required_scopes": ["mcp"],
-            },
+            "auth_provider": "keycloak",
         }
     )
 
@@ -112,7 +108,7 @@ def server_config(upstream_url: str = "http://127.0.0.1:9/mcp") -> McpServerConf
 @pytest.fixture(autouse=True)
 def use_static_auth_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     def load_static_provider(
-        _config: ServerAuthProviderConfig,
+        _config: ManagedAuthProviderConfig,
         *,
         base_url: str,
     ) -> StaticAuthProvider:
@@ -278,7 +274,7 @@ def none_server() -> McpServerConfig:
         {
             "name": "relay",
             "upstream_url": "http://127.0.0.1:9/mcp",
-            "auth": {"provider": "none"},
+            "auth_provider": None,
             "forward_client_credentials": True,
         }
     )

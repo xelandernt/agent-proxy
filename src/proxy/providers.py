@@ -586,13 +586,6 @@ class WorkOsAuthProviderConfig(_OAuthProxyAuthProviderConfig):
         )
 
 
-class NoneAuthProviderConfig(_AuthProviderConfig):
-    provider: Literal["none"]
-
-    def build(self, *, base_url: str) -> AuthProvider | None:
-        return None
-
-
 class JwtAuthProviderConfig(_AuthProviderConfig):
     provider: Literal["jwt"]
     public_key: str | None = None
@@ -762,7 +755,7 @@ class StaticCredentialsAuthProviderConfig(_AuthProviderConfig):
         )
 
 
-ServerAuthProviderConfig = Annotated[
+ManagedAuthProviderConfig = Annotated[
     Auth0AuthProviderConfig
     | AuthKitAuthProviderConfig
     | AwsCognitoAuthProviderConfig
@@ -774,7 +767,6 @@ ServerAuthProviderConfig = Annotated[
     | HuggingFaceAuthProviderConfig
     | JwtAuthProviderConfig
     | KeycloakAuthProviderConfig
-    | NoneAuthProviderConfig
     | OciAuthProviderConfig
     | PropelAuthProviderConfig
     | ScalekitAuthProviderConfig
@@ -782,7 +774,6 @@ ServerAuthProviderConfig = Annotated[
     | WorkOsAuthProviderConfig,
     Field(discriminator="provider"),
 ]
-
 
 AdminAuthProviderConfig = Annotated[
     AwsCognitoAdminAuthProviderConfig
@@ -795,10 +786,10 @@ AdminAuthProviderConfig = Annotated[
 
 @overload
 def load_auth_provider(
-    config: ServerAuthProviderConfig,
+    config: ManagedAuthProviderConfig,
     *,
     base_url: str,
-) -> AuthProvider | None: ...
+) -> AuthProvider: ...
 
 
 @overload
@@ -810,18 +801,22 @@ def load_auth_provider(
 
 
 def load_auth_provider(
-    config: ServerAuthProviderConfig | AdminAuthProviderConfig,
+    config: ManagedAuthProviderConfig | AdminAuthProviderConfig,
     *,
     base_url: str,
-) -> AuthProvider | None:
+) -> AuthProvider:
     """Construct a FastMCP provider from a fully validated typed configuration.
 
-    Returns ``None`` for the ``none`` provider, which performs no
-    authentication at the gateway.
+    The managed provider union contains only authenticated MCP providers.
     """
 
     try:
-        return config.build(base_url=base_url)
+        provider = config.build(base_url=base_url)
+        if provider is None:
+            raise AuthProviderLoadError(
+                f"'{config.provider}' did not construct an auth provider"
+            )
+        return provider
     except Exception as error:
         raise AuthProviderLoadError(
             f"Could not construct '{config.provider}' auth provider: {error}"

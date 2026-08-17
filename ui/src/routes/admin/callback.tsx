@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Skeleton } from "#/components/ui/skeleton";
 import {
 	completeOAuthLogin,
@@ -18,8 +18,11 @@ export const Route = createFileRoute("/admin/callback")({
 function AdminCallback() {
 	const navigate = useNavigate();
 	const search = Route.useSearch();
+	const started = useRef(false);
 
 	useEffect(() => {
+		if (started.current) return;
+		started.current = true;
 		const code = search.code ?? "";
 		(async () => {
 			try {

@@ -74,6 +74,11 @@
             "schema": {
               "anyOf": [
                 {
+                  "enum": [
+                    "minute",
+                    "hour",
+                    "day"
+                  ],
                   "type": "string"
                 },
                 {
@@ -244,6 +249,11 @@
             "schema": {
               "anyOf": [
                 {
+                  "enum": [
+                    "minute",
+                    "hour",
+                    "day"
+                  ],
                   "type": "string"
                 },
                 {
@@ -605,6 +615,155 @@
           }
         }
       }
+    },
+    "/api/admin/auth-providers": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Auth Providers",
+        "operationId": "list_auth_providers_api_admin_auth_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuthProviderView"
+                  },
+                  "type": "array",
+                  "title": "Response List Auth Providers Api Admin Auth Providers Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Auth Provider",
+        "operationId": "create_auth_provider_api_admin_auth_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthProviderCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthProviderView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/auth-providers/{name}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Auth Provider",
+        "operationId": "update_auth_provider_api_admin_auth_providers__name__put",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthProviderUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthProviderView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Auth Provider",
+        "operationId": "delete_auth_provider_api_admin_auth_providers__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -887,6 +1046,201 @@
           "authkit_domain"
         ],
         "title": "AuthKitAuthProviderConfig"
+      },
+      "AuthProviderCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Name"
+          },
+          "auth": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/JwtAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OciAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/PropelAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            ],
+            "title": "Auth",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
+                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
+                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
+                "azure": "#/components/schemas/AzureAuthProviderConfig",
+                "descope": "#/components/schemas/DescopeAuthProviderConfig",
+                "discord": "#/components/schemas/DiscordAuthProviderConfig",
+                "github": "#/components/schemas/GitHubAuthProviderConfig",
+                "google": "#/components/schemas/GoogleAuthProviderConfig",
+                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
+                "jwt": "#/components/schemas/JwtAuthProviderConfig",
+                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "oci": "#/components/schemas/OciAuthProviderConfig",
+                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
+                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
+                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
+                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "auth"
+        ],
+        "title": "AuthProviderCreateRequest"
+      },
+      "AuthProviderUpdateRequest": {
+        "properties": {
+          "auth": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/JwtAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OciAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/PropelAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            ],
+            "title": "Auth",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
+                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
+                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
+                "azure": "#/components/schemas/AzureAuthProviderConfig",
+                "descope": "#/components/schemas/DescopeAuthProviderConfig",
+                "discord": "#/components/schemas/DiscordAuthProviderConfig",
+                "github": "#/components/schemas/GitHubAuthProviderConfig",
+                "google": "#/components/schemas/GoogleAuthProviderConfig",
+                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
+                "jwt": "#/components/schemas/JwtAuthProviderConfig",
+                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
+                "oci": "#/components/schemas/OciAuthProviderConfig",
+                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
+                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
+                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
+                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "auth"
+        ],
+        "title": "AuthProviderUpdateRequest"
+      },
+      "AuthProviderView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "auth": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Auth"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "auth"
+        ],
+        "title": "AuthProviderView",
+        "description": "Admin representation with credential fields omitted."
       },
       "AwsCognitoAuthProviderConfig": {
         "properties": {
@@ -2479,21 +2833,6 @@
         "title": "McpServersDocument",
         "description": "The ``/.well-known/mcp-servers`` discovery document."
       },
-      "NoneAuthProviderConfig": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "const": "none",
-            "title": "Provider"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider"
-        ],
-        "title": "NoneAuthProviderConfig"
-      },
       "OciAuthProviderConfig": {
         "properties": {
           "resource_base_url": {
@@ -3013,6 +3352,11 @@
           },
           "bucket": {
             "type": "string",
+            "enum": [
+              "minute",
+              "hour",
+              "day"
+            ],
             "title": "Bucket"
           },
           "points": {
@@ -3055,83 +3399,18 @@
             "format": "uri",
             "title": "Upstream Url"
           },
-          "auth": {
-            "oneOf": [
+          "auth_provider": {
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
               },
               {
-                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/AzureAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/JwtAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/NoneAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/OciAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/PropelAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+                "type": "null"
               }
             ],
-            "title": "Auth",
-            "discriminator": {
-              "propertyName": "provider",
-              "mapping": {
-                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
-                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
-                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
-                "azure": "#/components/schemas/AzureAuthProviderConfig",
-                "descope": "#/components/schemas/DescopeAuthProviderConfig",
-                "discord": "#/components/schemas/DiscordAuthProviderConfig",
-                "github": "#/components/schemas/GitHubAuthProviderConfig",
-                "google": "#/components/schemas/GoogleAuthProviderConfig",
-                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
-                "jwt": "#/components/schemas/JwtAuthProviderConfig",
-                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
-                "none": "#/components/schemas/NoneAuthProviderConfig",
-                "oci": "#/components/schemas/OciAuthProviderConfig",
-                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
-                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
-                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
-                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
-              }
-            }
+            "title": "Auth Provider"
           },
           "verify_upstream_tls": {
             "type": "boolean",
@@ -3148,8 +3427,7 @@
         "type": "object",
         "required": [
           "name",
-          "upstream_url",
-          "auth"
+          "upstream_url"
         ],
         "title": "ServerCreateRequest",
         "description": "Payload for creating a server."
@@ -3191,83 +3469,18 @@
             "format": "uri",
             "title": "Upstream Url"
           },
-          "auth": {
-            "oneOf": [
+          "auth_provider": {
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
               },
               {
-                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/AzureAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/JwtAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/NoneAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/OciAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/PropelAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+                "type": "null"
               }
             ],
-            "title": "Auth",
-            "discriminator": {
-              "propertyName": "provider",
-              "mapping": {
-                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
-                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
-                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
-                "azure": "#/components/schemas/AzureAuthProviderConfig",
-                "descope": "#/components/schemas/DescopeAuthProviderConfig",
-                "discord": "#/components/schemas/DiscordAuthProviderConfig",
-                "github": "#/components/schemas/GitHubAuthProviderConfig",
-                "google": "#/components/schemas/GoogleAuthProviderConfig",
-                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
-                "jwt": "#/components/schemas/JwtAuthProviderConfig",
-                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
-                "none": "#/components/schemas/NoneAuthProviderConfig",
-                "oci": "#/components/schemas/OciAuthProviderConfig",
-                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
-                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
-                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
-                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
-              }
-            }
+            "title": "Auth Provider"
           },
           "verify_upstream_tls": {
             "type": "boolean",
@@ -3283,8 +3496,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "upstream_url",
-          "auth"
+          "upstream_url"
         ],
         "title": "ServerUpdateRequest",
         "description": "Payload for updating a server; the name is immutable."
@@ -3303,83 +3515,16 @@
             "type": "string",
             "title": "Upstream Url"
           },
-          "auth": {
-            "oneOf": [
+          "auth_provider": {
+            "anyOf": [
               {
-                "$ref": "#/components/schemas/Auth0AuthProviderConfig"
+                "type": "string"
               },
               {
-                "$ref": "#/components/schemas/AuthKitAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/AwsCognitoAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/AzureAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/DescopeAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/DiscordAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/GitHubAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/GoogleAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/HuggingFaceAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/JwtAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/KeycloakAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/NoneAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/OciAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/PropelAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/ScalekitAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/SupabaseAuthProviderConfig"
-              },
-              {
-                "$ref": "#/components/schemas/WorkOsAuthProviderConfig"
+                "type": "null"
               }
             ],
-            "title": "Auth",
-            "discriminator": {
-              "propertyName": "provider",
-              "mapping": {
-                "auth0": "#/components/schemas/Auth0AuthProviderConfig",
-                "authkit": "#/components/schemas/AuthKitAuthProviderConfig",
-                "aws-cognito": "#/components/schemas/AwsCognitoAuthProviderConfig",
-                "azure": "#/components/schemas/AzureAuthProviderConfig",
-                "descope": "#/components/schemas/DescopeAuthProviderConfig",
-                "discord": "#/components/schemas/DiscordAuthProviderConfig",
-                "github": "#/components/schemas/GitHubAuthProviderConfig",
-                "google": "#/components/schemas/GoogleAuthProviderConfig",
-                "huggingface": "#/components/schemas/HuggingFaceAuthProviderConfig",
-                "jwt": "#/components/schemas/JwtAuthProviderConfig",
-                "keycloak": "#/components/schemas/KeycloakAuthProviderConfig",
-                "none": "#/components/schemas/NoneAuthProviderConfig",
-                "oci": "#/components/schemas/OciAuthProviderConfig",
-                "propelauth": "#/components/schemas/PropelAuthProviderConfig",
-                "scalekit": "#/components/schemas/ScalekitAuthProviderConfig",
-                "supabase": "#/components/schemas/SupabaseAuthProviderConfig",
-                "workos": "#/components/schemas/WorkOsAuthProviderConfig"
-              }
-            }
+            "title": "Auth Provider"
           },
           "verify_upstream_tls": {
             "type": "boolean",
@@ -3395,12 +3540,12 @@
           "name",
           "description",
           "upstream_url",
-          "auth",
+          "auth_provider",
           "verify_upstream_tls",
           "forward_client_credentials"
         ],
         "title": "ServerView",
-        "description": "Admin-facing server representation with secrets masked."
+        "description": "Admin-facing server representation."
       },
       "SessionRequest": {
         "properties": {

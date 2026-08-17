@@ -10,8 +10,8 @@ function AdminNew() {
 			title="New server"
 			description="The new endpoint becomes live on the gateway immediately after creation."
 			mode="create"
-			onDone={() => navigate({ to: "/admin" })}
-			onCancelHref="/admin"
+			onDone={() => navigate({ to: "/" })}
+			onCancelHref="/"
 		/>
 	);
 }

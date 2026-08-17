@@ -46,6 +46,26 @@ def test_extract_usage_event_tracks_tool_call_name() -> None:
     )
 
 
+def test_extract_usage_event_tracks_initialize_client_info() -> None:
+    payload = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2026-07-28",
+                "capabilities": {},
+                "clientInfo": {"name": "codex", "version": "0.147.0"},
+            },
+        }
+    ).encode()
+
+    event = extract_usage_event(payload)
+
+    assert event is not None
+    assert event.client_app == "codex"
+
+
 def test_extract_usage_event_tracks_resource_uri() -> None:
     event = extract_usage_event(modern_payload("resources/read", uri="file:///notes"))
 

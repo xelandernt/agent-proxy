@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, BookOpenIcon, ServerCogIcon } from "lucide-react";
+import { ArrowLeftIcon, BookOpenIcon } from "lucide-react";
 
 import { Button } from "#/components/ui/button";
 import { FIELD_TOOLTIPS } from "#/lib/provider-docs/fields";
@@ -69,12 +69,6 @@ export function ProviderGuidePage({ guide }: { guide: ProviderGuide }) {
 					<ArrowLeftIcon className="size-3" />
 					All provider guides
 				</Link>
-				<Link to="/admin">
-					<Button variant="ghost" size="sm">
-						<ServerCogIcon className="size-3.5" />
-						Manage servers
-					</Button>
-				</Link>
 			</div>
 
 			<header className="island-shell rounded-2xl p-8">
@@ -112,13 +106,31 @@ export function ProviderGuidePage({ guide }: { guide: ProviderGuide }) {
 					Fill out the proxy form
 				</h2>
 				<p className="mb-6 text-sm text-[var(--sea-ink-soft)]">
-					In the gateway admin, open{" "}
-					<Link to="/admin/new" className="underline underline-offset-2">
-						New server
-					</Link>{" "}
-					and pick <code className="text-xs">{guide.id}</code> as the provider.
-					Every field below shows how to fill it in; the same text appears as a
-					tooltip next to each field in the form.
+					{guide.id === "none" ? (
+						<>
+							In the gateway admin, open the{" "}
+							<Link to="/admin/new" className="underline underline-offset-2">
+								New server
+							</Link>{" "}
+							form and leave gateway authentication disabled. Every field below
+							shows how to fill it in; the same text appears as a tooltip next
+							to each field in the form.
+						</>
+					) : (
+						<>
+							In the gateway admin, open the{" "}
+							<Link
+								to="/admin/auth-providers/new"
+								search={{ provider: guide.id }}
+								className="underline underline-offset-2"
+							>
+								New provider
+							</Link>{" "}
+							form for <code className="text-xs">{guide.id}</code>. Every field
+							below shows how to fill it in; the same text appears as a tooltip
+							next to each field in the form.
+						</>
+					)}
 				</p>
 				<div>
 					{guide.fields.map((entry) => (
@@ -128,12 +140,21 @@ export function ProviderGuidePage({ guide }: { guide: ProviderGuide }) {
 			</section>
 
 			<div className="flex justify-center pb-4">
-				<Link to="/admin/new">
-					<Button size="lg">
-						<BookOpenIcon className="size-4" />
-						Open the form and add this server
-					</Button>
-				</Link>
+				{guide.id === "none" ? (
+					<Link to="/admin/new">
+						<Button size="lg">
+							<BookOpenIcon className="size-4" />
+							Open the form and add this server
+						</Button>
+					</Link>
+				) : (
+					<Link to="/admin/auth-providers/new" search={{ provider: guide.id }}>
+						<Button size="lg">
+							<BookOpenIcon className="size-4" />
+							Open the form and add this provider
+						</Button>
+					</Link>
+				)}
 			</div>
 		</div>
 	);
