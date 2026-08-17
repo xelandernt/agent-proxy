@@ -146,7 +146,11 @@ async def test_update_start_failure_leaves_persistence_and_runtime_unchanged(
         async def stop(self) -> None:
             return None
 
-    monkeypatch.setattr(manager._factory, "create", lambda _config: FailingApp())
+    monkeypatch.setattr(
+        manager._factory,
+        "create",
+        lambda _config, _auth: FailingApp(),
+    )
 
     with pytest.raises(RuntimeError, match="replacement failed"):
         await manager.update("calendar", replacement)
