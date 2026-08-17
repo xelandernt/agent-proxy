@@ -11,6 +11,8 @@ from tests.support import StaticAuthProvider
 
 REALM_URL = "https://identity.example/realms/test"
 UI_CLIENT_ID = "admin"
+COGNITO_ISSUER = "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_test"
+COGNITO_CLIENT_ID = "cognito-admin"
 STATIC_USERNAME = "admin"
 STATIC_PASSWORD = "hunter2"
 STATIC_SECRET = "a-very-long-random-secret-at-least-32-bytes"
@@ -43,6 +45,23 @@ def keycloak_config() -> GatewayConfig:
                     "provider": "keycloak",
                     "realm_url": REALM_URL,
                     "client_id": UI_CLIENT_ID,
+                }
+            },
+        }
+    )
+
+
+@pytest.fixture()
+def cognito_config() -> GatewayConfig:
+    return GatewayConfig.model_validate(
+        {
+            "public_base_url": "https://gateway.example",
+            "admin": {
+                "auth": {
+                    "provider": "aws-cognito",
+                    "user_pool_id": "eu-central-1_test",
+                    "client_id": COGNITO_CLIENT_ID,
+                    "aws_region": "eu-central-1",
                 }
             },
         }
@@ -117,6 +136,19 @@ def test_auth_status_describes_keycloak_browser_flow(
     assert response.json() == {
         "provider": "keycloak",
         "oauth": {"issuer": REALM_URL, "client_id": UI_CLIENT_ID},
+    }
+
+
+def test_auth_status_describes_cognito_browser_flow(
+    cognito_config: GatewayConfig,
+) -> None:
+    with boot(cognito_config) as client:
+        response = client.get("/api/admin/auth-status")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "aws-cognito",
+        "oauth": {"issuer": COGNITO_ISSUER, "client_id": COGNITO_CLIENT_ID},
     }
 
 

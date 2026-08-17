@@ -622,6 +622,72 @@ class JwtAuthProviderConfig(_AuthProviderConfig):
         )
 
 
+class CognitoAdminAuthProvider(JWTVerifier):
+    """Verify access tokens issued for one Cognito app client."""
+
+    def __init__(
+        self,
+        *,
+        client_id: str,
+        jwks_uri: str,
+        issuer: str,
+        required_scopes: list[str] | None,
+        base_url: str,
+        ssrf_safe: bool,
+    ) -> None:
+        self._client_id = client_id
+        super().__init__(
+            jwks_uri=jwks_uri,
+            issuer=issuer,
+            algorithm="RS256",
+            required_scopes=required_scopes,
+            base_url=base_url,
+            ssrf_safe=ssrf_safe,
+        )
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        access_token = await super().verify_token(token)
+        if access_token is None:
+            return None
+        if access_token.claims.get("token_use") != "access":
+            return None
+        if access_token.claims.get("client_id") != self._client_id:
+            return None
+        return access_token
+
+
+class AwsCognitoAdminAuthProviderConfig(_AuthProviderConfig):
+    """Admin authentication through a Cognito public OAuth client."""
+
+    provider: Literal["aws-cognito"]
+    user_pool_id: str
+    client_id: str
+    aws_region: str = "eu-central-1"
+    issuer_url: AnyHttpUrl | None = None
+    required_scopes: list[str] | None = None
+
+    @property
+    def resolved_issuer(self) -> str:
+        """Return the issuer used by Cognito's OIDC metadata and JWTs."""
+
+        if self.issuer_url is not None:
+            return str(self.issuer_url).rstrip("/")
+        return (
+            f"https://cognito-idp.{self.aws_region}.amazonaws.com/{self.user_pool_id}"
+        )
+
+    def build(self, *, base_url: str) -> AuthProvider:
+        issuer = self.resolved_issuer
+        return CognitoAdminAuthProvider(
+            client_id=self.client_id,
+            jwks_uri=f"{issuer}/.well-known/jwks.json",
+            issuer=issuer,
+            required_scopes=self.required_scopes,
+            base_url=base_url,
+            ssrf_safe=True,
+        )
+
+
 class StaticCredentialsAuthProvider(AuthProvider):
     """Admin password authentication via gateway-signed HS256 JWTs.
 
@@ -719,7 +785,8 @@ ServerAuthProviderConfig = Annotated[
 
 
 AdminAuthProviderConfig = Annotated[
-    JwtAuthProviderConfig
+    AwsCognitoAdminAuthProviderConfig
+    | JwtAuthProviderConfig
     | KeycloakAuthProviderConfig
     | StaticCredentialsAuthProviderConfig,
     Field(discriminator="provider"),

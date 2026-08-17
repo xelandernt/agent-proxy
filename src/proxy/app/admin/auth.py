@@ -9,6 +9,7 @@ from fastapi import HTTPException, Request, Response, status
 from fastmcp.server.auth import AuthProvider
 
 from proxy.providers import (
+    AwsCognitoAdminAuthProviderConfig,
     KeycloakAuthProviderConfig,
     load_auth_provider,
 )
@@ -128,7 +129,12 @@ def build_admin_provider(
         return None
     base_url = f"{public_base_url.rstrip('/')}/admin"
     oauth_browser_flow: AdminOAuthBrowserFlow | None = None
-    if (
+    if isinstance(admin.auth, AwsCognitoAdminAuthProviderConfig):
+        oauth_browser_flow = AdminOAuthBrowserFlow(
+            issuer=admin.auth.resolved_issuer,
+            client_id=admin.auth.client_id,
+        )
+    elif (
         isinstance(admin.auth, KeycloakAuthProviderConfig)
         and admin.auth.client_id is not None
     ):

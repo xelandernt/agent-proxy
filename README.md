@@ -272,8 +272,8 @@ Logfire remains local and does not export telemetry.
 ### Admin authentication and the browser login flow
 
 The admin identity boundary uses an explicit admin provider contract:
-`keycloak` for browser sign-in, `jwt` for pasted tokens, or `static` for a
-gateway-owned username and password. Every
+`keycloak` or `aws-cognito` for browser sign-in, `jwt` for pasted tokens, or
+`static` for a gateway-owned username and password. Every
 protected admin endpoint validates the session cookie or
 `Authorization: Bearer <token>` through the provider.
 
@@ -285,6 +285,28 @@ The UI exchanges the resulting code for the realm-issued access token and
 attaches it to admin API calls, which the gateway verifies against the realm's
 JWKS — the same token is accepted whether it arrives via the browser flow or
 is pasted in manually.
+
+For `aws-cognito`, configure a Cognito user pool app client as a **public**
+client with the authorization-code grant and PKCE enabled. Add
+`{ui-origin}/admin/callback` to its allowed callback URLs and configure its
+managed login domain. The gateway derives the Cognito issuer and JWKS endpoint
+from `user_pool_id` and `aws_region`; set `issuer_url` only when the pool uses a
+different Cognito issuer configuration. The gateway verifies the RS256
+signature, `token_use: access`, Cognito issuer, and configured app-client ID.
+
+```yaml
+admin:
+  auth:
+    provider: aws-cognito
+    user_pool_id: eu-central-1_XXXXXXXXX
+    client_id: your-public-cognito-app-client
+    aws_region: eu-central-1
+```
+
+The Cognito authorization code flow is performed directly by the browser with
+PKCE; the client secret used by the server-side MCP `aws-cognito` provider must
+not be configured for this admin client. Include the UI origin in
+`middleware.cors.origins`.
 
 ```yaml
 admin:

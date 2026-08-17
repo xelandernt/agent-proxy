@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from fastmcp.server.auth import AuthProvider
+from fastmcp.server.auth import AccessToken, AuthProvider
 from fastmcp.server.auth.oidc_proxy import OIDCConfiguration
 from fastmcp.server.auth.providers.auth0 import Auth0Provider
 from fastmcp.server.auth.providers.aws import AWSCognitoProvider
@@ -24,8 +24,10 @@ from proxy.providers import (
     AdminAuthProviderConfig,
     Auth0AuthProviderConfig,
     AuthKitAuthProviderConfig,
+    AwsCognitoAdminAuthProviderConfig,
     AwsCognitoAuthProviderConfig,
     AzureAuthProviderConfig,
+    CognitoAdminAuthProvider,
     DescopeAuthProviderConfig,
     DiscordAuthProviderConfig,
     GitHubAuthProviderConfig,
@@ -275,10 +277,65 @@ def test_admin_auth_schema_exposes_only_admin_flows() -> None:
     schema = TypeAdapter(AdminAuthProviderConfig).json_schema()
 
     assert set(schema["discriminator"]["mapping"]) == {
+        "aws-cognito",
         "jwt",
         "keycloak",
         "static",
     }
+
+
+def test_cognito_admin_provider_builds_with_derived_issuer() -> None:
+    config = AwsCognitoAdminAuthProviderConfig(
+        provider="aws-cognito",
+        user_pool_id="eu-central-1_example",
+        client_id="admin-client",
+    )
+
+    provider = load_auth_provider(
+        config,
+        base_url="https://gateway.example/admin",
+    )
+
+    assert isinstance(provider, CognitoAdminAuthProvider)
+    assert config.resolved_issuer == (
+        "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_example"
+    )
+    assert provider.issuer == config.resolved_issuer
+    assert provider.jwks_uri == f"{config.resolved_issuer}/.well-known/jwks.json"
+
+
+@pytest.mark.asyncio
+async def test_cognito_admin_provider_requires_access_token_for_configured_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    claims: dict[str, object] = {}
+
+    async def fake_verify(_self: JWTVerifier, _token: str):
+        return AccessToken(
+            token="token",
+            client_id="client",
+            scopes=[],
+            claims=claims,
+        )
+
+    monkeypatch.setattr(JWTVerifier, "verify_token", fake_verify)
+    provider = CognitoAdminAuthProvider(
+        client_id="admin-client",
+        jwks_uri="https://cognito.example/jwks.json",
+        issuer="https://cognito.example/pool",
+        required_scopes=None,
+        base_url="https://gateway.example/admin",
+        ssrf_safe=True,
+    )
+
+    claims.update({"token_use": "access", "client_id": "admin-client"})
+    assert await provider.verify_token("token") is not None
+
+    claims.update({"token_use": "id", "client_id": "admin-client"})
+    assert await provider.verify_token("token") is None
+
+    claims.update({"token_use": "access", "client_id": "other-client"})
+    assert await provider.verify_token("token") is None
 
 
 def test_provider_rejects_unknown_fields() -> None:
