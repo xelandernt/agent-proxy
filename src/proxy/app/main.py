@@ -12,6 +12,7 @@ from proxy.app.admin.endpoints import (
     public_router as admin_public_router,
 )
 from proxy.app.admin.endpoints import router as admin_router
+from proxy.app.health import router as health_router
 from proxy.app.usage.endpoints import router as usage_router
 from proxy.app.usage.middleware import UsageRecorder
 from proxy.app.well_known import router as well_known_router
@@ -68,6 +69,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
         allow_headers=cors.allow_headers,
     )
     gateway.include_router(well_known_router)
+    gateway.include_router(health_router)
     gateway.include_router(usage_router)
     gateway.include_router(admin_public_router)
     gateway.include_router(admin_router)

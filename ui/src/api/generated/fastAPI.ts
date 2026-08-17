@@ -415,6 +415,14 @@ export interface HTTPValidationError {
   detail?: ValidationError[];
 }
 
+/**
+ * Successful gateway health-check response.
+ */
+export const HealthResponseValue = {
+  status: "ok",
+} as const;
+export type HealthResponse = typeof HealthResponseValue;
+
 export type HuggingFaceAuthProviderConfigResourceBaseUrl = string | null;
 
 export type HuggingFaceAuthProviderConfigIssuerUrl = string | null;
@@ -687,6 +695,16 @@ export interface SeriesPoint {
   total: number;
 }
 
+export type SeriesReportBucket =
+  (typeof SeriesReportBucket)[keyof typeof SeriesReportBucket];
+
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const SeriesReportBucket = {
+  minute: "minute",
+  hour: "hour",
+  day: "day",
+} as const;
+
 /**
  * Request volumes for one MCP server bucketed over a time window.
  */
@@ -694,7 +712,7 @@ export interface SeriesReport {
   server: string;
   start: string;
   end: string;
-  bucket: "minute" | "hour" | "day";
+  bucket: SeriesReportBucket;
   points: SeriesBucket[];
 }
 
@@ -950,6 +968,42 @@ export const mcpServersWellKnownMcpServersGet = async (
     status: res.status,
     headers: res.headers,
   } as mcpServersWellKnownMcpServersGetResponse;
+};
+
+/**
+ * Report that the gateway process is running.
+ * @summary Healthz
+ */
+export type healthzHealthzGetResponse200 = {
+  data: HealthResponse;
+  status: 200;
+};
+
+export type healthzHealthzGetResponseSuccess = healthzHealthzGetResponse200 & {
+  headers: Headers;
+};
+export type healthzHealthzGetResponse = healthzHealthzGetResponseSuccess;
+
+export const getHealthzHealthzGetUrl = () => {
+  return `/healthz`;
+};
+
+export const healthzHealthzGet = async (
+  options?: RequestInit,
+): Promise<healthzHealthzGetResponse> => {
+  const res = await fetch(getHealthzHealthzGetUrl(), {
+    ...options,
+    method: "GET",
+  });
+
+  const body = [204, 205, 304].includes(res.status) ? null : await res.text();
+
+  const data: healthzHealthzGetResponse["data"] = body ? JSON.parse(body) : {};
+  return {
+    data,
+    status: res.status,
+    headers: res.headers,
+  } as healthzHealthzGetResponse;
 };
 
 /**

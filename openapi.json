@@ -24,6 +24,25 @@
         }
       }
     },
+    "/healthz": {
+      "get": {
+        "summary": "Healthz",
+        "description": "Report that the gateway process is running.",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/servers/series": {
       "get": {
         "tags": [
@@ -2352,6 +2371,21 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "description": "Successful gateway health-check response."
       },
       "HuggingFaceAuthProviderConfig": {
         "properties": {

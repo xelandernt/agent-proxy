@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 
 class Base(DeclarativeBase):
@@ -16,7 +17,11 @@ class Base(DeclarativeBase):
 def create_engine(database_url: str) -> AsyncEngine:
     """Create the asynchronous SQLAlchemy engine for a PostgreSQL DSN."""
 
-    return create_async_engine(database_url, pool_pre_ping=True)
+    return create_async_engine(
+        database_url,
+        poolclass=NullPool,
+        pool_pre_ping=True,
+    )
 
 
 def create_session_factory(

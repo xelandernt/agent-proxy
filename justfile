@@ -39,12 +39,6 @@ hook:
 unhook:
     uv run prek uninstall
 
-# publish project on pypi
-publish:
-    rm -rf dist
-    uv build
-    uv publish --token $PYPI_TOKEN
-
 # generate configuration schema
 config-schema:
     uv run proxy config-schema ./resources/config.schema.json
