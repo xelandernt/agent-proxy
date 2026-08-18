@@ -550,6 +550,8 @@ export const McpServerListingAuth = {
   none: "none",
 } as const;
 
+export type McpServerListingAuthProviderType = string | null;
+
 /**
  * One publicly discoverable MCP server mounted by the gateway.
  */
@@ -558,6 +560,7 @@ export interface McpServerListing {
   description: string;
   url: string;
   auth: McpServerListingAuth;
+  auth_provider_type?: McpServerListingAuthProviderType;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { ItemCount, SeriesBucket } from "#/lib/mcp";
+import type { ItemCount, SeriesBucket, SeriesReport } from "#/lib/mcp";
 
 export type UsageDimension =
 	| "total"
@@ -12,9 +12,24 @@ export function rowsFor(
 	dimension: UsageDimension,
 ): ItemCount[] {
 	if (dimension === "total") {
-		return point.total > 0 ? [{ name: "requests", count: point.total }] : [];
+		return [{ name: "requests", count: point.total }];
 	}
 	return point[dimension];
+}
+
+export function chartPoints(report: SeriesReport): SeriesBucket[] {
+	if (report.points.length > 0) return report.points;
+
+	return [
+		{
+			ts: report.end,
+			total: 0,
+			tools: [],
+			methods: [],
+			clients: [],
+			statuses: [],
+		},
+	];
 }
 
 export function stackSeries(

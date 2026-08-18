@@ -240,6 +240,7 @@ def test_well_known_mcp_servers_publishes_public_endpoints(
                 "description": "",
                 "url": "https://gateway.example/calendar/mcp",
                 "auth": "oauth2",
+                "auth_provider_type": "keycloak",
             }
         ]
     }
@@ -382,6 +383,7 @@ def test_none_provider_publishes_none_in_discovery_document(
                 "description": "",
                 "url": "https://gateway.example/relay/mcp",
                 "auth": "none",
+                "auth_provider_type": None,
             }
         ]
     }

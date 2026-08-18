@@ -2838,6 +2838,17 @@
               "none"
             ],
             "title": "Auth"
+          },
+          "auth_provider_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auth Provider Type"
           }
         },
         "type": "object",

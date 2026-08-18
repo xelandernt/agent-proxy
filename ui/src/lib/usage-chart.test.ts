@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { SeriesBucket } from "#/lib/mcp";
-import { stackSeries } from "./usage-chart.ts";
+import type { SeriesBucket, SeriesReport } from "#/lib/mcp";
+import { chartPoints, rowsFor, stackSeries } from "./usage-chart.ts";
 
 function point(total: number, alpha: number, beta: number): SeriesBucket {
 	return {
@@ -36,4 +36,28 @@ test("stackSeries does not accumulate totals over time", () => {
 	]);
 
 	assert.deepEqual(result.rows, [[1, 1]]);
+});
+
+test("chartPoints provides a zero-value point for an empty report", () => {
+	const report: SeriesReport = {
+		server: "demo",
+		start: "2026-01-01T00:00:00Z",
+		end: "2026-01-01T01:00:00Z",
+		bucket: "hour",
+		points: [],
+	};
+
+	assert.deepEqual(chartPoints(report), [
+		{
+			ts: "2026-01-01T01:00:00Z",
+			total: 0,
+			tools: [],
+			methods: [],
+			clients: [],
+			statuses: [],
+		},
+	]);
+	assert.deepEqual(rowsFor(chartPoints(report)[0], "total"), [
+		{ name: "requests", count: 0 },
+	]);
 });

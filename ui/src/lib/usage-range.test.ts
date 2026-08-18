@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveUsageRange } from "./usage-range.ts";
+import {
+	resolveUsageRange,
+	usageRangeForCalendarDateTimes,
+} from "./usage-range.ts";
 
 test("preset ranges roll forward on each resolution", () => {
 	const range = { presetMinutes: 60 };
@@ -27,4 +30,30 @@ test("custom ranges remain fixed", () => {
 		from: "2026-01-01T00:00:00.000Z",
 		to: "2026-01-02T00:00:00.000Z",
 	});
+});
+
+test("calendar ranges preserve the selected times", () => {
+	const range = usageRangeForCalendarDateTimes(
+		new Date(2026, 0, 1),
+		"14:30",
+		new Date(2026, 0, 2),
+		"09:15",
+	);
+
+	assert.deepEqual(range, {
+		from: new Date(2026, 0, 1, 14, 30),
+		to: new Date(2026, 0, 2, 9, 15),
+	});
+});
+
+test("calendar ranges reject equal or reverse datetimes", () => {
+	assert.equal(
+		usageRangeForCalendarDateTimes(
+			new Date(2026, 0, 1),
+			"10:00",
+			new Date(2026, 0, 1),
+			"10:00",
+		),
+		null,
+	);
 });

@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
-import type { SeriesReport } from "#/lib/mcp";
-import { rowsFor, stackSeries, type UsageDimension } from "#/lib/usage-chart";
+import type { SeriesBucket, SeriesReport } from "#/lib/mcp";
+import {
+	chartPoints,
+	rowsFor,
+	stackSeries,
+	type UsageDimension,
+} from "#/lib/usage-chart";
 import { cn } from "#/lib/utils";
 
 const DIMENSIONS = [
@@ -69,15 +74,17 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 		statuses: new Set(),
 	});
 
+	const points = useMemo(() => chartPoints(report), [report]);
+
 	const counts = useMemo(() => {
 		const map = new Map<string, number>();
-		for (const point of report.points) {
+		for (const point of points) {
 			for (const row of rowsFor(point, dimension)) {
 				map.set(row.name, (map.get(row.name) ?? 0) + row.count);
 			}
 		}
 		return map;
-	}, [report, dimension]);
+	}, [points, dimension]);
 
 	const names = useMemo(
 		() =>
@@ -91,15 +98,6 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 	// color when others are hidden, matching the legend.
 	const colorFor = (name: string) =>
 		SERIES_COLORS[names.indexOf(name) % SERIES_COLORS.length];
-
-	const total = useMemo(
-		() => report.points.reduce((sum, point) => sum + point.total, 0),
-		[report],
-	);
-
-	if (total === 0) {
-		return <p className="text-sm text-muted-foreground">No activity.</p>;
-	}
 
 	const toggleHidden = (name: string) => {
 		setHidden((previous) => {
@@ -134,7 +132,8 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 				))}
 			</div>
 			<StackedAreas
-				report={report}
+				points={points}
+				bucket={report.bucket}
 				dimension={dimension}
 				names={visibleNames}
 				colorFor={colorFor}
@@ -151,18 +150,18 @@ export function UsageChart({ report }: { report: SeriesReport }) {
 }
 
 function StackedAreas({
-	report,
+	points,
+	bucket,
 	dimension,
 	names,
 	colorFor,
 }: {
-	report: SeriesReport;
+	points: SeriesBucket[];
+	bucket: SeriesReport["bucket"];
 	dimension: DimensionId;
 	names: string[];
 	colorFor: (name: string) => string;
 }) {
-	const points = report.points;
-
 	const cumulative = useMemo(
 		() => stackSeries(points, dimension, names),
 		[points, dimension, names],
@@ -205,7 +204,7 @@ function StackedAreas({
 					preserveAspectRatio="none"
 					className="h-full w-full"
 					role="img"
-					aria-label={`Requests per ${report.bucket} over the selected window`}
+					aria-label={`Requests per ${bucket} over the selected window`}
 				>
 					{TICK_FRACTIONS.map((fraction) => (
 						<line
