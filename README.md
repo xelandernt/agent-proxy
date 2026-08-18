@@ -1,8 +1,8 @@
 # agent-proxy
 
-An authentication gateway for unauthenticated MCP servers. FastMCP owns MCP
-and OAuth; the gateway supplies routing, provider configuration, and a strict
-credential boundary in front of each upstream.
+An authentication gateway for MCP servers and an OpenAI-compatible model
+gateway. FastMCP owns MCP and OAuth routing; the in-process LiteLLM SDK connects
+model aliases to provider APIs without exposing provider credentials to users.
 
 The gateway contract is MCP `2026-07-28` only:
 
@@ -10,6 +10,103 @@ The gateway contract is MCP `2026-07-28` only:
 - there is no `initialize`, `MCP-Session-Id`, GET stream, or DELETE teardown;
 - clients and upstream servers are expected to follow the `2026-07-28`
   contract.
+
+The model gateway exposes `GET /v1/models` and `POST /v1/responses`. It does
+not expose `/v1/chat/completions` in the first release.
+
+## OpenAI-compatible model gateway
+
+Administrators create model aliases at `/admin/models`, including the LiteLLM
+provider/model name, an optional provider endpoint, settings, and encrypted
+credentials. End users browse the redacted model catalog at `/account/models`,
+then create personal proxy API keys at `/account` and restrict each key to
+selected aliases. A user login must use an identity-bearing OIDC or JWT
+provider; the admin-only static provider is not accepted because it cannot
+distinguish users.
+
+Both admin and user authentication are required at startup. Configure their
+identity providers and a Fernet credential-encryption key. The
+`model_gateway` section and its key are also required at startup:
+
+```yaml
+admin:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example.com/realms/agents
+    client_id: admin
+
+user:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example.com/realms/agents
+    client_id: user
+  oauth_scopes: [openid, email]
+
+model_gateway:
+  credential_encryption_key: ${MODEL_GATEWAY_CREDENTIAL_ENCRYPTION_KEY}
+```
+
+Generate a key for the environment with:
+
+```bash
+uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+```
+
+After an administrator creates a model and a user creates a scoped proxy key,
+the official OpenAI Python client can call the gateway directly:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="ap_...",
+    base_url="https://mcp.example.com/v1",
+)
+response = client.responses.create(
+    model="claude-sonnet",
+    input="Summarize this deployment.",
+)
+print(response.output_text)
+```
+
+`client.models.list()` returns only the aliases selected for that proxy key.
+The first release accepts text/message input, instructions, token limits,
+reasoning options, function tools and outputs, sampling controls, truncation,
+metadata, and SSE streaming. It rejects unknown fields, multimodal content,
+hosted tools, stored/background responses, and `previous_response_id` instead
+of forwarding provider-dependent behavior silently.
+
+The admin API accepts provider-specific LiteLLM arguments without UI forks.
+These redacted examples show the intended boundary:
+
+| Provider | `upstream_model` | `api_base` | `settings` | `secrets` |
+|----------|------------------|------------|------------|-----------|
+| Anthropic | `anthropic/claude-sonnet-4-5` | omitted | `{"timeout": 120}` | `{"api_key": "..."}` |
+| Amazon Bedrock | `bedrock/anthropic.claude-v2` | omitted | `{"aws_region_name": "eu-central-1"}` | `{"aws_access_key_id": "...", "aws_secret_access_key": "..."}` |
+| Azure OpenAI | `azure/gpt-5` | `https://example.openai.azure.com` | `{"api_version": "..."}` | `{"api_key": "..."}` |
+
+Provider and model support still depends on the pinned LiteLLM release and on
+the upstream provider's Responses API capabilities. See LiteLLM's
+[provider matrix](https://github.com/BerriAI/litellm#supported-providers).
+
+Operational constraints for the first release:
+
+- Backups containing model deployments require the same encryption key.
+  Automatic key rotation is not implemented; replace each model's secrets
+  before retiring an old key.
+- Revoking a proxy key is immediate and irreversible. Its historical metadata
+  remains for usage accounting, but its active model scopes are removed.
+- All authenticated users can discover every model alias and description;
+  upstream provider settings and endpoints remain admin-only. Only a key's
+  selected aliases are returned by `/v1/models`.
+- Administrators and users have independent sessions. Admin access does not
+  grant user-key access, and static username/password authentication remains
+  admin-only.
+
+Provider credentials, upstream endpoints, prompts, tool arguments, and model
+output are not written to usage records. Only identity/key references, public
+model name, provider category, status, token counts, latency, and timestamps
+are recorded.
 
 ## Compatibility
 
@@ -195,15 +292,26 @@ postgresql:
   password: proxy
   db_name: proxy
 
-# Optional: the identity provider that may log in to the admin API and UI.
-# Any user authenticated against this provider is an administrator. When
-# omitted, server management returns HTTP 503.
+# Required: the identity provider that may log in to the admin API and UI.
+# Any user authenticated against this provider is an administrator.
 admin:
   auth:
     provider: keycloak
     realm_url: https://identity.example.com/realms/agents
     client_id: admin
+
+# Required: a separate identity-bearing provider for end users. Static
+# authentication is not accepted because user tokens must identify a user.
+user:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example.com/realms/agents
+    client_id: user
+  oauth_scopes: [openid, email]
 ```
+
+Configuration validation fails and the process does not start when either
+`admin` or `user` is absent or its provider cannot be constructed.
 
 MCP servers are no longer configured in YAML. They are created at runtime
 through the admin API (`/api/admin/servers`) or the admin UI at `/admin`:

@@ -155,6 +155,18 @@ def boot_gateway(monkeypatch: pytest.MonkeyPatch) -> TestClient:
                     "client_id": "admin",
                 }
             },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
         }
     )
     return TestClient(create_app(config))

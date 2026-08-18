@@ -1,9 +1,4 @@
-import {
-	createFileRoute,
-	Link,
-	Outlet,
-	useLocation,
-} from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { ServerCogIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AdminLogin } from "#/components/admin-login";
@@ -61,31 +56,6 @@ function AdminLayout() {
 
 	if (status === "unauthenticated") {
 		return <AdminLogin onAuthenticated={() => setStatus("authenticated")} />;
-	}
-
-	if (status === "unconfigured") {
-		return (
-			<div className="mx-auto w-full max-w-2xl p-8">
-				<Empty>
-					<EmptyMedia variant="icon">
-						<ServerCogIcon />
-					</EmptyMedia>
-					<EmptyHeader>
-						<EmptyTitle>Server management is not configured</EmptyTitle>
-						<EmptyDescription>
-							Add an <code className="font-mono">admin.auth</code> section to
-							your gateway configuration and restart to enable server
-							management.
-						</EmptyDescription>
-					</EmptyHeader>
-					<EmptyContent>
-						<Link to="/">
-							<Button variant="outline">Back to servers</Button>
-						</Link>
-					</EmptyContent>
-				</Empty>
-			</div>
-		);
 	}
 
 	return (

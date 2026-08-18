@@ -382,6 +382,24 @@
       "title": "MiddlewareConfig",
       "type": "object"
     },
+    "ModelGatewayConfig": {
+      "additionalProperties": false,
+      "description": "Security settings for upstream model credentials.",
+      "properties": {
+        "credential_encryption_key": {
+          "description": "URL-safe base64 Fernet key used to encrypt provider credentials.",
+          "format": "password",
+          "title": "Credential Encryption Key",
+          "type": "string",
+          "writeOnly": true
+        }
+      },
+      "required": [
+        "credential_encryption_key"
+      ],
+      "title": "ModelGatewayConfig",
+      "type": "object"
+    },
     "PostgresqlConfig": {
       "additionalProperties": false,
       "description": "Configuration for the PostgreSQL database.",
@@ -458,6 +476,57 @@
       ],
       "title": "StaticCredentialsAuthProviderConfig",
       "type": "object"
+    },
+    "UserConfig": {
+      "additionalProperties": false,
+      "description": "Interactive identity provider for end-user account access.",
+      "properties": {
+        "auth": {
+          "discriminator": {
+            "mapping": {
+              "aws-cognito": "#/$defs/AwsCognitoAdminAuthProviderConfig",
+              "jwt": "#/$defs/JwtAuthProviderConfig",
+              "keycloak": "#/$defs/KeycloakAuthProviderConfig"
+            },
+            "propertyName": "provider"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AwsCognitoAdminAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/JwtAuthProviderConfig"
+            },
+            {
+              "$ref": "#/$defs/KeycloakAuthProviderConfig"
+            }
+          ],
+          "title": "Auth"
+        },
+        "oauth_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Oauth Scopes",
+          "type": "array"
+        },
+        "session_cookie_samesite": {
+          "default": "lax",
+          "description": "SameSite policy for the user account session cookie.",
+          "enum": [
+            "strict",
+            "lax",
+            "none"
+          ],
+          "title": "Session Cookie Samesite",
+          "type": "string"
+        }
+      },
+      "required": [
+        "auth"
+      ],
+      "title": "UserConfig",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -483,17 +552,20 @@
       "$ref": "#/$defs/MiddlewareConfig"
     },
     "admin": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/AdminConfig"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
+      "$ref": "#/$defs/AdminConfig"
+    },
+    "user": {
+      "$ref": "#/$defs/UserConfig"
+    },
+    "model_gateway": {
+      "$ref": "#/$defs/ModelGatewayConfig"
     }
   },
+  "required": [
+    "admin",
+    "user",
+    "model_gateway"
+  ],
   "title": "GatewayConfig",
   "type": "object"
 }

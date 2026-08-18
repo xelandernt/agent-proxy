@@ -24,9 +24,25 @@ def openapi(output_path: Path) -> None:
 
     from proxy.app.main import create_app
 
-    # The schema only describes routes and models; no database connection or
-    # server boot is needed, so the default configuration suffices.
-    config = GatewayConfig()
+    # The schema only describes routes and models. Supply deterministic
+    # identity providers because production configuration requires both roles.
+    config = GatewayConfig.model_validate(
+        {
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "schema-generation-only-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
+        }
+    )
     schema = json.dumps(create_app(config).openapi(), indent=2)
     output_path.write_text(f"{schema}\n")
 

@@ -43,16 +43,11 @@ def auth_status(request: Request) -> dict:
     a pasted token is accepted.
     """
 
-    provider = request.app.state.admin_provider
-    if provider is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Server management is not configured.",
-        )
+    provider = get_admin_provider(request)
     admin = request.app.state.config.admin
     flow = provider.oauth_browser_flow()
     return {
-        "provider": admin.auth.provider if admin is not None else None,
+        "provider": admin.auth.provider,
         "oauth": (
             {"issuer": flow.issuer, "client_id": flow.client_id}
             if flow is not None
@@ -75,8 +70,6 @@ class LoginRequest(BaseModel):
 
 def _cookie_policy(request: Request) -> CookieSameSite:
     admin = request.app.state.config.admin
-    if admin is None:
-        return "lax"
     return admin.session_cookie_samesite
 
 

@@ -6,16 +6,18 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-proxy"
-description = "A modern MCP authentication gateway powered by FastMCP"
+description = "An MCP authentication and OpenAI-compatible model gateway"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "asyncpg>=0.30.0",
+    "cryptography>=46.0.0",
     "cyclopts>=4.16.1",
     "fastapi>=0.139.2",
     "fastmcp==4.0.0b2",
     "httpx2>=2.9.1",
     "joserfc>=1.7.4",
+    "litellm==1.94.1",
     "logfire[fastapi,system-metrics]>=4.34.0",
     "pydantic>=2.12.0",
     "pydantic-settings[yaml]>=2.14.1",
@@ -32,6 +34,7 @@ proxy = "proxy.cli.cli:cli"
 
 [dependency-groups]
 dev = [
+    "openai>=2.54.0",
     "prek>=0.4.3",
     "pyrefly>=1.0.0",
     "pytest>=9.0.3",

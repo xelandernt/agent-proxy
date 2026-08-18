@@ -1,10 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
+	BotIcon,
 	KeyRoundIcon,
 	LockIcon,
 	LockKeyholeIcon,
 	LockOpenIcon,
 	ServerIcon,
+	UserRoundIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AgentGatewayLogo } from "#/components/agent-gateway-logo";
@@ -27,8 +29,16 @@ export function AdminNavigation() {
 	const providersActive =
 		location.pathname.startsWith("/admin/auth-providers") ||
 		location.pathname.startsWith("/docs");
+	const modelsActive =
+		location.pathname.startsWith("/admin/models") ||
+		location.pathname.startsWith("/account/models");
+	const accountActive =
+		location.pathname.startsWith("/account") && !modelsActive;
 	const serversActive =
-		!providersActive && location.pathname !== "/admin/callback";
+		!providersActive &&
+		!modelsActive &&
+		!accountActive &&
+		location.pathname !== "/admin/callback";
 	const expanded = sidebarHovered || sidebarLocked;
 
 	const refreshAuth = useCallback(async () => {
@@ -122,6 +132,45 @@ export function AdminNavigation() {
 						<TooltipTrigger asChild>
 							{authenticated ? (
 								<Link
+									to="/admin/models"
+									className={cn(
+										navItemClass,
+										modelsActive
+											? "bg-accent text-foreground"
+											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+									)}
+									aria-current={modelsActive ? "page" : undefined}
+									aria-label="Models"
+								>
+									<BotIcon className="size-4 shrink-0" />
+									<span className={labelClass}>Models</span>
+								</Link>
+							) : (
+								<Link
+									to="/account/models"
+									className={cn(
+										navItemClass,
+										modelsActive
+											? "bg-accent text-foreground"
+											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+									)}
+									aria-current={modelsActive ? "page" : undefined}
+									aria-label="Models"
+								>
+									<BotIcon className="size-4 shrink-0" />
+									<span className={labelClass}>Models</span>
+								</Link>
+							)}
+						</TooltipTrigger>
+						<TooltipContent side="right">
+							{authenticated ? "Manage models" : "Available models"}
+						</TooltipContent>
+					</Tooltip>
+
+					<Tooltip>
+						<TooltipTrigger asChild>
+							{authenticated ? (
+								<Link
 									to="/admin/auth-providers"
 									search={{ provider: undefined }}
 									className={cn(
@@ -153,6 +202,26 @@ export function AdminNavigation() {
 								? "Providers"
 								: "Providers are available to administrators only"}
 						</TooltipContent>
+					</Tooltip>
+
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Link
+								to="/account"
+								className={cn(
+									navItemClass,
+									accountActive
+										? "bg-accent text-foreground"
+										: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+								)}
+								aria-current={accountActive ? "page" : undefined}
+								aria-label="Account"
+							>
+								<UserRoundIcon className="size-4 shrink-0" />
+								<span className={labelClass}>Account</span>
+							</Link>
+						</TooltipTrigger>
+						<TooltipContent side="right">Account and API keys</TooltipContent>
 					</Tooltip>
 				</nav>
 

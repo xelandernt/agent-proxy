@@ -19,7 +19,11 @@ from pydantic_settings import (
     YamlConfigSettingsSource,
 )
 
-from proxy.providers import AdminAuthProviderConfig, KeycloakAuthProviderConfig
+from proxy.providers import (
+    AdminAuthProviderConfig,
+    KeycloakAuthProviderConfig,
+    UserAuthProviderConfig,
+)
 
 CONFIG_DIRECTORY: Final = ".proxy"
 CONFIG_FILE_ENV: Final = "PROXY_CONFIG_FILE"
@@ -124,6 +128,45 @@ class AdminConfig(BaseModel):
         return self
 
 
+class UserConfig(BaseModel):
+    """Interactive identity provider for end-user account access."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    auth: UserAuthProviderConfig
+    oauth_scopes: list[str] = Field(default_factory=lambda: ["openid", "email"])
+    session_cookie_samesite: Literal["strict", "lax", "none"] = Field(
+        default="lax",
+        description="SameSite policy for the user account session cookie.",
+    )
+
+    @model_validator(mode="after")
+    def validate_user_auth(self) -> UserConfig:
+        if (
+            isinstance(self.auth, KeycloakAuthProviderConfig)
+            and self.auth.client_id is None
+        ):
+            raise ValueError(
+                "user.auth.client_id is required for the keycloak provider."
+            )
+        required = {"openid", "email"}
+        if not required.issubset(self.oauth_scopes):
+            raise ValueError("user.oauth_scopes must include 'openid' and 'email'.")
+        if len(self.oauth_scopes) != len(set(self.oauth_scopes)):
+            raise ValueError("user.oauth_scopes must not contain duplicates.")
+        return self
+
+
+class ModelGatewayConfig(BaseModel):
+    """Security settings for upstream model credentials."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    credential_encryption_key: SecretStr = Field(
+        description="URL-safe base64 Fernet key used to encrypt provider credentials.",
+    )
+
+
 class GatewayConfig(BaseModel):
     """Validated, environment-independent gateway configuration."""
 
@@ -134,7 +177,9 @@ class GatewayConfig(BaseModel):
     postgresql: PostgresqlConfig = Field(default_factory=PostgresqlConfig)
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
     middleware: MiddlewareConfig = Field(default_factory=MiddlewareConfig)
-    admin: AdminConfig | None = None
+    admin: AdminConfig
+    user: UserConfig
+    model_gateway: ModelGatewayConfig
 
 
 class _GatewaySettings(BaseSettings):
@@ -152,7 +197,9 @@ class _GatewaySettings(BaseSettings):
     postgresql: PostgresqlConfig = Field(default_factory=PostgresqlConfig)
     public_base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8008")
     middleware: MiddlewareConfig = Field(default_factory=MiddlewareConfig)
-    admin: AdminConfig | None = None
+    admin: AdminConfig
+    user: UserConfig
+    model_gateway: ModelGatewayConfig
 
     @classmethod
     def settings_customise_sources(

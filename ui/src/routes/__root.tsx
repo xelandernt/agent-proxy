@@ -7,13 +7,27 @@ import {
 	useLocation,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { FileQuestionIcon, LogInIcon, LogOutIcon } from "lucide-react";
+import {
+	FileQuestionIcon,
+	LogInIcon,
+	LogOutIcon,
+	ShieldCheckIcon,
+	UserRoundIcon,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AdminNavigation } from "#/components/admin-navigation";
 import { BackgroundDither } from "#/components/background-dither";
 import { DitherToggle, ThemeToggle } from "#/components/toggles";
 import { Button } from "#/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import {
 	Empty,
 	EmptyContent,
@@ -30,7 +44,12 @@ import {
 	TooltipTrigger,
 } from "#/components/ui/tooltip";
 import { UsagePill } from "#/components/usage-pill";
-import { checkAdminAuth, endAdminSession } from "#/lib/auth";
+import {
+	checkAdminAuth,
+	checkUserAuth,
+	endAdminSession,
+	endUserSession,
+} from "#/lib/auth";
 import { patchGatewayFetch } from "#/lib/gateway";
 import { ThemeProvider } from "#/lib/theme";
 
@@ -62,7 +81,7 @@ function RootDocument() {
 							<UsagePill />
 							<DitherToggle />
 							<ThemeToggle />
-							<AdminSessionControl />
+							<SessionControl />
 						</div>
 					</header>
 					<Outlet />
@@ -84,58 +103,85 @@ function RootDocument() {
 	);
 }
 
-function AdminSessionControl() {
+function SessionControl() {
 	const location = useLocation();
 	const [authenticated, setAuthenticated] = useState(false);
 	const [busy, setBusy] = useState(false);
-	const isCallbackPath = location.pathname.endsWith("/admin/callback");
+	const userArea = location.pathname.startsWith("/account");
+	const callback =
+		location.pathname === "/admin/callback" ||
+		location.pathname === "/account/callback";
 
 	useEffect(() => {
-		if (location.pathname.endsWith("/admin/callback")) {
+		if (callback) {
 			setAuthenticated(false);
 			return;
 		}
 		let active = true;
-		checkAdminAuth().then((status) => {
+		const checkAuth = userArea ? checkUserAuth : checkAdminAuth;
+		checkAuth().then((status) => {
 			if (active) setAuthenticated(status === "authenticated");
 		});
 		return () => {
 			active = false;
 		};
-	}, [location.pathname]);
+	}, [callback, userArea]);
 
-	if (isCallbackPath) return null;
+	if (callback || (userArea && !authenticated)) return null;
 
 	if (!authenticated) {
 		return (
 			<TooltipProvider>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Link to="/admin">
-							<Button
-								variant="ghost"
-								size="icon"
-								aria-label="Sign in"
-								className="transition-transform hover:scale-110 active:scale-95"
-							>
-								<LogInIcon className="size-4" />
-							</Button>
-						</Link>
-					</TooltipTrigger>
-					<TooltipContent side="bottom">Sign in</TooltipContent>
-				</Tooltip>
+				<DropdownMenu>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<DropdownMenuTrigger asChild>
+								<Button
+									variant="ghost"
+									size="icon"
+									aria-label="Sign in"
+									className="transition-transform hover:scale-110 active:scale-95"
+								>
+									<LogInIcon className="size-4" />
+								</Button>
+							</DropdownMenuTrigger>
+						</TooltipTrigger>
+						<TooltipContent side="bottom">Sign in</TooltipContent>
+					</Tooltip>
+					<DropdownMenuContent align="end" className="min-w-48">
+						<DropdownMenuLabel>Sign in as</DropdownMenuLabel>
+						<DropdownMenuGroup>
+							<DropdownMenuItem asChild>
+								<Link to="/account">
+									<UserRoundIcon />
+									User
+								</Link>
+							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link to="/admin">
+									<ShieldCheckIcon />
+									Administrator
+								</Link>
+							</DropdownMenuItem>
+						</DropdownMenuGroup>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</TooltipProvider>
 		);
 	}
 
 	const logout = async () => {
 		setBusy(true);
-		if (await endAdminSession()) {
-			window.location.assign("/");
-			return;
+		try {
+			const endSession = userArea ? endUserSession : endAdminSession;
+			if (await endSession()) {
+				window.location.assign("/");
+				return;
+			}
+			toast.error("Could not sign out. Try again.");
+		} finally {
+			setBusy(false);
 		}
-		setBusy(false);
-		toast.error("Could not sign out. Try again.");
 	};
 
 	return (

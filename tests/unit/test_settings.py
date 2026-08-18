@@ -14,7 +14,23 @@ from proxy.settings import (
 
 
 def test_postgresql_defaults_to_local_development_connection() -> None:
-    config = GatewayConfig.model_validate({})
+    config = GatewayConfig.model_validate(
+        {
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
+        }
+    )
 
     assert (
         config.postgresql.connection_url
@@ -25,6 +41,19 @@ def test_postgresql_defaults_to_local_development_connection() -> None:
 def test_postgresql_connection_parts_round_trip() -> None:
     config = GatewayConfig.model_validate(
         {
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
             "postgresql": {
                 "address": "db.example",
                 "port": 6432,
@@ -42,7 +71,23 @@ def test_postgresql_connection_parts_round_trip() -> None:
 
 
 def test_middleware_defaults_to_local_development_cors() -> None:
-    config = GatewayConfig.model_validate({})
+    config = GatewayConfig.model_validate(
+        {
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
+        }
+    )
 
     assert config.middleware.cors.origins == ["http://localhost:3000"]
     assert config.middleware.cors.allow_credentials is True
@@ -52,7 +97,24 @@ def test_middleware_defaults_to_local_development_cors() -> None:
 
 def test_gateway_rejects_servers_key() -> None:
     with pytest.raises(ValidationError, match="servers"):
-        GatewayConfig.model_validate({"servers": []})
+        GatewayConfig.model_validate(
+            {
+                "admin": {"auth": {"provider": "static"}},
+                "user": {
+                    "auth": {
+                        "provider": "jwt",
+                        "public_key": "test-user-auth-secret",
+                        "algorithm": "HS256",
+                    }
+                },
+                "model_gateway": {
+                    "credential_encryption_key": (
+                        "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                    )
+                },
+                "servers": [],
+            }
+        )
 
 
 def test_admin_accepts_auth_provider() -> None:
@@ -64,6 +126,18 @@ def test_admin_accepts_auth_provider() -> None:
                     "realm_url": "https://identity.example/realms/test",
                     "client_id": "admin",
                 }
+            },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
             },
         }
     )
@@ -82,14 +156,78 @@ def test_admin_rejects_keycloak_without_client_id() -> None:
                         "realm_url": "https://identity.example/realms/test",
                     }
                 },
+                "user": {
+                    "auth": {
+                        "provider": "jwt",
+                        "public_key": "test-user-auth-secret",
+                        "algorithm": "HS256",
+                    }
+                },
+                "model_gateway": {
+                    "credential_encryption_key": (
+                        "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                    )
+                },
             }
         )
 
 
-def test_admin_defaults_to_absent() -> None:
-    config = GatewayConfig.model_validate({})
+def test_user_requires_openid_email_scopes() -> None:
+    config = GatewayConfig.model_validate(
+        {
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "keycloak",
+                    "realm_url": "https://identity.example/realms/test",
+                    "client_id": "user-ui",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
+        }
+    )
 
-    assert config.admin is None
+    assert config.user is not None
+    assert config.user.oauth_scopes == ["openid", "email"]
+
+    with pytest.raises(ValidationError, match="must include 'openid' and 'email'"):
+        GatewayConfig.model_validate(
+            {
+                "admin": {"auth": {"provider": "static"}},
+                "user": {
+                    "auth": {
+                        "provider": "keycloak",
+                        "realm_url": "https://identity.example/realms/test",
+                        "client_id": "user-ui",
+                    },
+                    "oauth_scopes": ["openid"],
+                },
+                "model_gateway": {
+                    "credential_encryption_key": (
+                        "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                    )
+                },
+            }
+        )
+
+
+def test_static_user_provider_is_not_supported() -> None:
+    with pytest.raises(ValidationError, match="static"):
+        GatewayConfig.model_validate(
+            {
+                "admin": {"auth": {"provider": "static"}},
+                "user": {"auth": {"provider": "static"}},
+                "model_gateway": {
+                    "credential_encryption_key": (
+                        "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                    )
+                },
+            }
+        )
 
 
 def test_admin_rejects_unknown_fields() -> None:
@@ -104,6 +242,18 @@ def test_admin_rejects_unknown_fields() -> None:
                     },
                     "settings": {},
                 },
+                "user": {
+                    "auth": {
+                        "provider": "jwt",
+                        "public_key": "test-user-auth-secret",
+                        "algorithm": "HS256",
+                    }
+                },
+                "model_gateway": {
+                    "credential_encryption_key": (
+                        "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                    )
+                },
             }
         )
 
@@ -111,6 +261,19 @@ def test_admin_rejects_unknown_fields() -> None:
 def test_gateway_accepts_logfire_configuration() -> None:
     config = GatewayConfig.model_validate(
         {
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
             "logfire": {
                 "token": "secret-token",
                 "environment": "production",
@@ -151,6 +314,13 @@ admin:
     provider: keycloak
     realm_url: https://identity.example/realms/test
     client_id: admin
+user:
+  auth:
+    provider: jwt
+    public_key: test-user-auth-secret
+    algorithm: HS256
+model_gateway:
+  credential_encryption_key: Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E=
 """.lstrip()
     )
     monkeypatch.setenv(CONFIG_FILE_ENV, str(config_file))

@@ -19,9 +19,8 @@ postgresql:
   password: proxy
   db_name: proxy
 
-# Optional: the identity provider that may log in to the admin API and UI.
-# Any user authenticated against this provider is an administrator. When
-# omitted, the admin interface returns HTTP 503.
+# Required: the identity provider that may log in to the admin API and UI.
+# Any user authenticated against this provider is an administrator.
 admin:
   auth:
     provider: keycloak
@@ -47,3 +46,21 @@ admin:
 #   password: change-me
 #   jwt_secret: ${ADMIN_JWT_SECRET}
 #   token_ttl_seconds: 3600
+
+# Required: a separate identity provider for end users who create model API
+# keys. Static username/password authentication is intentionally unsupported
+# here because every token must identify a distinct user. Browser login always
+# requests the openid and email scopes; register {ui-origin}/account/callback.
+user:
+  auth:
+    provider: keycloak
+    realm_url: https://identity.example.com/realms/agents
+    client_id: user
+  oauth_scopes:
+    - openid
+    - email
+
+# Required at startup. Generate a Fernet key and provide it through the
+# environment in production; do not commit a real key.
+model_gateway:
+  credential_encryption_key: ${MODEL_GATEWAY_CREDENTIAL_ENCRYPTION_KEY}

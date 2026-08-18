@@ -783,6 +783,13 @@ AdminAuthProviderConfig = Annotated[
     Field(discriminator="provider"),
 ]
 
+UserAuthProviderConfig = Annotated[
+    AwsCognitoAdminAuthProviderConfig
+    | JwtAuthProviderConfig
+    | KeycloakAuthProviderConfig,
+    Field(discriminator="provider"),
+]
+
 
 @overload
 def load_auth_provider(
@@ -800,8 +807,18 @@ def load_auth_provider(
 ) -> AuthProvider: ...
 
 
+@overload
 def load_auth_provider(
-    config: ManagedAuthProviderConfig | AdminAuthProviderConfig,
+    config: UserAuthProviderConfig,
+    *,
+    base_url: str,
+) -> AuthProvider: ...
+
+
+def load_auth_provider(
+    config: ManagedAuthProviderConfig
+    | AdminAuthProviderConfig
+    | UserAuthProviderConfig,
     *,
     base_url: str,
 ) -> AuthProvider:

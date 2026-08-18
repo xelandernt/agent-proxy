@@ -31,6 +31,18 @@ def static_config() -> GatewayConfig:
                     "jwt_secret": STATIC_SECRET,
                 }
             },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
         }
     )
 
@@ -46,6 +58,18 @@ def keycloak_config() -> GatewayConfig:
                     "realm_url": REALM_URL,
                     "client_id": UI_CLIENT_ID,
                 }
+            },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
             },
         }
     )
@@ -63,6 +87,18 @@ def cognito_config() -> GatewayConfig:
                     "client_id": COGNITO_CLIENT_ID,
                     "aws_region": "eu-central-1",
                 }
+            },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
             },
         }
     )
@@ -116,16 +152,6 @@ def test_me_rejects_missing_and_invalid_tokens(
     assert bad_scheme.status_code == 401
 
 
-def test_admin_endpoints_return_503_when_not_configured() -> None:
-    config = GatewayConfig.model_validate({})
-    with boot(config) as client:
-        response = client.get(
-            "/api/admin/me", headers={"Authorization": "Bearer valid-token"}
-        )
-
-    assert response.status_code == 503
-
-
 def test_auth_status_describes_keycloak_browser_flow(
     keycloak_config: GatewayConfig,
 ) -> None:
@@ -163,6 +189,18 @@ def test_auth_status_for_token_only_provider_is_null() -> None:
                     "algorithm": "HS256",
                 }
             },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
         }
     )
     with boot(config) as client:
@@ -170,14 +208,6 @@ def test_auth_status_for_token_only_provider_is_null() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"provider": "jwt", "oauth": None}
-
-
-def test_auth_status_returns_503_when_not_configured() -> None:
-    config = GatewayConfig.model_validate({})
-    with boot(config) as client:
-        response = client.get("/api/admin/auth-status")
-
-    assert response.status_code == 503
 
 
 def test_auth_status_describes_static_password_provider(
@@ -244,6 +274,18 @@ def test_static_auth_works_with_default_credentials() -> None:
                 "auth": {
                     "provider": "static",
                 }
+            },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
             },
         }
     )
@@ -344,6 +386,18 @@ def test_cookie_mutation_blocks_cross_site_origin_when_samesite_none(
                     "client_id": UI_CLIENT_ID,
                 },
                 "session_cookie_samesite": "none",
+            },
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
             },
         }
     )

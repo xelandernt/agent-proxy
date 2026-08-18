@@ -8,25 +8,18 @@ import {
 } from "#/lib/auth";
 
 export const Route = createFileRoute("/admin/callback")({
-	validateSearch: (search: Record<string, unknown>) => ({
-		code: typeof search.code === "string" ? search.code : undefined,
-		state: typeof search.state === "string" ? search.state : undefined,
-	}),
 	component: AdminCallback,
 });
 
 function AdminCallback() {
 	const navigate = useNavigate();
-	const search = Route.useSearch();
 	const started = useRef(false);
 
 	useEffect(() => {
 		if (started.current) return;
 		started.current = true;
-		const code = search.code ?? "";
 		(async () => {
 			try {
-				if (!code) throw new Error("Authorization response missing a code.");
 				const authInfo = await fetchAdminAuthInfo();
 				const oauthInfo = authInfo?.oauth;
 				if (!oauthInfo) throw new Error("Admin OAuth is not configured.");
@@ -42,7 +35,7 @@ function AdminCallback() {
 			}
 			navigate({ to: "/admin", replace: true });
 		})();
-	}, [search.code, navigate]);
+	}, [navigate]);
 
 	return (
 		<div className="mx-auto flex w-full max-w-md flex-col gap-4 p-8">

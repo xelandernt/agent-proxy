@@ -37,8 +37,12 @@ async def create_all_tables(engine: AsyncEngine) -> None:
 
     # Model imports are intentionally local: importing the database module
     # should define the shared metadata without importing every feature.
+    import proxy.api_keys.models
+    import proxy.app.model_usage.models
     import proxy.app.usage.models
+    import proxy.app.users.models
     import proxy.auth_providers.persistence
+    import proxy.model_deployments.models
     import proxy.servers.models  # noqa: F401
 
     async with engine.begin() as connection:

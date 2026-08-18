@@ -22,6 +22,16 @@ logfire:
 
 admin:
   auth:
-    provider: static
-    username: user
-    password: password
+    provider: keycloak
+    realm_url: http://localhost:8080/realms/agent-proxy
+    client_id: admin
+
+user:
+  auth:
+    provider: keycloak
+    realm_url: http://localhost:8080/realms/agent-proxy
+    client_id: user
+
+model_gateway:
+  # Development-only key. Generate a separate Fernet key for every deployment.
+  credential_encryption_key: Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E=

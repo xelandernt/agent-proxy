@@ -167,6 +167,19 @@ def usage_client(
         {
             "public_base_url": "https://gateway.example",
             "postgresql": postgresql,
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
         }
     )
     app = create_app(config)
@@ -336,6 +349,19 @@ def test_usage_tracks_none_provider_requests(
         {
             "public_base_url": "https://gateway.example",
             "postgresql": postgresql,
+            "admin": {"auth": {"provider": "static"}},
+            "user": {
+                "auth": {
+                    "provider": "jwt",
+                    "public_key": "test-user-auth-secret",
+                    "algorithm": "HS256",
+                }
+            },
+            "model_gateway": {
+                "credential_encryption_key": (
+                    "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
+                )
+            },
         }
     )
     app = create_app(config)

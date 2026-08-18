@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
@@ -14,8 +13,6 @@ from proxy.providers import (
     load_auth_provider,
 )
 from proxy.settings import AdminConfig
-
-logger = logging.getLogger(__name__)
 
 ADMIN_SESSION_COOKIE: str = "admin_token"
 
@@ -120,13 +117,10 @@ class _AdminAuthProvider(AdminAuthProvider):
 
 
 def build_admin_provider(
-    admin: AdminConfig | None,
+    admin: AdminConfig,
     public_base_url: str,
-) -> AdminAuthProvider | None:
-    """Construct the admin identity provider, or None when not configured."""
-
-    if admin is None:
-        return None
+) -> AdminAuthProvider:
+    """Construct the required admin identity provider."""
     base_url = f"{public_base_url.rstrip('/')}/admin"
     oauth_browser_flow: AdminOAuthBrowserFlow | None = None
     if isinstance(admin.auth, AwsCognitoAdminAuthProviderConfig):
@@ -142,28 +136,14 @@ def build_admin_provider(
             issuer=str(admin.auth.realm_url),
             client_id=admin.auth.client_id,
         )
-    try:
-        provider = load_auth_provider(admin.auth, base_url=base_url)
-    except Exception:
-        logger.warning(
-            "Admin authentication is unavailable; admin endpoints require a "
-            "configured identity provider.",
-            exc_info=True,
-        )
-        return None
+    provider = load_auth_provider(admin.auth, base_url=base_url)
     return _AdminAuthProvider(provider, oauth_browser_flow=oauth_browser_flow)
 
 
 def get_admin_provider(request: Request) -> AdminAuthProvider:
-    """Return the admin provider, or 503 when no admin section is configured."""
+    """Return the configured admin provider."""
 
-    provider: AdminAuthProvider | None = request.app.state.admin_provider
-    if provider is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Server management is not configured.",
-        )
-    return provider
+    return cast(AdminAuthProvider, request.app.state.admin_provider)
 
 
 def _bearer_token(request: Request) -> str | None:
