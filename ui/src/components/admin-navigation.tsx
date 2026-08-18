@@ -103,10 +103,10 @@ export function AdminNavigation() {
 											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
 									)}
 									aria-current={serversActive ? "page" : undefined}
-									aria-label="Servers"
+									aria-label="MCP servers"
 								>
 									<ServerIcon className="size-4 shrink-0" />
-									<span className={labelClass}>Servers</span>
+									<span className={labelClass}>MCP servers</span>
 								</Link>
 							) : (
 								<Link
@@ -118,14 +118,14 @@ export function AdminNavigation() {
 											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
 									)}
 									aria-current={serversActive ? "page" : undefined}
-									aria-label="Servers"
+									aria-label="MCP servers"
 								>
 									<ServerIcon className="size-4 shrink-0" />
-									<span className={labelClass}>Servers</span>
+									<span className={labelClass}>MCP servers</span>
 								</Link>
 							)}
 						</TooltipTrigger>
-						<TooltipContent side="right">Servers</TooltipContent>
+						<TooltipContent side="right">MCP servers</TooltipContent>
 					</Tooltip>
 
 					<Tooltip>
@@ -204,25 +204,32 @@ export function AdminNavigation() {
 						</TooltipContent>
 					</Tooltip>
 
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Link
-								to="/account"
-								className={cn(
-									navItemClass,
-									accountActive
-										? "bg-accent text-foreground"
-										: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-								)}
-								aria-current={accountActive ? "page" : undefined}
-								aria-label="Account"
-							>
-								<UserRoundIcon className="size-4 shrink-0" />
-								<span className={labelClass}>Account</span>
-							</Link>
-						</TooltipTrigger>
-						<TooltipContent side="right">Account and API keys</TooltipContent>
-					</Tooltip>
+					<div className="mt-3 border-t pt-3">
+						{expanded && (
+							<p className="mb-1 px-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+								Account
+							</p>
+						)}
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Link
+									to="/account"
+									className={cn(
+										navItemClass,
+										accountActive
+											? "bg-accent text-foreground"
+											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+									)}
+									aria-current={accountActive ? "page" : undefined}
+									aria-label="API keys"
+								>
+									<UserRoundIcon className="size-4 shrink-0" />
+									<span className={labelClass}>API keys</span>
+								</Link>
+							</TooltipTrigger>
+							<TooltipContent side="right">API keys</TooltipContent>
+						</Tooltip>
+					</div>
 				</nav>
 
 				<div className="mt-auto pt-4">

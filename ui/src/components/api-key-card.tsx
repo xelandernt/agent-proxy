@@ -1,4 +1,4 @@
-import { Trash2Icon } from "lucide-react";
+import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -7,39 +7,49 @@ import { ModelSelection } from "#/components/model-selection";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "#/components/ui/card";
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "#/components/ui/dropdown-menu";
 import { Field, FieldLabel } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
+import {
+	Popover,
+	PopoverContent,
+	PopoverHeader,
+	PopoverTitle,
+} from "#/components/ui/popover";
 import { AdminApiError } from "#/lib/admin";
-import { useRevokeApiKey, useUpdateApiKey } from "#/lib/model-gateway-queries";
+import { useDeleteApiKey, useUpdateApiKey } from "#/lib/model-gateway-queries";
 
 type ApiKeyCardProps = {
 	apiKey: ApiKeyView;
 	models: string[];
 };
 
+function formatDate(value: string | null) {
+	return value ? new Date(value).toLocaleString() : "Never";
+}
+
 export function ApiKeyCard({ apiKey, models }: ApiKeyCardProps) {
-	const revokedAt = apiKey.revoked_at;
+	const [editOpen, setEditOpen] = useState(false);
+	const [deleted, setDeleted] = useState(false);
+	const [name, setName] = useState(apiKey.name);
 	const [selected, setSelected] = useState(apiKey.models);
 	const update = useUpdateApiKey();
-	const revoke = useRevokeApiKey();
+	const removeKey = useDeleteApiKey();
 
 	const save = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (update.isPending) return;
-		const form = new FormData(event.currentTarget);
-		const name = String(form.get("name") ?? "").trim();
 		try {
 			await update.mutateAsync({
 				id: apiKey.id,
-				payload: { name, models: selected },
+				payload: { name: name.trim(), models: selected },
 			});
-			toast.success(`Updated ${name}`);
+			setEditOpen(false);
+			toast.success(`Updated ${name.trim()}`);
 		} catch (error) {
 			toast.error(
 				error instanceof AdminApiError
@@ -51,88 +61,123 @@ export function ApiKeyCard({ apiKey, models }: ApiKeyCardProps) {
 
 	const remove = async () => {
 		if (
-			revoke.isPending ||
-			!window.confirm(`Revoke API key "${apiKey.name}"? This cannot be undone.`)
+			removeKey.isPending ||
+			!window.confirm(`Delete API key "${apiKey.name}"? This cannot be undone.`)
 		) {
 			return;
 		}
 		try {
-			await revoke.mutateAsync(apiKey.id);
-			toast.success(`Revoked ${apiKey.name}`);
+			await removeKey.mutateAsync(apiKey.id);
+			setDeleted(true);
+			toast.success(`Deleted ${apiKey.name}`);
 		} catch (error) {
 			toast.error(
 				error instanceof AdminApiError
 					? error.message
-					: "Could not revoke the API key.",
+					: "Could not delete the API key.",
 			);
 		}
 	};
 
+	if (deleted) return null;
+
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center justify-between gap-3 text-base">
-					<span className="flex items-center gap-2">
-						{apiKey.name}
-						{revokedAt && <Badge variant="secondary">Revoked</Badge>}
-					</span>
-					<code className="text-xs font-normal text-muted-foreground">
-						{apiKey.prefix}…
-					</code>
-				</CardTitle>
-				<CardDescription>
-					Created {new Date(apiKey.created_at).toLocaleString()}
-					{apiKey.last_used_at
-						? ` · Last used ${new Date(apiKey.last_used_at).toLocaleString()}`
-						: " · Never used"}
-				</CardDescription>
-			</CardHeader>
-			<CardContent>
-				{revokedAt ? (
-					<p className="text-sm text-muted-foreground">
-						Revoked {new Date(revokedAt).toLocaleString()}. This key no longer
-						has access to any model.
-					</p>
-				) : (
-					<form onSubmit={save} className="flex flex-col gap-4">
-						<Field>
-							<FieldLabel htmlFor={`key-${apiKey.id}`}>Name</FieldLabel>
-							<Input
-								id={`key-${apiKey.id}`}
-								name="name"
-								defaultValue={apiKey.name}
-								required
-							/>
-						</Field>
-						<Field>
-							<FieldLabel>Allowed models</FieldLabel>
-							<ModelSelection
-								names={models}
-								selected={selected}
-								onChange={setSelected}
-							/>
-						</Field>
-						<div className="flex justify-end gap-2">
+		<tr className="border-b last:border-0">
+			<td className="px-4 py-3 align-top font-medium">{apiKey.name}</td>
+			<td className="px-4 py-3 align-top">
+				<code className="text-xs text-muted-foreground">{apiKey.prefix}…</code>
+			</td>
+			<td className="max-w-64 px-4 py-3 align-top">
+				<div className="flex flex-wrap gap-1">
+					{apiKey.models.map((model) => (
+						<Badge key={model} variant="outline" className="font-mono text-xs">
+							{model}
+						</Badge>
+					))}
+				</div>
+			</td>
+			<td className="whitespace-nowrap px-4 py-3 align-top text-sm text-muted-foreground">
+				{formatDate(apiKey.created_at)}
+			</td>
+			<td className="whitespace-nowrap px-4 py-3 align-top text-sm text-muted-foreground">
+				{formatDate(apiKey.last_used_at)}
+			</td>
+			<td className="px-4 py-3 text-right align-top">
+				<Popover
+					open={editOpen}
+					onOpenChange={(open) => {
+						setEditOpen(open);
+						if (open) {
+							setName(apiKey.name);
+							setSelected(apiKey.models);
+						}
+					}}
+				>
+					<DropdownMenu>
+						<DropdownMenuTrigger asChild>
 							<Button
-								type="button"
 								variant="outline"
-								className="text-destructive"
-								disabled={revoke.isPending}
-								onClick={() => void remove()}
+								size="icon"
+								aria-label={`Actions for ${apiKey.name}`}
 							>
-								<Trash2Icon className="size-3.5" />
-								{revoke.isPending ? "Revoking…" : "Revoke"}
+								<MoreHorizontalIcon className="size-4" />
 							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end">
+							<DropdownMenuItem onSelect={() => setEditOpen(true)}>
+								<PencilIcon />
+								Edit API key
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								variant="destructive"
+								disabled={removeKey.isPending}
+								onSelect={(event) => {
+									event.preventDefault();
+									void remove();
+								}}
+							>
+								<Trash2Icon />
+								Delete API key
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+					<PopoverContent
+						align="end"
+						className="w-[min(28rem,calc(100vw-2rem))]"
+					>
+						<PopoverHeader>
+							<PopoverTitle>Edit API key</PopoverTitle>
+						</PopoverHeader>
+						<form onSubmit={save} className="mt-4 flex flex-col gap-4">
+							<Field>
+								<FieldLabel htmlFor={`key-${apiKey.id}`}>Name</FieldLabel>
+								<Input
+									id={`key-${apiKey.id}`}
+									value={name}
+									onChange={(event) => setName(event.target.value)}
+									required
+								/>
+							</Field>
+							<Field>
+								<FieldLabel>Allowed models</FieldLabel>
+								<ModelSelection
+									names={models}
+									selected={selected}
+									onChange={setSelected}
+								/>
+							</Field>
 							<Button
 								type="submit"
-								disabled={update.isPending || selected.length === 0}
+								disabled={
+									update.isPending || !name.trim() || selected.length === 0
+								}
 							>
-								{update.isPending ? "Saving…" : "Save access"}
+								{update.isPending ? "Saving…" : "Save changes"}
 							</Button>
-						</div>
-					</form>
-				)}
-			</CardContent>
-		</Card>
+						</form>
+					</PopoverContent>
+				</Popover>
+			</td>
+		</tr>
 	);
 }

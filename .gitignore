@@ -226,3 +226,6 @@ __marimo__/
 
 # Playwright
 .playwright-mcp
+
+# OpenCode
+opencode.json

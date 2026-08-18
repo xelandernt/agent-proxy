@@ -90,7 +90,7 @@ export function useUpdateApiKey() {
 	});
 }
 
-export function useRevokeApiKey() {
+export function useDeleteApiKey() {
 	const client = useQueryClient();
 	return useMutation({
 		mutationFn: revokeUserApiKey,

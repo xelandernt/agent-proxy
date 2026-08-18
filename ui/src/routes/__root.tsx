@@ -220,7 +220,7 @@ function RootNotFound() {
 				</EmptyHeader>
 				<EmptyContent>
 					<Link to="/">
-						<Button variant="outline">Back to servers</Button>
+						<Button variant="outline">Back to MCP servers</Button>
 					</Link>
 				</EmptyContent>
 			</Empty>

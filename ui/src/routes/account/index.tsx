@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { KeyRoundIcon, LogOutIcon, PlusIcon } from "lucide-react";
+import { KeyRoundIcon, PlusIcon } from "lucide-react";
 import type { FormEvent } from "react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -28,8 +28,14 @@ import {
 	FieldLabel,
 } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
+import {
+	Popover,
+	PopoverContent,
+	PopoverHeader,
+	PopoverTitle,
+	PopoverTrigger,
+} from "#/components/ui/popover";
 import { AdminApiError } from "#/lib/admin";
-import { endUserSession } from "#/lib/auth";
 import { CopySnippet } from "#/lib/copy";
 import {
 	useCreateApiKey,
@@ -49,8 +55,9 @@ function AccountIndex() {
 	const [selection, setSelection] = useState<string[] | null>(null);
 	const [created, setCreated] = useState<ApiKeyCreated | null>(null);
 	const creating = useRef(false);
-	const loggingOut = useRef(false);
+	const [createOpen, setCreateOpen] = useState(false);
 	const modelNames = models.data?.map((model) => model.name) ?? [];
+	const activeKeys = keys.data?.filter((apiKey) => !apiKey.revoked_at) ?? [];
 	const selected = selection ?? modelNames;
 
 	const submit = async (event: FormEvent) => {
@@ -65,6 +72,7 @@ function AccountIndex() {
 			setCreated(result);
 			setName("");
 			setSelection(null);
+			setCreateOpen(false);
 			toast.success("API key created");
 		} catch (error) {
 			toast.error(
@@ -74,16 +82,6 @@ function AccountIndex() {
 			);
 		} finally {
 			creating.current = false;
-		}
-	};
-
-	const logout = async () => {
-		if (loggingOut.current) return;
-		loggingOut.current = true;
-		if (await endUserSession()) window.location.assign("/");
-		else {
-			loggingOut.current = false;
-			toast.error("Could not sign out. Try again.");
 		}
 	};
 
@@ -100,10 +98,60 @@ function AccountIndex() {
 							: "Manage personal model access."}
 					</p>
 				</div>
-				<Button variant="outline" onClick={() => void logout()}>
-					<LogOutIcon className="size-4" />
-					Sign out
-				</Button>
+				<Popover open={createOpen} onOpenChange={setCreateOpen}>
+					<PopoverTrigger asChild>
+						<Button>
+							<PlusIcon className="size-4" />
+							Create API key
+						</Button>
+					</PopoverTrigger>
+					<PopoverContent
+						align="end"
+						className="w-[min(28rem,calc(100vw-2rem))]"
+					>
+						<PopoverHeader>
+							<PopoverTitle>Create API key</PopoverTitle>
+						</PopoverHeader>
+						<form onSubmit={submit} className="mt-4">
+							<FieldGroup>
+								<Field>
+									<FieldLabel htmlFor="new-key-name">Name</FieldLabel>
+									<Input
+										id="new-key-name"
+										value={name}
+										onChange={(event) => setName(event.target.value)}
+										placeholder="Local development"
+										required
+									/>
+								</Field>
+								<Field>
+									<FieldLabel>Allowed models</FieldLabel>
+									{modelNames.length ? (
+										<ModelSelection
+											names={modelNames}
+											selected={selected}
+											onChange={setSelection}
+										/>
+									) : (
+										<FieldDescription>
+											No models are configured yet. Ask an administrator to
+											create one.
+										</FieldDescription>
+									)}
+								</Field>
+								<Button
+									type="submit"
+									className="self-end"
+									disabled={
+										create.isPending || !name.trim() || selected.length === 0
+									}
+								>
+									{create.isPending ? "Creating…" : "Create API key"}
+								</Button>
+							</FieldGroup>
+						</form>
+					</PopoverContent>
+				</Popover>
 			</header>
 
 			{created && (
@@ -125,58 +173,6 @@ function AccountIndex() {
 				</Card>
 			)}
 
-			<Card>
-				<CardHeader>
-					<CardTitle className="flex items-center gap-2">
-						<PlusIcon className="size-4" />
-						Create API key
-					</CardTitle>
-					<CardDescription>
-						Choose exactly which configured models this key can call.
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<form onSubmit={submit}>
-						<FieldGroup>
-							<Field>
-								<FieldLabel htmlFor="new-key-name">Name</FieldLabel>
-								<Input
-									id="new-key-name"
-									value={name}
-									onChange={(event) => setName(event.target.value)}
-									placeholder="Local development"
-									required
-								/>
-							</Field>
-							<Field>
-								<FieldLabel>Allowed models</FieldLabel>
-								{modelNames.length ? (
-									<ModelSelection
-										names={modelNames}
-										selected={selected}
-										onChange={setSelection}
-									/>
-								) : (
-									<FieldDescription>
-										No models are configured yet. Ask an administrator to create
-										one.
-									</FieldDescription>
-								)}
-							</Field>
-							<Button
-								type="submit"
-								className="self-end"
-								disabled={
-									create.isPending || !name.trim() || selected.length === 0
-								}
-							>
-								{create.isPending ? "Creating…" : "Create API key"}
-							</Button>
-						</FieldGroup>
-					</form>
-				</CardContent>
-			</Card>
-
 			<section className="flex flex-col gap-4">
 				<h2 className="font-serif text-2xl font-semibold">Existing keys</h2>
 				{keys.isLoading && (
@@ -189,7 +185,7 @@ function AccountIndex() {
 							: String(keys.error)}
 					</p>
 				)}
-				{keys.isSuccess && keys.data.length === 0 && (
+				{keys.isSuccess && activeKeys.length === 0 && (
 					<Empty>
 						<EmptyMedia variant="icon">
 							<KeyRoundIcon />
@@ -202,9 +198,43 @@ function AccountIndex() {
 						</EmptyHeader>
 					</Empty>
 				)}
-				{keys.data?.map((apiKey) => (
-					<ApiKeyCard key={apiKey.id} apiKey={apiKey} models={modelNames} />
-				))}
+				{activeKeys.length > 0 && (
+					<div className="overflow-x-auto rounded-lg border">
+						<table className="w-full min-w-[50rem] text-left text-sm">
+							<thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+								<tr>
+									<th scope="col" className="px-4 py-3 font-medium">
+										Name
+									</th>
+									<th scope="col" className="px-4 py-3 font-medium">
+										Key prefix
+									</th>
+									<th scope="col" className="px-4 py-3 font-medium">
+										Allowed models
+									</th>
+									<th scope="col" className="px-4 py-3 font-medium">
+										Created
+									</th>
+									<th scope="col" className="px-4 py-3 font-medium">
+										Last used
+									</th>
+									<th scope="col" className="px-4 py-3 text-right font-medium">
+										Actions
+									</th>
+								</tr>
+							</thead>
+							<tbody>
+								{activeKeys.map((apiKey) => (
+									<ApiKeyCard
+										key={apiKey.id}
+										apiKey={apiKey}
+										models={modelNames}
+									/>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 			</section>
 		</div>
 	);
