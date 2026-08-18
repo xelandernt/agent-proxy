@@ -25,6 +25,8 @@ from proxy.app.inference.errors import (
     openai_unhandled_error_handler,
     openai_validation_handler,
 )
+from proxy.app.model_usage.admin_endpoints import router as admin_usage_router
+from proxy.app.model_usage.endpoints import router as user_usage_router
 from proxy.app.model_usage.recorder import ModelUsageRecorder
 from proxy.app.usage.endpoints import router as usage_router
 from proxy.app.usage.middleware import UsageRecorder
@@ -99,9 +101,11 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     gateway.include_router(admin_router)
     gateway.include_router(auth_providers_router)
     gateway.include_router(admin_models_router)
+    gateway.include_router(admin_usage_router)
     gateway.include_router(user_public_router)
     gateway.include_router(user_router)
     gateway.include_router(user_account_router)
+    gateway.include_router(user_usage_router)
     gateway.include_router(inference_router)
     gateway.add_exception_handler(OpenAIErrorException, cast(Any, openai_error_handler))
     gateway.add_exception_handler(

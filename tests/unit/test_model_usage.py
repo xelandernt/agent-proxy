@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
@@ -23,6 +24,7 @@ def usage_record() -> ModelUsageRecord:
         input_tokens=2,
         output_tokens=3,
         total_tokens=5,
+        cost_usd=Decimal("0.00125"),
         duration_ms=10,
         error_type=None,
         streaming=False,

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from decimal import Decimal
 from typing import Any
 
 import pytest
+from litellm.types.llms.openai import ResponseCompletedEvent, ResponsesAPIResponse
 
 from proxy.llm.adapter import LiteLLMResponsesAdapter, LLMUpstreamError
 from proxy.model_deployments.schemas import ResolvedModelDeployment
@@ -36,7 +38,7 @@ async def test_adapter_owns_model_endpoint_credentials_and_stream_flag(
 
     monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
 
-    response = await LiteLLMResponsesAdapter().create(
+    result = await LiteLLMResponsesAdapter().create(
         deployment(), {"input": "hello", "model": "attacker", "stream": True}
     )
 
@@ -48,8 +50,9 @@ async def test_adapter_owns_model_endpoint_credentials_and_stream_flag(
         "stream": False,
         "api_base": "https://provider.example/v1",
     }
-    assert response["model"] == "public-model"
-    assert "_hidden_params" not in response
+    assert result.payload["model"] == "public-model"
+    assert "_hidden_params" not in result.payload
+    assert result.accounting.cost_usd == Decimal("1")
 
 
 @pytest.mark.asyncio
@@ -68,10 +71,10 @@ async def test_adapter_streams_events_without_buffering(
     stream = LiteLLMResponsesAdapter().stream(deployment(), {"input": "hello"})
 
     first = await anext(stream)
-    assert first["type"] == "response.created"
-    assert first["response"]["model"] == "public-model"
+    assert first.payload["type"] == "response.created"
+    assert first.payload["response"]["model"] == "public-model"
     second = await anext(stream)
-    assert second["delta"] == "hello"
+    assert second.payload["delta"] == "hello"
 
 
 @pytest.mark.asyncio
@@ -94,7 +97,7 @@ async def test_adapter_closes_upstream_when_consumer_disconnects(
     monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
     stream = LiteLLMResponsesAdapter().stream(deployment(), {"input": "hello"})
 
-    assert (await anext(stream))["delta"] == "first"
+    assert (await anext(stream)).payload["delta"] == "first"
     await stream.aclose()
 
     assert closed is True
@@ -133,3 +136,136 @@ async def test_adapter_sanitizes_invalid_upstream_response(
         await LiteLLMResponsesAdapter().create(deployment(), {"input": "hello"})
 
     assert captured.value.error_type == "InvalidLLMResponse"
+
+
+def response(*, cost: object = 0.00125) -> ResponsesAPIResponse:
+    value = ResponsesAPIResponse(
+        id="resp_1",
+        created_at=1,
+        model="anthropic/private-model",
+        output=[],
+        usage={"input_tokens": 5, "output_tokens": 3, "total_tokens": 8},
+    )
+    value._hidden_params["response_cost"] = cost
+    return value
+
+
+@pytest.mark.asyncio
+async def test_adapter_extracts_typed_non_streaming_accounting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_aresponses(**_kwargs: Any) -> ResponsesAPIResponse:
+        return response(cost=0.00125)
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+
+    result = await LiteLLMResponsesAdapter().create(deployment(), {"input": "hello"})
+
+    assert result.accounting.input_tokens == 5
+    assert result.accounting.output_tokens == 3
+    assert result.accounting.total_tokens == 8
+    assert result.accounting.cost_usd == Decimal("0.00125")
+    assert result.payload["model"] == "public-model"
+    assert "_hidden_params" not in result.payload
+
+
+@pytest.mark.asyncio
+async def test_adapter_calculates_terminal_stream_cost_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    terminal_response = response(cost=None)
+    terminal_response._hidden_params.clear()
+    terminal = ResponseCompletedEvent(
+        type="response.completed", response=terminal_response
+    )
+    calls: list[object] = []
+
+    async def events() -> AsyncIterator[ResponseCompletedEvent]:
+        yield terminal
+
+    async def fake_aresponses(**_kwargs: Any) -> AsyncIterator[ResponseCompletedEvent]:
+        return events()
+
+    def fake_completion_cost(*, completion_response: object) -> float:
+        calls.append(completion_response)
+        return 0.00125
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+    monkeypatch.setattr(
+        "proxy.llm.adapter.litellm.completion_cost", fake_completion_cost
+    )
+
+    results = [
+        result
+        async for result in LiteLLMResponsesAdapter().stream(
+            deployment(), {"input": "hello"}
+        )
+    ]
+
+    assert results[0].accounting.total_tokens == 8
+    assert results[0].accounting.cost_usd == Decimal("0.00125")
+    assert calls == [terminal_response]
+    assert "cost" not in results[0].payload["response"]["usage"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("tokens", "cost"),
+    [
+        (-1, -1),
+        (True, True),
+        (1.5, float("inf")),
+        ("1", float("nan")),
+    ],
+)
+async def test_adapter_rejects_invalid_accounting_values(
+    monkeypatch: pytest.MonkeyPatch,
+    tokens: object,
+    cost: object,
+) -> None:
+    raw = {
+        "id": "resp_1",
+        "model": "private",
+        "usage": {
+            "input_tokens": tokens,
+            "output_tokens": tokens,
+            "total_tokens": tokens,
+        },
+        "_hidden_params": {"response_cost": cost},
+    }
+
+    async def fake_aresponses(**_kwargs: Any) -> dict[str, Any]:
+        return raw
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+
+    result = await LiteLLMResponsesAdapter().create(deployment(), {"input": "hello"})
+
+    assert result.accounting.input_tokens is None
+    assert result.accounting.output_tokens is None
+    assert result.accounting.total_tokens is None
+    assert result.accounting.cost_usd is None
+
+
+@pytest.mark.asyncio
+async def test_adapter_preserves_zero_accounting_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw = {
+        "id": "resp_1",
+        "model": "private",
+        "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
+        "_hidden_params": {"response_cost": 0.0},
+    }
+
+    async def fake_aresponses(**_kwargs: Any) -> dict[str, Any]:
+        return raw
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+
+    result = await LiteLLMResponsesAdapter().create(deployment(), {"input": "hello"})
+
+    assert result.accounting.input_tokens == 0
+    assert result.accounting.output_tokens == 0
+    assert result.accounting.total_tokens == 0
+    assert result.accounting.cost_usd == Decimal("0.0")

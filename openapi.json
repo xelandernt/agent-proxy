@@ -973,6 +973,232 @@
         }
       }
     },
+    "/api/admin/usage": {
+      "get": {
+        "tags": [
+          "admin-model-usage"
+        ],
+        "summary": "Admin Model Usage",
+        "operationId": "admin_model_usage_api_admin_usage_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "To"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "api_key_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminModelUsageReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/usage/series": {
+      "get": {
+        "tags": [
+          "admin-model-usage"
+        ],
+        "summary": "Admin Model Usage Series",
+        "operationId": "admin_model_usage_series_api_admin_usage_series_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "To"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "minute",
+                "hour",
+                "day"
+              ],
+              "type": "string",
+              "title": "Bucket"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "api_key_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelUsageSeriesReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/user/auth-status": {
       "get": {
         "tags": [
@@ -1285,6 +1511,198 @@
         }
       }
     },
+    "/api/user/usage": {
+      "get": {
+        "tags": [
+          "user-model-usage"
+        ],
+        "summary": "User Model Usage",
+        "operationId": "user_model_usage_api_user_usage_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "To"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "api_key_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserModelUsageReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/usage/series": {
+      "get": {
+        "tags": [
+          "user-model-usage"
+        ],
+        "summary": "User Model Usage Series",
+        "operationId": "user_model_usage_series_api_user_usage_series_get",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "To"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "minute",
+                "hour",
+                "day"
+              ],
+              "type": "string",
+              "title": "Bucket"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100,
+                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model"
+            }
+          },
+          {
+            "name": "api_key_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Api Key Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelUsageSeriesReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/models": {
       "get": {
         "tags": [
@@ -1348,6 +1766,123 @@
   },
   "components": {
     "schemas": {
+      "AdminModelUsageReport": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "metered_requests": {
+            "type": "integer",
+            "title": "Metered Requests"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "costed_requests": {
+            "type": "integer",
+            "title": "Costed Requests"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsageModelBreakdown"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "api_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsageApiKeyBreakdown"
+            },
+            "type": "array",
+            "title": "Api Keys"
+          },
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsageUserBreakdown"
+            },
+            "type": "array",
+            "title": "Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "successful_requests",
+          "failed_requests",
+          "metered_requests",
+          "input_tokens",
+          "output_tokens",
+          "total_tokens",
+          "costed_requests",
+          "cost_usd",
+          "start",
+          "end",
+          "models",
+          "api_keys",
+          "users"
+        ],
+        "title": "AdminModelUsageReport"
+      },
       "ApiKeyCreate": {
         "properties": {
           "name": {
@@ -2718,187 +3253,6 @@
         ],
         "title": "DiscordAuthProviderConfig"
       },
-      "FunctionCallInput": {
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "function_call",
-            "title": "Type"
-          },
-          "call_id": {
-            "type": "string",
-            "title": "Call Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "arguments": {
-            "type": "string",
-            "title": "Arguments"
-          },
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Id"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "in_progress",
-                  "completed",
-                  "incomplete"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "type",
-          "call_id",
-          "name",
-          "arguments"
-        ],
-        "title": "FunctionCallInput"
-      },
-      "FunctionCallOutput": {
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "function_call_output",
-            "title": "Type"
-          },
-          "call_id": {
-            "type": "string",
-            "title": "Call Id"
-          },
-          "output": {
-            "type": "string",
-            "title": "Output"
-          },
-          "id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Id"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "in_progress",
-                  "completed",
-                  "incomplete"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "type",
-          "call_id",
-          "output"
-        ],
-        "title": "FunctionCallOutput"
-      },
-      "FunctionTool": {
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "function",
-            "title": "Type"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 64,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "parameters": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Parameters"
-          },
-          "strict": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Strict"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "type",
-          "name",
-          "parameters"
-        ],
-        "title": "FunctionTool"
-      },
-      "FunctionToolChoice": {
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "function",
-            "title": "Type"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "type",
-          "name"
-        ],
-        "title": "FunctionToolChoice"
-      },
       "GitHubAuthProviderConfig": {
         "properties": {
           "resource_base_url": {
@@ -3567,43 +3921,6 @@
         ],
         "title": "HuggingFaceAuthProviderConfig"
       },
-      "InputMessage": {
-        "properties": {
-          "type": {
-            "anyOf": [
-              {
-                "type": "string",
-                "const": "message"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Type"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "user",
-              "assistant",
-              "system",
-              "developer"
-            ],
-            "title": "Role"
-          },
-          "content": {
-            "type": "string",
-            "title": "Content"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "role",
-          "content"
-        ],
-        "title": "InputMessage"
-      },
       "ItemCount": {
         "properties": {
           "name": {
@@ -4085,6 +4402,423 @@
         ],
         "title": "ModelDeploymentView"
       },
+      "ModelUsageApiKeyBreakdown": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "metered_requests": {
+            "type": "integer",
+            "title": "Metered Requests"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "costed_requests": {
+            "type": "integer",
+            "title": "Costed Requests"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "api_key_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Api Key Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "prefix": {
+            "type": "string",
+            "title": "Prefix"
+          },
+          "revoked": {
+            "type": "boolean",
+            "title": "Revoked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "successful_requests",
+          "failed_requests",
+          "metered_requests",
+          "input_tokens",
+          "output_tokens",
+          "total_tokens",
+          "costed_requests",
+          "cost_usd",
+          "api_key_id",
+          "name",
+          "prefix",
+          "revoked"
+        ],
+        "title": "ModelUsageApiKeyBreakdown"
+      },
+      "ModelUsageModelBreakdown": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "metered_requests": {
+            "type": "integer",
+            "title": "Metered Requests"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "costed_requests": {
+            "type": "integer",
+            "title": "Costed Requests"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "successful_requests",
+          "failed_requests",
+          "metered_requests",
+          "input_tokens",
+          "output_tokens",
+          "total_tokens",
+          "costed_requests",
+          "cost_usd",
+          "model"
+        ],
+        "title": "ModelUsageModelBreakdown"
+      },
+      "ModelUsageSeriesPoint": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "metered_requests": {
+            "type": "integer",
+            "title": "Metered Requests"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "costed_requests": {
+            "type": "integer",
+            "title": "Costed Requests"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "successful_requests",
+          "failed_requests",
+          "metered_requests",
+          "input_tokens",
+          "output_tokens",
+          "total_tokens",
+          "costed_requests",
+          "cost_usd",
+          "ts"
+        ],
+        "title": "ModelUsageSeriesPoint"
+      },
+      "ModelUsageSeriesReport": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "minute",
+              "hour",
+              "day"
+            ],
+            "title": "Bucket"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsageSeriesPoint"
+            },
+            "type": "array",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "bucket",
+          "points"
+        ],
+        "title": "ModelUsageSeriesReport"
+      },
+      "ModelUsageUserBreakdown": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "metered_requests": {
+            "type": "integer",
+            "title": "Metered Requests"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "costed_requests": {
+            "type": "integer",
+            "title": "Costed Requests"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "successful_requests",
+          "failed_requests",
+          "metered_requests",
+          "input_tokens",
+          "output_tokens",
+          "total_tokens",
+          "costed_requests",
+          "cost_usd",
+          "user_id",
+          "display_name",
+          "email"
+        ],
+        "title": "ModelUsageUserBreakdown"
+      },
       "OAuthBrowserInfo": {
         "properties": {
           "issuer": {
@@ -4512,226 +5246,11 @@
         ],
         "title": "PropelAuthProviderConfig"
       },
-      "ReasoningOptions": {
-        "properties": {
-          "effort": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "none",
-                  "minimal",
-                  "low",
-                  "medium",
-                  "high",
-                  "xhigh"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Effort"
-          },
-          "summary": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "auto",
-                  "concise",
-                  "detailed"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "ReasoningOptions"
-      },
       "ResponsesRequest": {
-        "properties": {
-          "model": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Model"
-          },
-          "input": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "items": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/InputMessage"
-                    },
-                    {
-                      "$ref": "#/components/schemas/FunctionCallInput"
-                    },
-                    {
-                      "$ref": "#/components/schemas/FunctionCallOutput"
-                    }
-                  ]
-                },
-                "type": "array"
-              }
-            ],
-            "title": "Input"
-          },
-          "instructions": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Instructions"
-          },
-          "max_output_tokens": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Output Tokens"
-          },
-          "reasoning": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReasoningOptions"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tools": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/FunctionTool"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tools"
-          },
-          "tool_choice": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "none",
-                  "auto",
-                  "required"
-                ]
-              },
-              {
-                "$ref": "#/components/schemas/FunctionToolChoice"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tool Choice"
-          },
-          "parallel_tool_calls": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Parallel Tool Calls"
-          },
-          "temperature": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 2.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Temperature"
-          },
-          "top_p": {
-            "anyOf": [
-              {
-                "type": "number",
-                "maximum": 1.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Top P"
-          },
-          "truncation": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "auto",
-                  "disabled"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Truncation"
-          },
-          "metadata": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "type": "string"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Metadata"
-          },
-          "stream": {
-            "type": "boolean",
-            "title": "Stream",
-            "default": false
-          }
-        },
-        "additionalProperties": false,
+        "additionalProperties": true,
         "type": "object",
-        "required": [
-          "model",
-          "input"
-        ],
         "title": "ResponsesRequest",
-        "description": "Strict first-release subset of OpenAI's Responses create request."
+        "description": "OpenAI Responses request with the gateway's routing requirements."
       },
       "ScalekitAuthProviderConfig": {
         "properties": {
@@ -5318,6 +5837,115 @@
           "oauth"
         ],
         "title": "UserAuthStatus"
+      },
+      "UserModelUsageReport": {
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "successful_requests": {
+            "type": "integer",
+            "title": "Successful Requests"
+          },
+          "failed_requests": {
+            "type": "integer",
+            "title": "Failed Requests"
+          },
+          "metered_requests": {
+            "type": "integer",
+            "title": "Metered Requests"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "costed_requests": {
+            "type": "integer",
+            "title": "Costed Requests"
+          },
+          "cost_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Usd"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsageModelBreakdown"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "api_keys": {
+            "items": {
+              "$ref": "#/components/schemas/ModelUsageApiKeyBreakdown"
+            },
+            "type": "array",
+            "title": "Api Keys"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requests",
+          "successful_requests",
+          "failed_requests",
+          "metered_requests",
+          "input_tokens",
+          "output_tokens",
+          "total_tokens",
+          "costed_requests",
+          "cost_usd",
+          "start",
+          "end",
+          "models",
+          "api_keys"
+        ],
+        "title": "UserModelUsageReport"
       },
       "UserView": {
         "properties": {

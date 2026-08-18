@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 from pydantic import SecretStr
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from proxy.api_keys.repository import ApiKeyRepository
@@ -34,10 +35,41 @@ async def session_factory(
 ) -> AsyncIterator[async_sessionmaker]:
     engine: AsyncEngine = create_engine(postgresql_url)
     await create_all_tables(engine)
+    await create_all_tables(engine)
     try:
         yield create_session_factory(engine)
     finally:
         await engine.dispose()
+
+
+async def test_fresh_schema_contains_cost_and_reporting_indexes(
+    postgresql_url: str,
+) -> None:
+    engine = create_engine(postgresql_url)
+    await create_all_tables(engine)
+    try:
+        async with engine.connect() as connection:
+            columns = await connection.run_sync(
+                lambda sync_connection: inspect(sync_connection).get_columns(
+                    "model_usage_events"
+                )
+            )
+            indexes = await connection.run_sync(
+                lambda sync_connection: inspect(sync_connection).get_indexes(
+                    "model_usage_events"
+                )
+            )
+    finally:
+        await engine.dispose()
+
+    cost = next(column for column in columns if column["name"] == "cost_usd")
+    assert cost["nullable"] is True
+    assert str(cost["type"]) == "NUMERIC(20, 12)"
+    assert {
+        ("user_id", "ts"),
+        ("api_key_id", "ts"),
+        ("model_name", "ts"),
+    } <= {tuple(index["column_names"]) for index in indexes}
 
 
 async def test_user_model_key_and_usage_lifecycle(
@@ -129,6 +161,7 @@ async def test_user_model_key_and_usage_lifecycle(
             input_tokens=10,
             output_tokens=4,
             total_tokens=14,
+            cost_usd=Decimal("0.00042"),
             duration_ms=25,
             error_type=None,
             streaming=False,
@@ -141,6 +174,7 @@ async def test_user_model_key_and_usage_lifecycle(
         event = (await session.execute(select(ModelUsageEvent))).scalar_one()
         assert event.model_name == "azure"
         assert event.total_tokens == 14
+        assert event.cost_usd == Decimal("0.000420000000")
         assert not (
             {"input", "output", "instructions"} & set(event.__table__.columns.keys())
         )

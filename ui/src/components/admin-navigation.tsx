@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
 	BotIcon,
+	ChartNoAxesCombinedIcon,
 	KeyRoundIcon,
 	LockIcon,
 	LockKeyholeIcon,
@@ -33,11 +34,15 @@ export function AdminNavigation() {
 		location.pathname.startsWith("/admin/models") ||
 		location.pathname.startsWith("/account/models");
 	const accountActive =
-		location.pathname.startsWith("/account") && !modelsActive;
+		location.pathname === "/account" || location.pathname === "/account/";
+	const usageActive =
+		location.pathname.startsWith("/admin/usage") ||
+		location.pathname.startsWith("/account/usage");
 	const serversActive =
 		!providersActive &&
 		!modelsActive &&
 		!accountActive &&
+		!usageActive &&
 		location.pathname !== "/admin/callback";
 	const expanded = sidebarHovered || sidebarLocked;
 
@@ -91,6 +96,30 @@ export function AdminNavigation() {
 				</Link>
 
 				<nav className="flex flex-col gap-1" aria-label="Sections">
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Link
+								to={authenticated ? "/admin/usage" : "/account/usage"}
+								className={cn(
+									navItemClass,
+									usageActive
+										? "bg-accent text-foreground"
+										: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+								)}
+								aria-current={usageActive ? "page" : undefined}
+								aria-label="Model usage"
+							>
+								<ChartNoAxesCombinedIcon className="size-4 shrink-0" />
+								<span className={labelClass}>
+									{authenticated ? "Usage" : "My usage"}
+								</span>
+							</Link>
+						</TooltipTrigger>
+						<TooltipContent side="right">
+							{authenticated ? "Model usage" : "Your model usage"}
+						</TooltipContent>
+					</Tooltip>
+
 					<Tooltip>
 						<TooltipTrigger asChild>
 							{authenticated ? (

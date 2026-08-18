@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Any
+from decimal import Decimal
 from uuid import UUID
 
 import pytest
@@ -11,7 +11,7 @@ from proxy.app.inference.errors import OpenAIErrorException
 from proxy.app.inference.schemas import ResponsesRequest
 from proxy.app.inference.service import InferenceService
 from proxy.app.model_usage.recorder import ModelUsageRecord
-from proxy.llm.adapter import LLMUpstreamError
+from proxy.llm.adapter import LLMAccounting, LLMResult, LLMUpstreamError
 from proxy.model_deployments.schemas import ResolvedModelDeployment
 
 KEY_ID = UUID("4fb9ca09-2e2b-4e3f-ac94-630f911c8acf")
@@ -35,33 +35,36 @@ class FakeModels:
 
 class FakeAdapter:
     failure: LLMUpstreamError | None = None
+    terminal_type = "response.completed"
 
     async def create(
         self,
         deployment: ResolvedModelDeployment,
         _request: dict[str, object],
-    ) -> dict[str, Any]:
+    ) -> LLMResult:
         if self.failure is not None:
             raise self.failure
-        return {
-            "id": "resp_1",
-            "model": deployment.name,
-            "usage": {"input_tokens": 5, "output_tokens": 3, "total_tokens": 8},
-        }
+        return LLMResult(
+            payload={"id": "resp_1", "model": deployment.name},
+            accounting=LLMAccounting(5, 3, 8, Decimal("0.00125")),
+        )
 
     async def stream(
         self,
         deployment: ResolvedModelDeployment,
         _request: dict[str, object],
-    ) -> AsyncIterator[dict[str, Any]]:
-        yield {"type": "response.output_text.delta", "delta": "hello"}
-        yield {
-            "type": "response.completed",
-            "response": {
-                "model": deployment.name,
-                "usage": {"input_tokens": 5, "output_tokens": 3, "total_tokens": 8},
+    ) -> AsyncIterator[LLMResult]:
+        yield LLMResult(
+            payload={"type": "response.output_text.delta", "delta": "hello"},
+            accounting=LLMAccounting(None, None, None, None),
+        )
+        yield LLMResult(
+            payload={
+                "type": self.terminal_type,
+                "response": {"model": deployment.name},
             },
-        }
+            accounting=LLMAccounting(5, 3, 8, Decimal("0.00125")),
+        )
 
 
 class FakeUsageRecorder:
@@ -120,6 +123,26 @@ async def test_inference_records_non_streaming_and_streaming_usage() -> None:
         (True, 8),
     ]
     assert all(record.provider == "anthropic" for record in usage.records)
+    assert all(record.cost_usd == Decimal("0.00125") for record in usage.records)
+
+
+@pytest.mark.asyncio
+async def test_inference_records_incomplete_stream_as_failed_with_accounting() -> None:
+    inference, _, adapter, usage = service()
+    adapter.terminal_type = "response.incomplete"
+
+    events = [
+        event
+        async for event in inference.stream(
+            api_key("alpha"), ResponsesRequest(model="alpha", input="hello")
+        )
+    ]
+
+    assert events[-1]["type"] == "response.incomplete"
+    assert usage.records[0].status_code == 502
+    assert usage.records[0].error_type == "incomplete_response"
+    assert usage.records[0].total_tokens == 8
+    assert usage.records[0].cost_usd == Decimal("0.00125")
 
 
 @pytest.mark.asyncio
@@ -161,3 +184,5 @@ async def test_inference_maps_upstream_failures_without_provider_details(
     assert captured.value.body.code == code
     assert "provider-secret" not in captured.value.body.message
     assert usage.records[0].status_code == status_code
+    assert usage.records[0].total_tokens is None
+    assert usage.records[0].cost_usd is None

@@ -9,6 +9,8 @@ from proxy.api_keys.repository import ApiKeyRepository
 from proxy.api_keys.service import ApiKeyService
 from proxy.app.inference.service import InferenceService
 from proxy.app.model_usage.recorder import ModelUsageRecorder
+from proxy.app.model_usage.repository import ModelUsageRepository
+from proxy.app.model_usage.service import ModelUsageService
 from proxy.app.users.auth import get_user_provider, user_session_token
 from proxy.app.users.repository import UserRepository
 from proxy.app.users.schemas import UserView
@@ -123,6 +125,26 @@ def get_model_usage_recorder(request: Request) -> ModelUsageRecorder:
 
 
 ModelUsageRecorderDep = Annotated[ModelUsageRecorder, Depends(get_model_usage_recorder)]
+
+
+def get_model_usage_repository(
+    session_factory: SessionFactoryDep,
+) -> ModelUsageRepository:
+    return ModelUsageRepository(session_factory)
+
+
+ModelUsageRepositoryDep = Annotated[
+    ModelUsageRepository, Depends(get_model_usage_repository)
+]
+
+
+def get_model_usage_service(
+    repository: ModelUsageRepositoryDep,
+) -> ModelUsageService:
+    return ModelUsageService(repository)
+
+
+ModelUsageServiceDep = Annotated[ModelUsageService, Depends(get_model_usage_service)]
 
 
 def get_inference_service(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import suppress
+from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
 import litellm
@@ -23,6 +25,24 @@ class InvalidLLMResponse(RuntimeError):
     """Raised when LiteLLM returns an unsupported response representation."""
 
 
+@dataclass(frozen=True, slots=True)
+class LLMAccounting:
+    """Validated accounting facts extracted from an untrusted LiteLLM result."""
+
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    cost_usd: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class LLMResult:
+    """A public-safe payload paired with private accounting metadata."""
+
+    payload: dict[str, Any]
+    accounting: LLMAccounting
+
+
 class LiteLLMResponsesAdapter:
     """Call LiteLLM directly without exposing its types to public layers."""
 
@@ -30,12 +50,12 @@ class LiteLLMResponsesAdapter:
         self,
         deployment: ResolvedModelDeployment,
         request: Mapping[str, Any],
-    ) -> dict[str, Any]:
+    ) -> LLMResult:
         try:
             response = await litellm.aresponses(
                 **self._arguments(deployment, request, stream=False)
             )
-            return normalize_response(response, deployment.name)
+            return _result(response, deployment.name)
         except Exception as error:
             raise _upstream_error(error) from error
 
@@ -43,14 +63,14 @@ class LiteLLMResponsesAdapter:
         self,
         deployment: ResolvedModelDeployment,
         request: Mapping[str, Any],
-    ) -> AsyncIterator[dict[str, Any]]:
+    ) -> AsyncIterator[LLMResult]:
         response: Any = None
         try:
             response = await litellm.aresponses(
                 **self._arguments(deployment, request, stream=True)
             )
             async for event in cast(AsyncIterator[Any], response):
-                yield normalize_response(event, deployment.name)
+                yield _result(event, deployment.name, streaming=True)
         except Exception as error:
             raise _upstream_error(error) from error
         finally:
@@ -92,6 +112,74 @@ def normalize_response(value: Any, public_model: str) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise InvalidLLMResponse("LiteLLM returned a non-object response.")
     return _sanitize(payload, public_model)
+
+
+def _result(value: Any, public_model: str, *, streaming: bool = False) -> LLMResult:
+    payload = normalize_response(value, public_model)
+    response = _terminal_response(value) if streaming else value
+    return LLMResult(
+        payload=payload,
+        accounting=_accounting(
+            response, calculate_cost=streaming and response is not None
+        ),
+    )
+
+
+def _terminal_response(value: Any) -> Any | None:
+    event_type = _field(value, "type")
+    if event_type not in {
+        "response.completed",
+        "response.failed",
+        "response.incomplete",
+    }:
+        return None
+    return _field(value, "response")
+
+
+def _accounting(value: Any, *, calculate_cost: bool) -> LLMAccounting:
+    usage = _field(value, "usage")
+    cost = _cost(_field(usage, "cost"))
+    if cost is None:
+        hidden = _field(value, "_hidden_params")
+        if isinstance(hidden, Mapping):
+            cost = _cost(hidden.get("response_cost"))
+    if cost is None and calculate_cost and value is not None:
+        try:
+            cost = _cost(litellm.completion_cost(completion_response=value))
+        except Exception:  # noqa: BLE001 - LiteLLM cost failures are untrusted input.
+            cost = None
+    return LLMAccounting(
+        input_tokens=_non_negative_integer(
+            _field(usage, "input_tokens", _field(usage, "prompt_tokens"))
+        ),
+        output_tokens=_non_negative_integer(
+            _field(usage, "output_tokens", _field(usage, "completion_tokens"))
+        ),
+        total_tokens=_non_negative_integer(_field(usage, "total_tokens")),
+        cost_usd=cost,
+    )
+
+
+def _field(value: Any, name: str, default: Any = None) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(name, default)
+    return getattr(value, name, default)
+
+
+def _non_negative_integer(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def _cost(value: Any) -> Decimal | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return None
+    try:
+        cost = Decimal(str(value))
+    except InvalidOperation:
+        return None
+    return cost if cost.is_finite() and cost >= 0 else None
 
 
 def _sanitize(value: Any, public_model: str) -> Any:

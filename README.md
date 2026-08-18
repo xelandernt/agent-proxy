@@ -371,10 +371,10 @@ register without manual client configuration. Other providers may require a
 gateway OAuth client as documented by FastMCP.
 
 This breaking release has no database migration or compatibility layer.
-Existing databases containing `servers.auth` must be recreated so the fresh
-schema can create `auth_providers` and the nullable `servers.auth_provider`
-foreign key. Provider names are immutable, and a provider linked to any server
-cannot be deleted.
+Recreate the PostgreSQL database before starting it; startup creates the full
+fresh schema, including reusable authentication providers and model-usage cost
+reporting. Existing data is not upgraded or retained. Provider names are
+immutable, and a provider linked to any server cannot be deleted.
 
 Configuration is loaded from `.proxy/config.yaml`. Set `PROXY_CONFIG_FILE` to
 use another file. Environment variables use the `PROXY__` prefix and `__` as

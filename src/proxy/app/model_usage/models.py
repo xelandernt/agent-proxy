@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -9,7 +10,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Identity,
+    Index,
     Integer,
+    Numeric,
     String,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -34,7 +37,14 @@ class ModelUsageEvent(Base):
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 12), nullable=True)
     duration_ms: Mapped[int] = mapped_column(Integer)
     error_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
     streaming: Mapped[bool] = mapped_column(Boolean)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+    __table_args__ = (
+        Index("ix_model_usage_events_user_ts", "user_id", "ts"),
+        Index("ix_model_usage_events_api_key_ts", "api_key_id", "ts"),
+        Index("ix_model_usage_events_model_ts", "model_name", "ts"),
+    )

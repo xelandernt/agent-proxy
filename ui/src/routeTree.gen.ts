@@ -16,9 +16,11 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccountIndexRouteImport } from './routes/account/index'
 import { Route as AccountCallbackRouteImport } from './routes/account/callback'
 import { Route as AccountModelsRouteImport } from './routes/account/models'
+import { Route as AccountUsageRouteImport } from './routes/account/usage'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminCallbackRouteImport } from './routes/admin/callback'
 import { Route as AdminNewRouteImport } from './routes/admin/new'
+import { Route as AdminUsageRouteImport } from './routes/admin/usage'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsProviderRouteImport } from './routes/docs/$provider'
 import { Route as AdminServerNameEditRouteImport } from './routes/admin/$serverName.edit'
@@ -64,6 +66,11 @@ const AccountModelsRoute = AccountModelsRouteImport.update({
   path: '/models',
   getParentRoute: () => AccountRoute,
 } as any)
+const AccountUsageRoute = AccountUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => AccountRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -77,6 +84,11 @@ const AdminCallbackRoute = AdminCallbackRouteImport.update({
 const AdminNewRoute = AdminNewRouteImport.update({
   id: '/new',
   path: '/new',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsageRoute = AdminUsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
   getParentRoute: () => AdminRoute,
 } as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
@@ -134,8 +146,10 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/account/callback': typeof AccountCallbackRoute
   '/account/models': typeof AccountModelsRoute
+  '/account/usage': typeof AccountUsageRoute
   '/admin/callback': typeof AdminCallbackRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/docs/$provider': typeof DocsProviderRoute
   '/account/': typeof AccountIndexRoute
   '/admin/': typeof AdminIndexRoute
@@ -153,8 +167,10 @@ export interface FileRoutesByTo {
   '/$serverName': typeof ServerNameRoute
   '/account/callback': typeof AccountCallbackRoute
   '/account/models': typeof AccountModelsRoute
+  '/account/usage': typeof AccountUsageRoute
   '/admin/callback': typeof AdminCallbackRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/docs/$provider': typeof DocsProviderRoute
   '/account': typeof AccountIndexRoute
   '/admin': typeof AdminIndexRoute
@@ -175,8 +191,10 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/account/callback': typeof AccountCallbackRoute
   '/account/models': typeof AccountModelsRoute
+  '/account/usage': typeof AccountUsageRoute
   '/admin/callback': typeof AdminCallbackRoute
   '/admin/new': typeof AdminNewRoute
+  '/admin/usage': typeof AdminUsageRoute
   '/docs/$provider': typeof DocsProviderRoute
   '/account/': typeof AccountIndexRoute
   '/admin/': typeof AdminIndexRoute
@@ -198,8 +216,10 @@ export interface FileRouteTypes {
     | '/admin'
     | '/account/callback'
     | '/account/models'
+    | '/account/usage'
     | '/admin/callback'
     | '/admin/new'
+    | '/admin/usage'
     | '/docs/$provider'
     | '/account/'
     | '/admin/'
@@ -217,8 +237,10 @@ export interface FileRouteTypes {
     | '/$serverName'
     | '/account/callback'
     | '/account/models'
+    | '/account/usage'
     | '/admin/callback'
     | '/admin/new'
+    | '/admin/usage'
     | '/docs/$provider'
     | '/account'
     | '/admin'
@@ -238,8 +260,10 @@ export interface FileRouteTypes {
     | '/admin'
     | '/account/callback'
     | '/account/models'
+    | '/account/usage'
     | '/admin/callback'
     | '/admin/new'
+    | '/admin/usage'
     | '/docs/$provider'
     | '/account/'
     | '/admin/'
@@ -313,6 +337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountModelsRouteImport
       parentRoute: typeof AccountRoute
     }
+    '/account/usage': {
+      id: '/account/usage'
+      path: '/usage'
+      fullPath: '/account/usage'
+      preLoaderRoute: typeof AccountUsageRouteImport
+      parentRoute: typeof AccountRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
@@ -332,6 +363,13 @@ declare module '@tanstack/react-router' {
       path: '/new'
       fullPath: '/admin/new'
       preLoaderRoute: typeof AdminNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/usage': {
+      id: '/admin/usage'
+      path: '/usage'
+      fullPath: '/admin/usage'
+      preLoaderRoute: typeof AdminUsageRouteImport
       parentRoute: typeof AdminRoute
     }
     '/docs/': {
@@ -403,12 +441,14 @@ declare module '@tanstack/react-router' {
 interface AccountRouteChildren {
   AccountCallbackRoute: typeof AccountCallbackRoute
   AccountModelsRoute: typeof AccountModelsRoute
+  AccountUsageRoute: typeof AccountUsageRoute
   AccountIndexRoute: typeof AccountIndexRoute
 }
 
 const AccountRouteChildren: AccountRouteChildren = {
   AccountCallbackRoute: AccountCallbackRoute,
   AccountModelsRoute: AccountModelsRoute,
+  AccountUsageRoute: AccountUsageRoute,
   AccountIndexRoute: AccountIndexRoute,
 }
 
@@ -418,6 +458,7 @@ const AccountRouteWithChildren =
 interface AdminRouteChildren {
   AdminCallbackRoute: typeof AdminCallbackRoute
   AdminNewRoute: typeof AdminNewRoute
+  AdminUsageRoute: typeof AdminUsageRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminServerNameEditRoute: typeof AdminServerNameEditRoute
   AdminAuthProvidersNewRoute: typeof AdminAuthProvidersNewRoute
@@ -431,6 +472,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCallbackRoute: AdminCallbackRoute,
   AdminNewRoute: AdminNewRoute,
+  AdminUsageRoute: AdminUsageRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminServerNameEditRoute: AdminServerNameEditRoute,
   AdminAuthProvidersNewRoute: AdminAuthProvidersNewRoute,
