@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -36,27 +36,25 @@ class ModelUsageFilters:
     start: datetime
     end: datetime
     user_id: uuid.UUID | None = None
-    api_key_id: uuid.UUID | None = None
-    model: str | None = None
+    api_key_ids: tuple[uuid.UUID, ...] = ()
+    models: tuple[str, ...] = ()
 
 
 class ModelUsageRepository:
     def __init__(self, session_factory: async_sessionmaker) -> None:
         self._session_factory = session_factory
 
-    async def api_key_belongs_to_user(
-        self, api_key_id: uuid.UUID, user_id: uuid.UUID
+    async def api_keys_belong_to_user(
+        self, api_key_ids: Collection[uuid.UUID], user_id: uuid.UUID
     ) -> bool:
-        statement = select(
-            select(ApiKeyRecord.id)
-            .where(
-                ApiKeyRecord.id == api_key_id,
-                ApiKeyRecord.user_id == user_id,
-            )
-            .exists()
+        if not api_key_ids:
+            return True
+        statement = select(func.count(ApiKeyRecord.id)).where(
+            ApiKeyRecord.id.in_(api_key_ids),
+            ApiKeyRecord.user_id == user_id,
         )
         async with self._session_factory() as session:
-            return bool((await session.execute(statement)).scalar_one())
+            return (await session.execute(statement)).scalar_one() == len(api_key_ids)
 
     async def totals(self, filters: ModelUsageFilters) -> UsageTotals:
         statement = select(*_aggregate_columns()).select_from(ModelUsageEvent)
@@ -176,10 +174,10 @@ def _filtered(statement: Select[Any], filters: ModelUsageFilters) -> Select[Any]
     ]
     if filters.user_id is not None:
         conditions.append(ModelUsageEvent.user_id == filters.user_id)
-    if filters.api_key_id is not None:
-        conditions.append(ModelUsageEvent.api_key_id == filters.api_key_id)
-    if filters.model is not None:
-        conditions.append(ModelUsageEvent.model_name == filters.model)
+    if filters.api_key_ids:
+        conditions.append(ModelUsageEvent.api_key_id.in_(filters.api_key_ids))
+    if filters.models:
+        conditions.append(ModelUsageEvent.model_name.in_(filters.models))
     return statement.where(*conditions)
 
 

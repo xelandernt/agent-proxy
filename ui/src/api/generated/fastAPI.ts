@@ -1399,8 +1399,8 @@ export type AdminModelUsageApiAdminUsageGetParams = {
   from: string;
   to: string;
   user_id?: string | null;
-  model?: string | null;
-  api_key_id?: string | null;
+  models?: string[] | null;
+  api_key_ids?: string[] | null;
 };
 
 export type AdminModelUsageSeriesApiAdminUsageSeriesGetParams = {
@@ -1408,8 +1408,8 @@ export type AdminModelUsageSeriesApiAdminUsageSeriesGetParams = {
   to: string;
   bucket: AdminModelUsageSeriesApiAdminUsageSeriesGetBucket;
   user_id?: string | null;
-  model?: string | null;
-  api_key_id?: string | null;
+  models?: string[] | null;
+  api_key_ids?: string[] | null;
 };
 
 export type AdminModelUsageSeriesApiAdminUsageSeriesGetBucket =
@@ -1425,16 +1425,16 @@ export const AdminModelUsageSeriesApiAdminUsageSeriesGetBucket = {
 export type UserModelUsageApiUserUsageGetParams = {
   from: string;
   to: string;
-  model?: string | null;
-  api_key_id?: string | null;
+  models?: string[] | null;
+  api_key_ids?: string[] | null;
 };
 
 export type UserModelUsageSeriesApiUserUsageSeriesGetParams = {
   from: string;
   to: string;
   bucket: UserModelUsageSeriesApiUserUsageSeriesGetBucket;
-  model?: string | null;
-  api_key_id?: string | null;
+  models?: string[] | null;
+  api_key_ids?: string[] | null;
 };
 
 export type UserModelUsageSeriesApiUserUsageSeriesGetBucket =

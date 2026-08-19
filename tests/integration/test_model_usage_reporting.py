@@ -230,12 +230,12 @@ def test_user_reporting_isolated_by_identity_and_key(
         )
         own_key = client.get(
             "/api/user/usage",
-            params=_window() | {"api_key_id": str(ids["revoked_key"])},
+            params=_window() | {"api_key_ids": str(ids["revoked_key"])},
             headers=_auth("first-token"),
         )
         foreign_key = client.get(
             "/api/user/usage",
-            params=_window() | {"api_key_id": str(ids["second_key"])},
+            params=_window() | {"api_key_ids": str(ids["second_key"])},
             headers=_auth("first-token"),
         )
     assert first.status_code == second.status_code == own_key.status_code == 200
@@ -298,7 +298,13 @@ def test_admin_reporting_authorization_and_filters(
         )
         filtered = client.get(
             "/api/admin/usage",
-            params=_window() | {"user_id": str(ids["first_user"]), "model": "alpha"},
+            params=_window() | {"user_id": str(ids["first_user"]), "models": "alpha"},
+            headers=admin_headers,
+        )
+        multi_model = client.get(
+            "/api/admin/usage",
+            params=list(_window().items())
+            + [("models", "alpha"), ("models", "not-recorded")],
             headers=admin_headers,
         )
         empty = client.get(
@@ -306,7 +312,7 @@ def test_admin_reporting_authorization_and_filters(
             params=_window()
             | {
                 "user_id": str(ids["first_user"]),
-                "api_key_id": str(ids["second_key"]),
+                "api_key_ids": str(ids["second_key"]),
             },
             headers=admin_headers,
         )
@@ -316,6 +322,7 @@ def test_admin_reporting_authorization_and_filters(
     assert len(all_users.json()["users"]) == 2
     assert filtered.json()["requests"] == 1
     assert filtered.json()["cost_usd"] == "0.100000000001"
+    assert multi_model.json()["requests"] == 2
     assert empty.json()["requests"] == 0
     assert empty.json()["models"] == []
     assert empty.json()["api_keys"] == []
@@ -359,8 +366,8 @@ async def test_high_cardinality_report_uses_composite_indexes(
             start=start,
             end=end,
             user_id=ids["first_user"],
-            api_key_id=ids["first_key"],
-            model="alpha",
+            api_key_ids=(ids["first_key"],),
+            models=("alpha",),
         )
         began = time.perf_counter()
         totals = await ModelUsageRepository(factory).totals(filters)

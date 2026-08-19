@@ -1208,39 +1208,41 @@
             }
           },
           {
-            "name": "model",
+            "name": "models",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 100,
-                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Model"
+              "title": "Models"
             }
           },
           {
-            "name": "api_key_id",
+            "name": "api_key_ids",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Api Key Id"
+              "title": "Api Key Ids"
             }
           }
         ],
@@ -1328,39 +1330,41 @@
             }
           },
           {
-            "name": "model",
+            "name": "models",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 100,
-                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Model"
+              "title": "Models"
             }
           },
           {
-            "name": "api_key_id",
+            "name": "api_key_ids",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Api Key Id"
+              "title": "Api Key Ids"
             }
           }
         ],
@@ -1729,39 +1733,41 @@
             }
           },
           {
-            "name": "model",
+            "name": "models",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 100,
-                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Model"
+              "title": "Models"
             }
           },
           {
-            "name": "api_key_id",
+            "name": "api_key_ids",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Api Key Id"
+              "title": "Api Key Ids"
             }
           }
         ],
@@ -1832,39 +1838,41 @@
             }
           },
           {
-            "name": "model",
+            "name": "models",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 100,
-                  "pattern": "^[a-z0-9][a-z0-9-]*$"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Model"
+              "title": "Models"
             }
           },
           {
-            "name": "api_key_id",
+            "name": "api_key_ids",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Api Key Id"
+              "title": "Api Key Ids"
             }
           }
         ],

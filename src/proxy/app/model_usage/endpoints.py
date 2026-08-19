@@ -13,14 +13,11 @@ from proxy.app.model_usage.service import (
     ModelUsageApiKeyNotFound,
 )
 from proxy.app.usage.types import UsageBucket
-from proxy.servers.constants import NAME_PATTERN
 
 router = APIRouter(prefix="/api/user/usage", tags=["user-model-usage"])
 
 FromQuery = Annotated[datetime, Query(alias="from")]
-ModelQuery = Annotated[
-    str | None, Query(min_length=1, max_length=100, pattern=NAME_PATTERN)
-]
+ModelQuery = Annotated[list[str] | None, Query()]
 
 
 @router.get("", response_model=UserModelUsageReport)
@@ -29,16 +26,16 @@ async def user_model_usage(
     service: ModelUsageServiceDep,
     from_: FromQuery,
     to: datetime,
-    model: ModelQuery = None,
-    api_key_id: UUID | None = None,
+    models: ModelQuery = None,
+    api_key_ids: Annotated[list[str] | None, Query()] = None,
 ) -> UserModelUsageReport:
     try:
         return await service.user_report(
             user.id,
             from_,
             to,
-            model=model,
-            api_key_id=api_key_id,
+            models=_query_values(models),
+            api_key_ids=_uuid_values(api_key_ids),
         )
     except (InvalidModelUsageRange, ModelUsageApiKeyNotFound) as error:
         raise _invalid_report(error) from error
@@ -51,8 +48,8 @@ async def user_model_usage_series(
     from_: FromQuery,
     to: datetime,
     bucket: UsageBucket,
-    model: ModelQuery = None,
-    api_key_id: UUID | None = None,
+    models: ModelQuery = None,
+    api_key_ids: Annotated[list[str] | None, Query()] = None,
 ) -> ModelUsageSeriesReport:
     try:
         return await service.user_series(
@@ -60,8 +57,8 @@ async def user_model_usage_series(
             from_,
             to,
             bucket,
-            model=model,
-            api_key_id=api_key_id,
+            models=_query_values(models),
+            api_key_ids=_uuid_values(api_key_ids),
         )
     except (InvalidModelUsageRange, ModelUsageApiKeyNotFound) as error:
         raise _invalid_report(error) from error
@@ -72,3 +69,16 @@ def _invalid_report(error: Exception) -> HTTPException:
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=error.args[0] if error.args else str(error),
     )
+
+
+def _query_values(values: list[str] | None) -> list[str] | None:
+    expanded = [item for value in values or [] for item in value.split(",") if item]
+    return expanded or None
+
+
+def _uuid_values(values: list[str] | None) -> list[UUID] | None:
+    try:
+        parsed = [UUID(value) for value in _query_values(values) or []]
+    except ValueError as error:
+        raise _invalid_report(error) from error
+    return parsed or None

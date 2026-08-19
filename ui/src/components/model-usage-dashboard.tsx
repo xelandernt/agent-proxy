@@ -13,6 +13,7 @@ import type {
 	ModelUsageUserBreakdown,
 	UserModelUsageReport,
 } from "#/api/generated/fastAPI";
+import { FilterMultiSelect } from "#/components/filter-multi-select";
 import { Alert, AlertDescription, AlertTitle } from "#/components/ui/alert";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
@@ -164,28 +165,36 @@ export function ModelUsageDashboard({
 									label: user.display_name ?? user.email,
 								}))}
 								onChange={(userId) =>
-									setFilters({ userId, model: filters.model })
+									setFilters({ userId, models: filters.models })
 								}
 							/>
 						)}
-						<FilterSelect
-							label="Model"
-							value={filters.model}
-							items={(facetReport?.models ?? []).map((model) => ({
-								value: model.model,
-								label: model.model,
-							}))}
-							onChange={(model) => setFilters({ ...filters, model })}
-						/>
-						<FilterSelect
-							label="API key"
-							value={filters.apiKeyId}
-							items={(facetReport?.api_keys ?? []).map((key) => ({
-								value: key.api_key_id,
-								label: `${key.name}${key.revoked ? " (revoked)" : ""}`,
-							}))}
-							onChange={(apiKeyId) => setFilters({ ...filters, apiKeyId })}
-						/>
+						<Field>
+							<FieldLabel>Models</FieldLabel>
+							<FilterMultiSelect
+								label="Models"
+								allLabel="All models"
+								selected={filters.models ?? []}
+								items={(facetReport?.models ?? []).map((model) => ({
+									value: model.model,
+									label: model.model,
+								}))}
+								onChange={(models) => setFilters({ ...filters, models })}
+							/>
+						</Field>
+						<Field>
+							<FieldLabel>API keys</FieldLabel>
+							<FilterMultiSelect
+								label="API keys"
+								allLabel="All API keys"
+								selected={filters.apiKeyIds ?? []}
+								items={(facetReport?.api_keys ?? []).map((key) => ({
+									value: key.api_key_id,
+									label: `${key.name}${key.revoked ? " (revoked)" : ""}`,
+								}))}
+								onChange={(apiKeyIds) => setFilters({ ...filters, apiKeyIds })}
+							/>
+						</Field>
 					</FieldGroup>
 				</CardContent>
 			</Card>

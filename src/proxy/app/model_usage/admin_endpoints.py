@@ -11,7 +11,6 @@ from proxy.app.dependencies import ModelUsageServiceDep
 from proxy.app.model_usage.schemas import AdminModelUsageReport, ModelUsageSeriesReport
 from proxy.app.model_usage.service import InvalidModelUsageRange
 from proxy.app.usage.types import UsageBucket
-from proxy.servers.constants import NAME_PATTERN
 
 router = APIRouter(
     prefix="/api/admin/usage",
@@ -20,9 +19,7 @@ router = APIRouter(
 )
 
 FromQuery = Annotated[datetime, Query(alias="from")]
-ModelQuery = Annotated[
-    str | None, Query(min_length=1, max_length=100, pattern=NAME_PATTERN)
-]
+ModelQuery = Annotated[list[str] | None, Query()]
 
 
 @router.get("", response_model=AdminModelUsageReport)
@@ -31,16 +28,16 @@ async def admin_model_usage(
     from_: FromQuery,
     to: datetime,
     user_id: UUID | None = None,
-    model: ModelQuery = None,
-    api_key_id: UUID | None = None,
+    models: ModelQuery = None,
+    api_key_ids: Annotated[list[str] | None, Query()] = None,
 ) -> AdminModelUsageReport:
     try:
         return await service.admin_report(
             from_,
             to,
             user_id=user_id,
-            model=model,
-            api_key_id=api_key_id,
+            models=_query_values(models),
+            api_key_ids=_uuid_values(api_key_ids),
         )
     except InvalidModelUsageRange as error:
         raise _invalid_report(error) from error
@@ -53,8 +50,8 @@ async def admin_model_usage_series(
     to: datetime,
     bucket: UsageBucket,
     user_id: UUID | None = None,
-    model: ModelQuery = None,
-    api_key_id: UUID | None = None,
+    models: ModelQuery = None,
+    api_key_ids: Annotated[list[str] | None, Query()] = None,
 ) -> ModelUsageSeriesReport:
     try:
         return await service.admin_series(
@@ -62,8 +59,8 @@ async def admin_model_usage_series(
             to,
             bucket,
             user_id=user_id,
-            model=model,
-            api_key_id=api_key_id,
+            models=_query_values(models),
+            api_key_ids=_uuid_values(api_key_ids),
         )
     except InvalidModelUsageRange as error:
         raise _invalid_report(error) from error
@@ -74,3 +71,16 @@ def _invalid_report(error: InvalidModelUsageRange) -> HTTPException:
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=str(error),
     )
+
+
+def _query_values(values: list[str] | None) -> list[str] | None:
+    expanded = [item for value in values or [] for item in value.split(",") if item]
+    return expanded or None
+
+
+def _uuid_values(values: list[str] | None) -> list[UUID] | None:
+    try:
+        parsed = [UUID(value) for value in _query_values(values) or []]
+    except ValueError as error:
+        raise _invalid_report(InvalidModelUsageRange(str(error))) from error
+    return parsed or None

@@ -46,8 +46,8 @@ export type {
 function usageParams(range: UsageRange, filters: ModelUsageFilters) {
 	return {
 		...resolveUsageRange(range),
-		model: filters.model,
-		api_key_id: filters.apiKeyId,
+		models: filters.models,
+		api_key_ids: filters.apiKeyIds,
 		user_id: filters.userId,
 	};
 }

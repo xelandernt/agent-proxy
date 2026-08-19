@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -22,6 +23,7 @@ from proxy.app.model_usage.schemas import (
 )
 from proxy.app.usage.service import BUCKET_STEPS, bucket_count
 from proxy.app.usage.types import UsageBucket
+from proxy.servers.constants import NAME_PATTERN
 
 MAX_REPORT_RANGE = timedelta(days=366)
 MAX_SERIES_BUCKETS = 1_500
@@ -50,18 +52,18 @@ class ModelUsageService:
         start: datetime,
         end: datetime,
         *,
-        model: str | None = None,
-        api_key_id: uuid.UUID | None = None,
+        models: list[str] | None = None,
+        api_key_ids: list[uuid.UUID] | None = None,
     ) -> UserModelUsageReport:
         filters = await self._user_filters(
-            user_id, start, end, model=model, api_key_id=api_key_id
+            user_id, start, end, models=models, api_key_ids=api_key_ids
         )
-        totals, models, keys = await asyncio.gather(
+        totals, model_rows, keys = await asyncio.gather(
             self._repository.totals(filters),
             self._repository.by_model(filters),
             self._repository.by_api_key(filters),
         )
-        return _user_report(filters, totals, models, keys)
+        return _user_report(filters, totals, model_rows, keys)
 
     async def admin_report(
         self,
@@ -69,23 +71,23 @@ class ModelUsageService:
         end: datetime,
         *,
         user_id: uuid.UUID | None = None,
-        model: str | None = None,
-        api_key_id: uuid.UUID | None = None,
+        models: list[str] | None = None,
+        api_key_ids: list[uuid.UUID] | None = None,
     ) -> AdminModelUsageReport:
         filters = _filters(
             start,
             end,
             user_id=user_id,
-            model=model,
-            api_key_id=api_key_id,
+            models=models,
+            api_key_ids=api_key_ids,
         )
-        totals, models, keys, users = await asyncio.gather(
+        totals, model_rows, keys, users = await asyncio.gather(
             self._repository.totals(filters),
             self._repository.by_model(filters),
             self._repository.by_api_key(filters),
             self._repository.by_user(filters),
         )
-        report = _user_report(filters, totals, models, keys)
+        report = _user_report(filters, totals, model_rows, keys)
         return AdminModelUsageReport(
             **report.model_dump(),
             users=[
@@ -106,11 +108,11 @@ class ModelUsageService:
         end: datetime,
         bucket: UsageBucket,
         *,
-        model: str | None = None,
-        api_key_id: uuid.UUID | None = None,
+        models: list[str] | None = None,
+        api_key_ids: list[uuid.UUID] | None = None,
     ) -> ModelUsageSeriesReport:
         filters = await self._user_filters(
-            user_id, start, end, model=model, api_key_id=api_key_id
+            user_id, start, end, models=models, api_key_ids=api_key_ids
         )
         return await self._series(filters, bucket)
 
@@ -121,16 +123,16 @@ class ModelUsageService:
         bucket: UsageBucket,
         *,
         user_id: uuid.UUID | None = None,
-        model: str | None = None,
-        api_key_id: uuid.UUID | None = None,
+        models: list[str] | None = None,
+        api_key_ids: list[uuid.UUID] | None = None,
     ) -> ModelUsageSeriesReport:
         return await self._series(
             _filters(
                 start,
                 end,
                 user_id=user_id,
-                model=model,
-                api_key_id=api_key_id,
+                models=models,
+                api_key_ids=api_key_ids,
             ),
             bucket,
         )
@@ -141,20 +143,19 @@ class ModelUsageService:
         start: datetime,
         end: datetime,
         *,
-        model: str | None,
-        api_key_id: uuid.UUID | None,
+        models: list[str] | None,
+        api_key_ids: list[uuid.UUID] | None,
     ) -> ModelUsageFilters:
-        if (
-            api_key_id is not None
-            and not await self._repository.api_key_belongs_to_user(api_key_id, user_id)
+        if api_key_ids and not await self._repository.api_keys_belong_to_user(
+            set(api_key_ids), user_id
         ):
             raise ModelUsageApiKeyNotFound("Unknown API key.")
         return _filters(
             start,
             end,
             user_id=user_id,
-            model=model,
-            api_key_id=api_key_id,
+            models=models,
+            api_key_ids=api_key_ids,
         )
 
     async def _series(
@@ -181,8 +182,8 @@ def _filters(
     end: datetime,
     *,
     user_id: uuid.UUID | None = None,
-    model: str | None = None,
-    api_key_id: uuid.UUID | None = None,
+    models: list[str] | None = None,
+    api_key_ids: list[uuid.UUID] | None = None,
 ) -> ModelUsageFilters:
     if start.tzinfo is None or end.tzinfo is None:
         raise InvalidModelUsageRange("'from' and 'to' must include a UTC offset.")
@@ -192,7 +193,19 @@ def _filters(
         raise InvalidModelUsageRange("'from' must be earlier than 'to'.")
     if end - start > MAX_REPORT_RANGE:
         raise InvalidModelUsageRange("The requested range cannot exceed 366 days.")
-    return ModelUsageFilters(start, end, user_id, api_key_id, model)
+    normalized_models = tuple(dict.fromkeys(models or []))
+    if any(
+        len(model) > 100 or re.fullmatch(NAME_PATTERN, model) is None
+        for model in normalized_models
+    ):
+        raise InvalidModelUsageRange("Model filters contain an invalid name.")
+    return ModelUsageFilters(
+        start,
+        end,
+        user_id,
+        tuple(dict.fromkeys(api_key_ids or [])),
+        normalized_models,
+    )
 
 
 def _user_report(

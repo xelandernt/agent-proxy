@@ -1,8 +1,8 @@
 import { type UsageRange, usageRangeKey } from "./usage-range.ts";
 
 export type ModelUsageFilters = {
-	model?: string;
-	apiKeyId?: string;
+	models?: string[];
+	apiKeyIds?: string[];
 	userId?: string;
 };
 
@@ -19,8 +19,8 @@ export function modelUsageQueryKey(
 		"model-usage",
 		kind,
 		...usageRangeKey(range),
-		filters.model ?? null,
-		filters.apiKeyId ?? null,
+		filters.models ?? null,
+		filters.apiKeyIds ?? null,
 		filters.userId ?? null,
 	] as const;
 }
