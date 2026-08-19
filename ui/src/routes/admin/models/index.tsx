@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { BoxIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ModelPricingSummary } from "#/components/model-pricing-summary";
 import { Button } from "#/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import {
@@ -114,6 +115,7 @@ function ModelsIndex() {
 										<code>{model.model_id}</code>
 									</p>
 								</div>
+								<ModelPricingSummary pricing={model.pricing} />
 								<div className="flex justify-end gap-2">
 									<Link
 										to="/admin/models/$modelName/edit"

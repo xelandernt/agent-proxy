@@ -45,7 +45,7 @@ async def session_factory(
         await engine.dispose()
 
 
-async def test_fresh_schema_contains_cost_and_reporting_indexes(
+async def test_fresh_schema_contains_pricing_cost_and_reporting_indexes(
     postgresql_url: str,
 ) -> None:
     engine = create_engine(postgresql_url)
@@ -62,6 +62,11 @@ async def test_fresh_schema_contains_cost_and_reporting_indexes(
                     "model_usage_events"
                 )
             )
+            model_columns = await connection.run_sync(
+                lambda sync_connection: inspect(sync_connection).get_columns(
+                    "model_deployments"
+                )
+            )
     finally:
         await engine.dispose()
 
@@ -73,6 +78,18 @@ async def test_fresh_schema_contains_cost_and_reporting_indexes(
         ("api_key_id", "ts"),
         ("model_name", "ts"),
     } <= {tuple(index["column_names"]) for index in indexes}
+    prices = {
+        column["name"]: column
+        for column in model_columns
+        if column["name"].endswith("usd_per_million_tokens")
+    }
+    assert set(prices) == {
+        "input_usd_per_million_tokens",
+        "cached_input_usd_per_million_tokens",
+        "output_usd_per_million_tokens",
+    }
+    assert all(column["nullable"] is True for column in prices.values())
+    assert all(str(column["type"]) == "NUMERIC(20, 12)" for column in prices.values())
 
 
 async def test_user_model_key_and_usage_lifecycle(
@@ -129,6 +146,11 @@ async def test_user_model_key_and_usage_lifecycle(
             name="claude",
             provider="anthropic-production",
             model_id="claude-sonnet-4-5",
+            pricing={
+                "input_usd_per_million_tokens": "3",
+                "cached_input_usd_per_million_tokens": "0.3",
+                "output_usd_per_million_tokens": "15",
+            },
         )
     )
     await models.create(
@@ -144,6 +166,7 @@ async def test_user_model_key_and_usage_lifecycle(
         assert stored is not None
         assert stored.provider == "anthropic-production"
         assert stored.model_id == "claude-sonnet-4-5"
+        assert stored.input_usd_per_million_tokens == Decimal("3.000000000000")
 
     created = await keys.create(
         user.id,

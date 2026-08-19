@@ -8,7 +8,7 @@ import pytest
 from litellm.types.llms.openai import ResponseCompletedEvent, ResponsesAPIResponse
 
 from proxy.llm.adapter import LiteLLMResponsesAdapter, LLMUpstreamError
-from proxy.model_deployments.schemas import ResolvedModelDeployment
+from proxy.model_deployments.schemas import ModelPricingView, ResolvedModelDeployment
 
 
 def deployment() -> ResolvedModelDeployment:
@@ -18,6 +18,12 @@ def deployment() -> ResolvedModelDeployment:
         api_base="https://provider.example/v1",
         settings={"timeout": 42},
         secrets={"api_key": "provider-secret"},
+        pricing=ModelPricingView(
+            input_usd_per_million_tokens=Decimal(3),
+            cached_input_usd_per_million_tokens=Decimal("0.3"),
+            output_usd_per_million_tokens=Decimal(15),
+            is_custom=False,
+        ),
     )
 
 
@@ -301,3 +307,79 @@ async def test_adapter_preserves_zero_accounting_values(
     assert result.accounting.output_tokens == 0
     assert result.accounting.total_tokens == 0
     assert result.accounting.cost_usd == Decimal("0.0")
+
+
+@pytest.mark.asyncio
+async def test_adapter_custom_pricing_overrides_provider_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    custom = deployment().model_copy(
+        update={
+            "pricing": ModelPricingView(
+                input_usd_per_million_tokens=Decimal(2),
+                cached_input_usd_per_million_tokens=Decimal("0.5"),
+                output_usd_per_million_tokens=Decimal(10),
+                is_custom=True,
+            )
+        }
+    )
+
+    async def fake_aresponses(**_kwargs: Any) -> ResponsesAPIResponse:
+        return response(cost=999)
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+
+    result = await LiteLLMResponsesAdapter().create(custom, {"input": "hello"})
+
+    assert result.accounting.cost_usd == Decimal("0.000037")
+
+
+@pytest.mark.asyncio
+async def test_adapter_custom_pricing_normalizes_anthropic_cache_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    custom = deployment().model_copy(
+        update={
+            "pricing": ModelPricingView(
+                input_usd_per_million_tokens=Decimal(2),
+                cached_input_usd_per_million_tokens=Decimal("0.5"),
+                output_usd_per_million_tokens=Decimal(10),
+                is_custom=True,
+            )
+        }
+    )
+
+    async def fake_aresponses(**_kwargs: Any) -> dict[str, Any]:
+        return {
+            "id": "resp_1",
+            "model": "anthropic/private-model",
+            "usage": {
+                "prompt_tokens": 3,
+                "completion_tokens": 3,
+                "total_tokens": 8,
+                "cache_read_input_tokens": 2,
+            },
+            "_hidden_params": {"response_cost": 999},
+        }
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+
+    result = await LiteLLMResponsesAdapter().create(custom, {"input": "hello"})
+
+    assert result.accounting.cost_usd == Decimal("0.000037")
+
+
+@pytest.mark.asyncio
+async def test_adapter_omits_cost_without_complete_pricing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_aresponses(**_kwargs: Any) -> ResponsesAPIResponse:
+        return response(cost=0.00125)
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+
+    result = await LiteLLMResponsesAdapter().create(
+        deployment().model_copy(update={"pricing": None}), {"input": "hello"}
+    )
+
+    assert result.accounting.cost_usd is None

@@ -11,6 +11,8 @@ from pydantic import BaseModel
 
 from proxy.model_deployments.schemas import ResolvedModelDeployment
 
+COST_QUANTUM = Decimal("0.000000000001")
+
 
 class LLMUpstreamError(RuntimeError):
     """Sanitized upstream failure with only gateway-safe classification."""
@@ -56,7 +58,7 @@ class LiteLLMResponsesAdapter:
             response = await litellm.aresponses(
                 **self._arguments(deployment, request, stream=False)
             )
-            return _result(response, deployment.name)
+            return _result(response, deployment)
         except Exception as error:
             raise _upstream_error(error) from error
 
@@ -71,7 +73,7 @@ class LiteLLMResponsesAdapter:
                 **self._arguments(deployment, request, stream=True)
             )
             async for event in cast(AsyncIterator[Any], response):
-                yield _result(event, deployment.name, streaming=True)
+                yield _result(event, deployment, streaming=True)
         except Exception as error:
             raise _upstream_error(error) from error
         finally:
@@ -115,12 +117,21 @@ def normalize_response(value: Any, public_model: str) -> dict[str, Any]:
     return _sanitize(payload, public_model)
 
 
-def _result(value: Any, public_model: str, *, streaming: bool = False) -> LLMResult:
-    payload = normalize_response(value, public_model)
+def _result(
+    value: Any,
+    deployment: ResolvedModelDeployment,
+    *,
+    streaming: bool = False,
+) -> LLMResult:
+    payload = normalize_response(value, deployment.name)
     response = _terminal_response(value) if streaming else value
     return LLMResult(
         payload=payload,
-        accounting=_accounting(response, calculate_cost=response is not None),
+        accounting=_accounting(
+            response,
+            deployment=deployment,
+            calculate_cost=response is not None,
+        ),
     )
 
 
@@ -135,7 +146,12 @@ def _terminal_response(value: Any) -> Any | None:
     return _field(value, "response")
 
 
-def _accounting(value: Any, *, calculate_cost: bool) -> LLMAccounting:
+def _accounting(
+    value: Any,
+    *,
+    deployment: ResolvedModelDeployment,
+    calculate_cost: bool,
+) -> LLMAccounting:
     usage = _field(value, "usage")
     input_details = _field(
         usage,
@@ -149,16 +165,7 @@ def _accounting(value: Any, *, calculate_cost: bool) -> LLMAccounting:
             "cache_read_input_tokens",
             _field(usage, "prompt_cache_hit_tokens"),
         )
-    cost = _cost(_field(usage, "cost"))
-    if cost is None:
-        hidden = _field(value, "_hidden_params")
-        if isinstance(hidden, Mapping):
-            cost = _cost(hidden.get("response_cost"))
-    if cost is None and calculate_cost and value is not None:
-        try:
-            cost = _cost(litellm.completion_cost(completion_response=value))
-        except Exception:  # noqa: BLE001 - LiteLLM cost failures are untrusted input.
-            cost = None
+    cost = _response_cost(value, usage, deployment, calculate_cost=calculate_cost)
     return LLMAccounting(
         input_tokens=_non_negative_integer(
             _field(usage, "input_tokens", _field(usage, "prompt_tokens"))
@@ -170,6 +177,53 @@ def _accounting(value: Any, *, calculate_cost: bool) -> LLMAccounting:
         cached_tokens=_non_negative_integer(cached_tokens),
         cost_usd=cost,
     )
+
+
+def _response_cost(
+    value: Any,
+    usage: Any,
+    deployment: ResolvedModelDeployment,
+    *,
+    calculate_cost: bool,
+) -> Decimal | None:
+    pricing = deployment.pricing
+    if pricing is None or not calculate_cost or value is None:
+        return None
+    if pricing.is_custom:
+        custom_costs = {
+            "input_cost_per_token": float(
+                pricing.input_usd_per_million_tokens / 1_000_000
+            ),
+            "cache_read_input_token_cost": float(
+                pricing.cached_input_usd_per_million_tokens / 1_000_000
+            ),
+            "output_cost_per_token": float(
+                pricing.output_usd_per_million_tokens / 1_000_000
+            ),
+        }
+        try:
+            cost = _cost(
+                litellm.completion_cost(
+                    completion_response=value,
+                    model=deployment.upstream_model,
+                    custom_cost_per_token=custom_costs,
+                )
+            )
+            return cost.quantize(COST_QUANTUM) if cost is not None else None
+        except Exception:  # noqa: BLE001 - LiteLLM usage data is untrusted input.
+            return None
+
+    cost = _cost(_field(usage, "cost"))
+    if cost is None:
+        hidden = _field(value, "_hidden_params")
+        if isinstance(hidden, Mapping):
+            cost = _cost(hidden.get("response_cost"))
+    if cost is not None:
+        return cost
+    try:
+        return _cost(litellm.completion_cost(completion_response=value))
+    except Exception:  # noqa: BLE001 - LiteLLM cost failures are untrusted input.
+        return None
 
 
 def _field(value: Any, name: str, default: Any = None) -> Any:

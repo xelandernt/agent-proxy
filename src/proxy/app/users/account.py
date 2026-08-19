@@ -21,7 +21,10 @@ async def list_models(
     _user: CurrentUserDep,
     models: ModelDeploymentServiceDep,
 ) -> list[AvailableModelView]:
-    return [AvailableModelView(name=model.name) for model in await models.list()]
+    return [
+        AvailableModelView(name=model.name, pricing=model.pricing)
+        for model in await models.list()
+    ]
 
 
 @router.get("/api-keys", response_model=list[ApiKeyView])

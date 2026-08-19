@@ -153,8 +153,10 @@ export function useCreateModel() {
 	const client = useQueryClient();
 	return useMutation({
 		mutationFn: (payload: ModelDeploymentCreate) => createAdminModel(payload),
-		onSuccess: () =>
-			client.invalidateQueries({ queryKey: ["admin", "models"] }),
+		onSuccess: async () => {
+			await client.invalidateQueries({ queryKey: ["admin", "models"] });
+			await client.invalidateQueries({ queryKey: ["user", "models"] });
+		},
 	});
 }
 

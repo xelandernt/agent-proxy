@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -48,13 +49,23 @@ class ModelDeploymentRepository:
             return await session.get(ModelDeploymentRecord, name)
 
     async def create(
-        self, *, name: str, provider: str, model_id: str
+        self,
+        *,
+        name: str,
+        provider: str,
+        model_id: str,
+        input_usd_per_million_tokens: Decimal | None,
+        cached_input_usd_per_million_tokens: Decimal | None,
+        output_usd_per_million_tokens: Decimal | None,
     ) -> ModelDeploymentRecord:
         now = datetime.now(UTC)
         row = ModelDeploymentRecord(
             name=name,
             provider=provider,
             model_id=model_id,
+            input_usd_per_million_tokens=input_usd_per_million_tokens,
+            cached_input_usd_per_million_tokens=(cached_input_usd_per_million_tokens),
+            output_usd_per_million_tokens=output_usd_per_million_tokens,
             created_at=now,
             updated_at=now,
         )
@@ -75,7 +86,14 @@ class ModelDeploymentRepository:
         return row
 
     async def update(
-        self, name: str, *, provider: str, model_id: str
+        self,
+        name: str,
+        *,
+        provider: str,
+        model_id: str,
+        input_usd_per_million_tokens: Decimal | None,
+        cached_input_usd_per_million_tokens: Decimal | None,
+        output_usd_per_million_tokens: Decimal | None,
     ) -> ModelDeploymentRecord:
         async with self._session_factory() as session:
             row = await session.get(ModelDeploymentRecord, name)
@@ -83,6 +101,11 @@ class ModelDeploymentRepository:
                 raise ModelDeploymentNotFound(f"Unknown model '{name}'.")
             row.provider = provider
             row.model_id = model_id
+            row.input_usd_per_million_tokens = input_usd_per_million_tokens
+            row.cached_input_usd_per_million_tokens = (
+                cached_input_usd_per_million_tokens
+            )
+            row.output_usd_per_million_tokens = output_usd_per_million_tokens
             row.updated_at = datetime.now(UTC)
             try:
                 await session.commit()

@@ -1,11 +1,31 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from decimal import Decimal
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from proxy.servers.constants import NAME_PATTERN
+
+UsdPerMillionTokens = Annotated[
+    Decimal,
+    Field(ge=0, max_digits=20, decimal_places=12),
+]
+
+
+class ModelPricing(BaseModel):
+    """Atomic USD prices for one million tokens."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_usd_per_million_tokens: UsdPerMillionTokens
+    cached_input_usd_per_million_tokens: UsdPerMillionTokens
+    output_usd_per_million_tokens: UsdPerMillionTokens
+
+
+class ModelPricingView(ModelPricing):
+    is_custom: bool
 
 
 class ModelDeploymentCreate(BaseModel):
@@ -14,6 +34,7 @@ class ModelDeploymentCreate(BaseModel):
     name: str = Field(pattern=NAME_PATTERN, max_length=100)
     provider: str = Field(pattern=NAME_PATTERN, max_length=100)
     model_id: str = Field(min_length=1, max_length=255)
+    pricing: ModelPricing | None = None
 
 
 class ModelDeploymentUpdate(BaseModel):
@@ -21,6 +42,7 @@ class ModelDeploymentUpdate(BaseModel):
 
     provider: str | None = Field(default=None, pattern=NAME_PATTERN, max_length=100)
     model_id: str | None = Field(default=None, min_length=1, max_length=255)
+    pricing: ModelPricing | None = None
 
 
 class ModelDeploymentView(BaseModel):
@@ -29,6 +51,7 @@ class ModelDeploymentView(BaseModel):
     name: str
     provider: str
     model_id: str
+    pricing: ModelPricingView | None
     created_at: datetime
     updated_at: datetime
 
@@ -41,3 +64,4 @@ class ResolvedModelDeployment(BaseModel):
     api_base: str | None
     settings: dict[str, Any]
     secrets: dict[str, str]
+    pricing: ModelPricingView | None

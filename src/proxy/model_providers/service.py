@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from pydantic import BaseModel, SecretStr
@@ -76,13 +77,7 @@ class ModelProviderService:
         row = await self._require(name)
         credentials = self._cipher.decrypt(row.encrypted_credentials)
         provider = row.config["provider"]
-        prefix = {
-            "openai": "openai",
-            "anthropic": "anthropic",
-            "azure_openai": "azure",
-            "bedrock": "bedrock",
-            "openai_compatible": "openai",
-        }[str(provider)]
+        upstream_model = _upstream_model(provider, model_id)
         settings: dict[str, Any] = {}
         api_base = None
         secrets: dict[str, str] = {}
@@ -114,7 +109,20 @@ class ModelProviderService:
                 secrets["aws_secret_access_key"] = credentials["secret_access_key"]
                 if credentials.get("session_token"):
                     secrets["aws_session_token"] = credentials["session_token"]
-        return f"{prefix}/{model_id}", api_base, settings, secrets
+        return upstream_model, api_base, settings, secrets
+
+    async def upstream_model(self, name: str, model_id: str) -> str:
+        row = await self._require(name)
+        return _upstream_model(row.config["provider"], model_id)
+
+    async def upstream_models(
+        self, deployments: Sequence[tuple[str, str]]
+    ) -> Sequence[str]:
+        providers = {row.name: row for row in await self._repository.list_all()}
+        return [
+            _upstream_model(providers[name].config["provider"], model_id)
+            for name, model_id in deployments
+        ]
 
     async def _require(self, name: str):
         row = await self._repository.get(name)
@@ -131,6 +139,17 @@ class ModelProviderService:
             created_at=row.created_at,
             updated_at=row.updated_at,
         )
+
+
+def _upstream_model(provider: object, model_id: str) -> str:
+    prefix = {
+        "openai": "openai",
+        "anthropic": "anthropic",
+        "azure_openai": "azure",
+        "bedrock": "bedrock",
+        "openai_compatible": "openai",
+    }[str(provider)]
+    return f"{prefix}/{model_id}"
 
 
 def _split_config(config: ModelProviderConfig) -> tuple[dict[str, Any], dict[str, str]]:

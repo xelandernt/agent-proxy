@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from proxy.model_deployments.schemas import ModelPricingView
+
 
 class UserPrincipal(BaseModel):
     """Verified identity claims used to resolve a durable user."""
@@ -35,6 +37,7 @@ class AvailableModelView(BaseModel):
     """Public model metadata available for API-key scope selection."""
 
     name: str
+    pricing: ModelPricingView | None
 
 
 class LoginRequest(BaseModel):

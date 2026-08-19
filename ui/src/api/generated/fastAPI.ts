@@ -216,11 +216,14 @@ export interface AuthProviderView {
   auth: AuthProviderViewAuth;
 }
 
+export type AvailableModelViewPricing = ModelPricingView | null;
+
 /**
  * Public model metadata available for API-key scope selection.
  */
 export interface AvailableModelView {
   name: string;
+  pricing: AvailableModelViewPricing;
 }
 
 export type AwsCognitoAuthProviderConfigResourceBaseUrl = string | null;
@@ -724,6 +727,8 @@ export interface McpServersDocument {
   servers: McpServerListing[];
 }
 
+export type ModelDeploymentCreatePricing = ModelPricing | null;
+
 export interface ModelDeploymentCreate {
   /**
    * @maxLength 100
@@ -740,23 +745,55 @@ export interface ModelDeploymentCreate {
    * @maxLength 255
    */
   model_id: string;
+  pricing?: ModelDeploymentCreatePricing;
 }
 
 export type ModelDeploymentUpdateProvider = string | null;
 
 export type ModelDeploymentUpdateModelId = string | null;
 
+export type ModelDeploymentUpdatePricing = ModelPricing | null;
+
 export interface ModelDeploymentUpdate {
   provider?: ModelDeploymentUpdateProvider;
   model_id?: ModelDeploymentUpdateModelId;
+  pricing?: ModelDeploymentUpdatePricing;
 }
+
+export type ModelDeploymentViewPricing = ModelPricingView | null;
 
 export interface ModelDeploymentView {
   name: string;
   provider: string;
   model_id: string;
+  pricing: ModelDeploymentViewPricing;
   created_at: string;
   updated_at: string;
+}
+
+export type ModelPricingInputUsdPerMillionTokens = number | string;
+
+export type ModelPricingCachedInputUsdPerMillionTokens = number | string;
+
+export type ModelPricingOutputUsdPerMillionTokens = number | string;
+
+/**
+ * Atomic USD prices for one million tokens.
+ */
+export interface ModelPricing {
+  input_usd_per_million_tokens: ModelPricingInputUsdPerMillionTokens;
+  cached_input_usd_per_million_tokens: ModelPricingCachedInputUsdPerMillionTokens;
+  output_usd_per_million_tokens: ModelPricingOutputUsdPerMillionTokens;
+}
+
+export interface ModelPricingView {
+  /** @pattern ^(?!^[-+.]*$)[+-]?0*(?:\d{0,8}|(?=[\d.]{1,21}0*$)\d{0,8}\.\d{0,12}0*$) */
+  input_usd_per_million_tokens: string;
+  /** @pattern ^(?!^[-+.]*$)[+-]?0*(?:\d{0,8}|(?=[\d.]{1,21}0*$)\d{0,8}\.\d{0,12}0*$) */
+  cached_input_usd_per_million_tokens: string;
+  /** @pattern ^(?!^[-+.]*$)[+-]?0*(?:\d{0,8}|(?=[\d.]{1,21}0*$)\d{0,8}\.\d{0,12}0*$) */
+  output_usd_per_million_tokens: string;
+  is_custom: boolean;
 }
 
 export type ModelProviderCreateConfig =

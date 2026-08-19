@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BoxIcon, KeyRoundIcon } from "lucide-react";
+import { ModelPricingSummary } from "#/components/model-pricing-summary";
 import { Button } from "#/components/ui/button";
 import {
 	Card,
@@ -121,7 +122,8 @@ function UserModels() {
 								</CardTitle>
 								<CardDescription>Available for API key access</CardDescription>
 							</CardHeader>
-							<CardContent>
+							<CardContent className="flex flex-col gap-4">
+								<ModelPricingSummary pricing={model.pricing} />
 								<CopySnippet
 									caption="OpenAI model ID"
 									content={model.name}

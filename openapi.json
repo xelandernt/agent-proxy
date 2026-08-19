@@ -2797,11 +2797,22 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPricingView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
-          "name"
+          "name",
+          "pricing"
         ],
         "title": "AvailableModelView",
         "description": "Public model metadata available for API-key scope selection."
@@ -4644,6 +4655,16 @@
             "maxLength": 255,
             "minLength": 1,
             "title": "Model Id"
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPricing"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -4682,6 +4703,16 @@
               }
             ],
             "title": "Model Id"
+          },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPricing"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -4702,6 +4733,16 @@
             "type": "string",
             "title": "Model Id"
           },
+          "pricing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelPricingView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -4718,10 +4759,95 @@
           "name",
           "provider",
           "model_id",
+          "pricing",
           "created_at",
           "updated_at"
         ],
         "title": "ModelDeploymentView"
+      },
+      "ModelPricing": {
+        "properties": {
+          "input_usd_per_million_tokens": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,21}0*$)\\d{0,8}\\.\\d{0,12}0*$)"
+              }
+            ],
+            "title": "Input Usd Per Million Tokens"
+          },
+          "cached_input_usd_per_million_tokens": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,21}0*$)\\d{0,8}\\.\\d{0,12}0*$)"
+              }
+            ],
+            "title": "Cached Input Usd Per Million Tokens"
+          },
+          "output_usd_per_million_tokens": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,21}0*$)\\d{0,8}\\.\\d{0,12}0*$)"
+              }
+            ],
+            "title": "Output Usd Per Million Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input_usd_per_million_tokens",
+          "cached_input_usd_per_million_tokens",
+          "output_usd_per_million_tokens"
+        ],
+        "title": "ModelPricing",
+        "description": "Atomic USD prices for one million tokens."
+      },
+      "ModelPricingView": {
+        "properties": {
+          "input_usd_per_million_tokens": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,21}0*$)\\d{0,8}\\.\\d{0,12}0*$)",
+            "title": "Input Usd Per Million Tokens"
+          },
+          "cached_input_usd_per_million_tokens": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,21}0*$)\\d{0,8}\\.\\d{0,12}0*$)",
+            "title": "Cached Input Usd Per Million Tokens"
+          },
+          "output_usd_per_million_tokens": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,8}|(?=[\\d.]{1,21}0*$)\\d{0,8}\\.\\d{0,12}0*$)",
+            "title": "Output Usd Per Million Tokens"
+          },
+          "is_custom": {
+            "type": "boolean",
+            "title": "Is Custom"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "input_usd_per_million_tokens",
+          "cached_input_usd_per_million_tokens",
+          "output_usd_per_million_tokens",
+          "is_custom"
+        ],
+        "title": "ModelPricingView"
       },
       "ModelProviderCreate": {
         "properties": {

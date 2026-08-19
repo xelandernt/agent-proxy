@@ -7,6 +7,7 @@ import type {
 	ModelDeploymentCreate,
 	ModelDeploymentUpdate,
 	ModelDeploymentView,
+	ModelPricing,
 } from "#/api/generated/fastAPI";
 import { Button } from "#/components/ui/button";
 import {
@@ -19,8 +20,11 @@ import {
 import {
 	Field,
 	FieldDescription,
+	FieldError,
 	FieldGroup,
 	FieldLabel,
+	FieldLegend,
+	FieldSet,
 } from "#/components/ui/field";
 import { Input } from "#/components/ui/input";
 import {
@@ -37,6 +41,7 @@ import {
 	useCreateModel,
 	useUpdateModel,
 } from "#/lib/model-gateway-queries";
+import { customPricingFromInputs } from "#/lib/model-pricing";
 
 export function ModelForm({ model }: { model?: ModelDeploymentView }) {
 	const navigate = useNavigate();
@@ -46,6 +51,17 @@ export function ModelForm({ model }: { model?: ModelDeploymentView }) {
 	const [name, setName] = useState(model?.name ?? "");
 	const [provider, setProvider] = useState(model?.provider ?? "");
 	const [modelId, setModelId] = useState(model?.model_id ?? "");
+	const customPricing = model?.pricing?.is_custom ? model.pricing : undefined;
+	const [inputPrice, setInputPrice] = useState(
+		customPricing?.input_usd_per_million_tokens ?? "",
+	);
+	const [cachedInputPrice, setCachedInputPrice] = useState(
+		customPricing?.cached_input_usd_per_million_tokens ?? "",
+	);
+	const [outputPrice, setOutputPrice] = useState(
+		customPricing?.output_usd_per_million_tokens ?? "",
+	);
+	const [pricingError, setPricingError] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const submitting = useRef(false);
 	const busy = createMutation.isPending || updateMutation.isPending;
@@ -57,6 +73,20 @@ export function ModelForm({ model }: { model?: ModelDeploymentView }) {
 			setError("Select a provider.");
 			return;
 		}
+		let pricing: ModelPricing | null;
+		try {
+			pricing = customPricingFromInputs({
+				input: inputPrice,
+				cachedInput: cachedInputPrice,
+				output: outputPrice,
+			});
+			setPricingError(null);
+		} catch (caught) {
+			setPricingError(
+				caught instanceof Error ? caught.message : "Invalid custom pricing.",
+			);
+			return;
+		}
 		submitting.current = true;
 		setError(null);
 		try {
@@ -64,6 +94,7 @@ export function ModelForm({ model }: { model?: ModelDeploymentView }) {
 				const payload: ModelDeploymentUpdate = {
 					provider,
 					model_id: modelId.trim(),
+					pricing,
 				};
 				await updateMutation.mutateAsync({ name: model.name, payload });
 				toast.success(`Updated ${model.name}`);
@@ -72,6 +103,7 @@ export function ModelForm({ model }: { model?: ModelDeploymentView }) {
 					name: name.trim(),
 					provider,
 					model_id: modelId.trim(),
+					pricing,
 				};
 				await createMutation.mutateAsync(payload);
 				toast.success(`Created ${payload.name}`);
@@ -104,7 +136,7 @@ export function ModelForm({ model }: { model?: ModelDeploymentView }) {
 					</CardTitle>
 					<CardDescription>
 						Create a public model name backed by a configured inference
-						provider.
+						provider, with optional custom token pricing.
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -171,6 +203,59 @@ export function ModelForm({ model }: { model?: ModelDeploymentView }) {
 									LiteLLM provider prefix.
 								</FieldDescription>
 							</Field>
+							<FieldSet>
+								<FieldLegend>Custom pricing</FieldLegend>
+								<FieldDescription>
+									USD per one million tokens. Enter all three prices, or leave
+									all three blank to use automatic pricing when available.
+								</FieldDescription>
+								<FieldGroup className="gap-4 md:grid md:grid-cols-3">
+									<Field data-invalid={Boolean(pricingError)}>
+										<FieldLabel htmlFor="model-input-price">Input</FieldLabel>
+										<Input
+											id="model-input-price"
+											type="number"
+											min="0"
+											step="any"
+											value={inputPrice}
+											onChange={(event) => setInputPrice(event.target.value)}
+											placeholder="2.50"
+											aria-invalid={Boolean(pricingError)}
+										/>
+									</Field>
+									<Field data-invalid={Boolean(pricingError)}>
+										<FieldLabel htmlFor="model-cached-input-price">
+											Cached input
+										</FieldLabel>
+										<Input
+											id="model-cached-input-price"
+											type="number"
+											min="0"
+											step="any"
+											value={cachedInputPrice}
+											onChange={(event) =>
+												setCachedInputPrice(event.target.value)
+											}
+											placeholder="0.25"
+											aria-invalid={Boolean(pricingError)}
+										/>
+									</Field>
+									<Field data-invalid={Boolean(pricingError)}>
+										<FieldLabel htmlFor="model-output-price">Output</FieldLabel>
+										<Input
+											id="model-output-price"
+											type="number"
+											min="0"
+											step="any"
+											value={outputPrice}
+											onChange={(event) => setOutputPrice(event.target.value)}
+											placeholder="10.00"
+											aria-invalid={Boolean(pricingError)}
+										/>
+									</Field>
+								</FieldGroup>
+								{pricingError && <FieldError>{pricingError}</FieldError>}
+							</FieldSet>
 							{error && <p className="text-sm text-destructive">{error}</p>}
 							<div className="flex justify-end gap-2">
 								<Link to="/admin/models">

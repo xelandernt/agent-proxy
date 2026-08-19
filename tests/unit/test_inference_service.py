@@ -30,6 +30,7 @@ class FakeModels:
             api_base=None,
             settings={},
             secrets={"api_key": "provider-secret"},
+            pricing=None,
         )
 
 
