@@ -1,13 +1,45 @@
 export type UsageRange = { presetMinutes: number } | { from: Date; to: Date };
 
+const UTC_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
+	month: "short",
+	day: "numeric",
+	year: "numeric",
+	timeZone: "UTC",
+});
+
 function calendarDateAtTime(date: Date, time: string): Date | null {
 	const match = /^(?:[01]\d|2[0-3]):[0-5]\d$/.exec(time);
 	if (!match) return null;
 
 	const [hours, minutes] = time.split(":").map(Number);
-	const dateTime = new Date(date);
-	dateTime.setHours(hours, minutes, 0, 0);
-	return dateTime;
+	return new Date(
+		Date.UTC(
+			date.getFullYear(),
+			date.getMonth(),
+			date.getDate(),
+			hours,
+			minutes,
+		),
+	);
+}
+
+export function calendarDateForUtcInstant(value: Date): Date {
+	return new Date(
+		value.getUTCFullYear(),
+		value.getUTCMonth(),
+		value.getUTCDate(),
+	);
+}
+
+export function formatUtcTime(value: Date): string {
+	return `${value.getUTCHours().toString().padStart(2, "0")}:${value
+		.getUTCMinutes()
+		.toString()
+		.padStart(2, "0")}`;
+}
+
+export function formatUtcDateTime(value: Date): string {
+	return `${UTC_DATE_FORMAT.format(value)} ${formatUtcTime(value)}`;
 }
 
 export function usageRangeForCalendarDateTimes(

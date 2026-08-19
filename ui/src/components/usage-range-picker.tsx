@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
@@ -18,6 +17,9 @@ import {
 	PopoverTrigger,
 } from "#/components/ui/popover";
 import {
+	calendarDateForUtcInstant,
+	formatUtcDateTime,
+	formatUtcTime,
 	type UsageRange,
 	usageRangeForCalendarDateTimes,
 } from "#/lib/usage-range";
@@ -46,16 +48,9 @@ function isCurrentUtcCalendarDate(date: Date, now: Date): boolean {
 	);
 }
 
-function formatUtcTime(now: Date): string {
-	return `${now.getUTCHours().toString().padStart(2, "0")}:${now
-		.getUTCMinutes()
-		.toString()
-		.padStart(2, "0")}`;
-}
-
 function formatDateTimeRange(range: UsageRange): string {
 	if ("presetMinutes" in range) return "Custom range";
-	return `${format(range.from, "LLL d, y HH:mm")} – ${format(range.to, "LLL d, y HH:mm")}`;
+	return `${formatUtcDateTime(range.from)} – ${formatUtcDateTime(range.to)}`;
 }
 
 function TimeSelect({
@@ -132,9 +127,12 @@ export function UsageRangePicker({
 
 	const resetDraft = () => {
 		if ("from" in range) {
-			setDraftDateRange({ from: range.from, to: range.to });
-			setDraftStartTime(format(range.from, "HH:mm"));
-			setDraftEndTime(format(range.to, "HH:mm"));
+			setDraftDateRange({
+				from: calendarDateForUtcInstant(range.from),
+				to: calendarDateForUtcInstant(range.to),
+			});
+			setDraftStartTime(formatUtcTime(range.from));
+			setDraftEndTime(formatUtcTime(range.to));
 			return;
 		}
 		setDraftDateRange(undefined);
@@ -217,7 +215,7 @@ export function UsageRangePicker({
 							}}
 						>
 							<FieldDescription>
-								Choose both dates, then set their times.
+								Choose both dates, then set their times in UTC.
 							</FieldDescription>
 							<FieldGroup className="mt-3 gap-3">
 								<TimeSelect

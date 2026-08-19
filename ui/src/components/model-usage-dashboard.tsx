@@ -280,7 +280,7 @@ function DashboardReport({
 					detail={`${report.input_tokens?.toLocaleString() ?? "?"} input · ${report.output_tokens?.toLocaleString() ?? "?"} output`}
 				/>
 				<MetricCard
-					title="Frozen cost"
+					title="Cost"
 					value={formatModelCost(report.cost_usd)}
 					detail={`${report.costed_requests} costed requests`}
 				/>
