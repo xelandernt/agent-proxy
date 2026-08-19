@@ -15,6 +15,7 @@ from proxy.app.admin.endpoints import (
     public_router as admin_public_router,
 )
 from proxy.app.admin.endpoints import router as admin_router
+from proxy.app.admin.model_providers import router as admin_model_providers_router
 from proxy.app.admin.models import router as admin_models_router
 from proxy.app.health import router as health_router
 from proxy.app.inference.endpoints import router as inference_router
@@ -101,6 +102,7 @@ def create_app(config: GatewayConfig | None = None) -> FastAPI:
     gateway.include_router(admin_router)
     gateway.include_router(auth_providers_router)
     gateway.include_router(admin_models_router)
+    gateway.include_router(admin_model_providers_router)
     gateway.include_router(admin_usage_router)
     gateway.include_router(user_public_router)
     gateway.include_router(user_router)

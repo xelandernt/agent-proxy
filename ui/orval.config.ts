@@ -9,6 +9,11 @@ export default defineConfig({
 			prettier: true,
 			clean: true,
 			override: {
+				mutator: {
+					path: "./src/lib/api-fetch.ts",
+					name: "apiFetch",
+					extension: ".ts",
+				},
 				header: () =>
 					[
 						"/* eslint-disable */",

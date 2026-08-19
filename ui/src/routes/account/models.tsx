@@ -119,9 +119,7 @@ function UserModels() {
 								<CardTitle className="font-mono text-base">
 									{model.name}
 								</CardTitle>
-								<CardDescription>
-									{model.description || "No description"}
-								</CardDescription>
+								<CardDescription>Available for API key access</CardDescription>
 							</CardHeader>
 							<CardContent>
 								<CopySnippet

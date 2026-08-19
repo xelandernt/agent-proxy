@@ -3,7 +3,7 @@ import type {
 	UserModelUsageReport,
 } from "#/api/generated/fastAPI";
 
-export type ModelUsageMetric = "requests" | "tokens" | "cost";
+export type ModelUsageMetric = "requests" | "tokens" | "cached" | "cost";
 export type ModelUsageAggregate = Pick<
 	UserModelUsageReport,
 	| "requests"
@@ -13,6 +13,8 @@ export type ModelUsageAggregate = Pick<
 	| "input_tokens"
 	| "output_tokens"
 	| "total_tokens"
+	| "cached_metered_requests"
+	| "cached_tokens"
 	| "costed_requests"
 	| "cost_usd"
 >;
@@ -32,12 +34,21 @@ export function formatModelCost(value: string | null): string {
 
 export function accountingCoverage(
 	aggregate: ModelUsageAggregate,
-	kind: "tokens" | "cost",
+	kind: "tokens" | "cached" | "cost",
 ): string | null {
-	const covered =
-		kind === "tokens" ? aggregate.metered_requests : aggregate.costed_requests;
+	const covered = {
+		tokens: aggregate.metered_requests,
+		cached: aggregate.cached_metered_requests,
+		cost: aggregate.costed_requests,
+	}[kind];
 	if (covered === aggregate.requests) return null;
-	return `${covered} of ${aggregate.requests} requests ${kind === "tokens" ? "metered" : "costed"}`;
+	const label =
+		kind === "tokens"
+			? "metered"
+			: kind === "cached"
+				? "reported cached tokens"
+				: "costed";
+	return `${covered} of ${aggregate.requests} requests ${label}`;
 }
 
 export function modelUsagePointValue(
@@ -46,6 +57,7 @@ export function modelUsagePointValue(
 ): number {
 	if (metric === "requests") return point.requests;
 	if (metric === "tokens") return point.total_tokens ?? 0;
+	if (metric === "cached") return point.cached_tokens ?? 0;
 	const cost = Number(point.cost_usd ?? 0);
 	return Number.isFinite(cost) ? cost : 0;
 }

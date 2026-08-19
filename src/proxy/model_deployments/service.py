@@ -10,89 +10,54 @@ from proxy.model_deployments.schemas import (
     ModelDeploymentView,
     ResolvedModelDeployment,
 )
-from proxy.security.credentials import CredentialCipher
+from proxy.model_providers.service import ModelProviderService
 
 
 class ModelDeploymentService:
     def __init__(
-        self,
-        repository: ModelDeploymentRepository,
-        cipher: CredentialCipher,
+        self, repository: ModelDeploymentRepository, providers: ModelProviderService
     ) -> None:
         self._repository = repository
-        self._cipher = cipher
+        self._providers = providers
 
     async def list(self) -> list[ModelDeploymentView]:
         return [self._view(row) for row in await self._repository.list_all()]
 
     async def get(self, name: str) -> ModelDeploymentView:
-        row = await self._require(name)
-        return self._view(row)
+        return self._view(await self._require(name))
 
     async def resolve(self, name: str) -> ResolvedModelDeployment:
         row = await self._require(name)
+        upstream_model, api_base, settings, secrets = await self._providers.resolve(
+            row.provider, row.model_id
+        )
         return ResolvedModelDeployment(
             name=row.name,
-            upstream_model=row.upstream_model,
-            api_base=row.api_base,
-            settings=row.settings,
-            secrets=self._cipher.decrypt(row.encrypted_secrets),
+            upstream_model=upstream_model,
+            api_base=api_base,
+            settings=settings,
+            secrets=secrets,
         )
 
     async def create(self, payload: ModelDeploymentCreate) -> ModelDeploymentView:
-        secrets = {
-            name: value.get_secret_value() for name, value in payload.secrets.items()
-        }
-        row = await self._repository.create(
-            name=payload.name,
-            description=payload.description,
-            upstream_model=payload.upstream_model,
-            api_base=str(payload.api_base) if payload.api_base else None,
-            settings=payload.settings,
-            encrypted_secrets=self._cipher.encrypt(secrets),
-            secret_names=sorted(secrets),
+        await self._providers.get(payload.provider)
+        return self._view(
+            await self._repository.create(
+                name=payload.name, provider=payload.provider, model_id=payload.model_id
+            )
         )
-        return self._view(row)
 
     async def update(
-        self,
-        name: str,
-        payload: ModelDeploymentUpdate,
+        self, name: str, payload: ModelDeploymentUpdate
     ) -> ModelDeploymentView:
         current = await self._require(name)
-        secrets = self._cipher.decrypt(current.encrypted_secrets)
-        for secret_name in payload.remove_secrets:
-            secrets.pop(secret_name, None)
-        secrets.update(
-            {
-                secret_name: value.get_secret_value()
-                for secret_name, value in payload.set_secrets.items()
-            }
+        provider = payload.provider or current.provider
+        await self._providers.get(provider)
+        return self._view(
+            await self._repository.update(
+                name, provider=provider, model_id=payload.model_id or current.model_id
+            )
         )
-        fields_set = payload.model_fields_set
-        api_base = current.api_base
-        if "api_base" in fields_set:
-            api_base = str(payload.api_base) if payload.api_base else None
-        row = await self._repository.update(
-            name,
-            description=(
-                payload.description
-                if payload.description is not None
-                else current.description
-            ),
-            upstream_model=(
-                payload.upstream_model
-                if payload.upstream_model is not None
-                else current.upstream_model
-            ),
-            api_base=api_base,
-            settings=payload.settings
-            if payload.settings is not None
-            else current.settings,
-            encrypted_secrets=self._cipher.encrypt(secrets),
-            secret_names=sorted(secrets),
-        )
-        return self._view(row)
 
     async def delete(self, name: str) -> None:
         await self._repository.delete(name)

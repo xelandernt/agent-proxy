@@ -29,6 +29,7 @@ class ModelUsageRecord:
     input_tokens: int | None
     output_tokens: int | None
     total_tokens: int | None
+    cached_tokens: int | None
     cost_usd: Decimal | None
     duration_ms: int
     error_type: str | None

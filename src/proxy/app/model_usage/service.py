@@ -39,6 +39,11 @@ class ModelUsageService:
     def __init__(self, repository: ModelUsageRepository) -> None:
         self._repository = repository
 
+    async def request_count(self, start: datetime, end: datetime) -> int:
+        """Return the aggregate model request count for a time window."""
+
+        return (await self._repository.totals(_filters(start, end))).requests
+
     async def user_report(
         self,
         user_id: uuid.UUID,
@@ -226,6 +231,8 @@ def _aggregate(values: UsageTotals) -> ModelUsageAggregate:
         input_tokens=values.input_tokens,
         output_tokens=values.output_tokens,
         total_tokens=values.total_tokens,
+        cached_metered_requests=values.cached_metered_requests,
+        cached_tokens=values.cached_tokens,
         costed_requests=values.costed_requests,
         cost_usd=_decimal_string(values.cost_usd),
     )
@@ -239,7 +246,7 @@ def _decimal_string(value: Decimal | None) -> str | None:
 
 
 def _empty() -> UsageTotals:
-    return UsageTotals(0, 0, 0, 0, None, None, None, 0, None)
+    return UsageTotals(0, 0, 0, 0, None, None, None, 0, None, 0, None)
 
 
 def _bucket_times(

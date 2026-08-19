@@ -10,6 +10,9 @@ import type {
 	ModelDeploymentCreate,
 	ModelDeploymentUpdate,
 	ModelDeploymentView,
+	ModelProviderCreate,
+	ModelProviderUpdate,
+	ModelProviderView,
 	ModelUsageSeriesReport,
 	UserModelUsageApiUserUsageGetParams,
 	UserModelUsageReport,
@@ -21,14 +24,18 @@ import {
 	adminModelUsageSeriesApiAdminUsageSeriesGet,
 	createApiKeyApiUserApiKeysPost,
 	createModelApiAdminModelsPost,
+	createModelProviderApiAdminModelProvidersPost,
 	deleteModelApiAdminModelsNameDelete,
+	deleteModelProviderApiAdminModelProvidersNameDelete,
 	listApiKeysApiUserApiKeysGet,
+	listModelProvidersApiAdminModelProvidersGet,
 	listModelsApiAdminModelsGet,
 	listModelsApiUserModelsGet,
 	meApiUserMeGet,
 	revokeApiKeyApiUserApiKeysKeyIdDelete,
 	updateApiKeyApiUserApiKeysKeyIdPatch,
 	updateModelApiAdminModelsNamePatch,
+	updateModelProviderApiAdminModelProvidersNamePut,
 	userModelUsageApiUserUsageGet,
 	userModelUsageSeriesApiUserUsageSeriesGet,
 } from "#/api/generated/fastAPI";
@@ -59,6 +66,39 @@ export async function updateAdminModel(
 
 export async function deleteAdminModel(name: string): Promise<void> {
 	const result = await deleteModelApiAdminModelsNameDelete(name);
+	if (result.status === 204) return;
+	throw adminError(result.status, result.data);
+}
+
+export async function listAdminModelProviders(): Promise<ModelProviderView[]> {
+	const result = await listModelProvidersApiAdminModelProvidersGet();
+	if (result.status === 200) return result.data;
+	throw adminError(result.status, result.data);
+}
+
+export async function createAdminModelProvider(
+	payload: ModelProviderCreate,
+): Promise<ModelProviderView> {
+	const result = await createModelProviderApiAdminModelProvidersPost(payload);
+	if (result.status === 201) return result.data;
+	throw adminError(result.status, result.data);
+}
+
+export async function updateAdminModelProvider(
+	name: string,
+	payload: ModelProviderUpdate,
+): Promise<ModelProviderView> {
+	const result = await updateModelProviderApiAdminModelProvidersNamePut(
+		name,
+		payload,
+	);
+	if (result.status === 200) return result.data;
+	throw adminError(result.status, result.data);
+}
+
+export async function deleteAdminModelProvider(name: string): Promise<void> {
+	const result =
+		await deleteModelProviderApiAdminModelProvidersNameDelete(name);
 	if (result.status === 204) return;
 	throw adminError(result.status, result.data);
 }

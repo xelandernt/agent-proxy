@@ -24,6 +24,9 @@ from proxy.model_deployments.repository import (
 )
 from proxy.model_deployments.schemas import ModelDeploymentCreate
 from proxy.model_deployments.service import ModelDeploymentService
+from proxy.model_providers.repository import ModelProviderRepository
+from proxy.model_providers.schemas import ModelProviderCreate
+from proxy.model_providers.service import ModelProviderService
 from proxy.security.credentials import CredentialCipher
 
 DEVELOPMENT_FERNET_KEY = "Zop6ZBEB1OB1D8SfORA4msZDzY1hEvqCnpF2DGpxs-E="
@@ -76,9 +79,10 @@ async def test_user_model_key_and_usage_lifecycle(
     session_factory: async_sessionmaker,
 ) -> None:
     users = UserRepository(session_factory)
+    cipher = CredentialCipher(SecretStr(DEVELOPMENT_FERNET_KEY))
+    providers = ModelProviderService(ModelProviderRepository(session_factory), cipher)
     models = ModelDeploymentService(
-        ModelDeploymentRepository(session_factory),
-        CredentialCipher(SecretStr(DEVELOPMENT_FERNET_KEY)),
+        ModelDeploymentRepository(session_factory), providers
     )
     keys = ApiKeyService(ApiKeyRepository(session_factory))
 
@@ -103,29 +107,43 @@ async def test_user_model_key_and_usage_lifecycle(
     assert updated.id == user.id
     assert updated.email == "renamed@example.com"
 
+    await providers.create(
+        ModelProviderCreate(
+            name="anthropic-production",
+            config={"provider": "anthropic", "api_key": "provider-secret-value"},
+        )
+    )
+    await providers.create(
+        ModelProviderCreate(
+            name="azure-production",
+            config={
+                "provider": "azure_openai",
+                "endpoint": "https://example.openai.azure.com",
+                "api_version": "2026-06-01",
+                "api_key": "azure-secret-value",
+            },
+        )
+    )
     await models.create(
         ModelDeploymentCreate(
             name="claude",
-            description="Primary model",
-            upstream_model="anthropic/claude-sonnet-4-5",
-            settings={"timeout": 120},
-            secrets={"api_key": "provider-secret-value"},
+            provider="anthropic-production",
+            model_id="claude-sonnet-4-5",
         )
     )
     await models.create(
         ModelDeploymentCreate(
             name="azure",
-            upstream_model="azure/gpt-5",
-            api_base="https://example.openai.azure.com",
-            secrets={"api_key": "azure-secret-value"},
+            provider="azure-production",
+            model_id="gpt-5",
         )
     )
 
     async with session_factory() as session:
         stored = await session.get(ModelDeploymentRecord, "claude")
         assert stored is not None
-        assert "provider-secret-value" not in stored.encrypted_secrets
-        assert stored.secret_names == ["api_key"]
+        assert stored.provider == "anthropic-production"
+        assert stored.model_id == "claude-sonnet-4-5"
 
     created = await keys.create(
         user.id,
@@ -161,6 +179,7 @@ async def test_user_model_key_and_usage_lifecycle(
             input_tokens=10,
             output_tokens=4,
             total_tokens=14,
+            cached_tokens=6,
             cost_usd=Decimal("0.00042"),
             duration_ms=25,
             error_type=None,
@@ -174,6 +193,7 @@ async def test_user_model_key_and_usage_lifecycle(
         event = (await session.execute(select(ModelUsageEvent))).scalar_one()
         assert event.model_name == "azure"
         assert event.total_tokens == 14
+        assert event.cached_tokens == 6
         assert event.cost_usd == Decimal("0.000420000000")
         assert not (
             {"input", "output", "instructions"} & set(event.__table__.columns.keys())

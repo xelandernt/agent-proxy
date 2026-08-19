@@ -52,7 +52,7 @@ async def test_adapter_owns_model_endpoint_credentials_and_stream_flag(
     }
     assert result.payload["model"] == "public-model"
     assert "_hidden_params" not in result.payload
-    assert result.accounting.cost_usd == Decimal("1")
+    assert result.accounting.cost_usd == Decimal(1)
 
 
 @pytest.mark.asyncio
@@ -144,7 +144,12 @@ def response(*, cost: object = 0.00125) -> ResponsesAPIResponse:
         created_at=1,
         model="anthropic/private-model",
         output=[],
-        usage={"input_tokens": 5, "output_tokens": 3, "total_tokens": 8},
+        usage={
+            "input_tokens": 5,
+            "output_tokens": 3,
+            "total_tokens": 8,
+            "input_tokens_details": {"cached_tokens": 2},
+        },
     )
     value._hidden_params["response_cost"] = cost
     return value
@@ -164,9 +169,36 @@ async def test_adapter_extracts_typed_non_streaming_accounting(
     assert result.accounting.input_tokens == 5
     assert result.accounting.output_tokens == 3
     assert result.accounting.total_tokens == 8
+    assert result.accounting.cached_tokens == 2
     assert result.accounting.cost_usd == Decimal("0.00125")
     assert result.payload["model"] == "public-model"
     assert "_hidden_params" not in result.payload
+
+
+@pytest.mark.asyncio
+async def test_adapter_calculates_non_streaming_cost_when_provider_omits_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    upstream = response(cost=None)
+    upstream._hidden_params.clear()
+    calls: list[object] = []
+
+    async def fake_aresponses(**_kwargs: Any) -> ResponsesAPIResponse:
+        return upstream
+
+    def fake_completion_cost(*, completion_response: object) -> float:
+        calls.append(completion_response)
+        return 0.00125
+
+    monkeypatch.setattr("proxy.llm.adapter.litellm.aresponses", fake_aresponses)
+    monkeypatch.setattr(
+        "proxy.llm.adapter.litellm.completion_cost", fake_completion_cost
+    )
+
+    result = await LiteLLMResponsesAdapter().create(deployment(), {"input": "hello"})
+
+    assert result.accounting.cost_usd == Decimal("0.00125")
+    assert calls == [upstream]
 
 
 @pytest.mark.asyncio

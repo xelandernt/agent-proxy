@@ -973,6 +973,195 @@
         }
       }
     },
+    "/api/admin/model-providers": {
+      "get": {
+        "tags": [
+          "admin-model-providers"
+        ],
+        "summary": "List Model Providers",
+        "operationId": "list_model_providers_api_admin_model_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelProviderView"
+                  },
+                  "type": "array",
+                  "title": "Response List Model Providers Api Admin Model Providers Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin-model-providers"
+        ],
+        "summary": "Create Model Provider",
+        "operationId": "create_model_provider_api_admin_model_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelProviderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProviderView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/model-providers/{name}": {
+      "get": {
+        "tags": [
+          "admin-model-providers"
+        ],
+        "summary": "Get Model Provider",
+        "operationId": "get_model_provider_api_admin_model_providers__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProviderView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin-model-providers"
+        ],
+        "summary": "Update Model Provider",
+        "operationId": "update_model_provider_api_admin_model_providers__name__put",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelProviderUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProviderView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-model-providers"
+        ],
+        "summary": "Delete Model Provider",
+        "operationId": "delete_model_provider_api_admin_model_providers__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/usage": {
       "get": {
         "tags": [
@@ -1817,6 +2006,21 @@
             ],
             "title": "Total Tokens"
           },
+          "cached_metered_requests": {
+            "type": "integer",
+            "title": "Cached Metered Requests"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
           "costed_requests": {
             "type": "integer",
             "title": "Costed Requests"
@@ -1873,6 +2077,8 @@
           "input_tokens",
           "output_tokens",
           "total_tokens",
+          "cached_metered_requests",
+          "cached_tokens",
           "costed_requests",
           "cost_usd",
           "start",
@@ -1882,6 +2088,34 @@
           "users"
         ],
         "title": "AdminModelUsageReport"
+      },
+      "AnthropicProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "anthropic",
+            "title": "Provider"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "AnthropicProviderConfig"
       },
       "ApiKeyCreate": {
         "properties": {
@@ -2555,16 +2789,11 @@
           "name": {
             "type": "string",
             "title": "Name"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "description"
+          "name"
         ],
         "title": "AvailableModelView",
         "description": "Public model metadata available for API-key scope selection."
@@ -2970,6 +3199,191 @@
           "required_scopes"
         ],
         "title": "AzureAuthProviderConfig"
+      },
+      "AzureOpenAIProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "azure_openai",
+            "title": "Provider"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "endpoint": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Endpoint"
+          },
+          "api_version": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Api Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "endpoint",
+          "api_version"
+        ],
+        "title": "AzureOpenAIProviderConfig"
+      },
+      "BedrockAccessKeyCredentials": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "access_keys",
+            "title": "Type"
+          },
+          "access_key_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Key Id"
+          },
+          "secret_access_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret Access Key"
+          },
+          "session_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "BedrockAccessKeyCredentials"
+      },
+      "BedrockApiKeyCredentials": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "api_key",
+            "title": "Type"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "BedrockApiKeyCredentials"
+      },
+      "BedrockDefaultCredentials": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "default",
+            "title": "Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "BedrockDefaultCredentials"
+      },
+      "BedrockProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "bedrock",
+            "title": "Provider"
+          },
+          "region": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Region"
+          },
+          "credentials": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BedrockDefaultCredentials"
+              },
+              {
+                "$ref": "#/components/schemas/BedrockApiKeyCredentials"
+              },
+              {
+                "$ref": "#/components/schemas/BedrockAccessKeyCredentials"
+              }
+            ],
+            "title": "Credentials",
+            "discriminator": {
+              "propertyName": "type",
+              "mapping": {
+                "access_keys": "#/components/schemas/BedrockAccessKeyCredentials",
+                "api_key": "#/components/schemas/BedrockApiKeyCredentials",
+                "default": "#/components/schemas/BedrockDefaultCredentials"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "region",
+          "credentials"
+        ],
+        "title": "BedrockProviderConfig"
       },
       "DescopeAuthProviderConfig": {
         "properties": {
@@ -3940,7 +4354,6 @@
         "title": "ItemCount",
         "description": "One labeled usage count."
       },
-      "JsonValue": {},
       "JwtAuthProviderConfig": {
         "properties": {
           "provider": {
@@ -4212,72 +4625,44 @@
             "pattern": "^[a-z0-9][a-z0-9-]*$",
             "title": "Name"
           },
-          "description": {
+          "provider": {
             "type": "string",
-            "maxLength": 255,
-            "title": "Description",
-            "default": ""
+            "maxLength": 100,
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Provider"
           },
-          "upstream_model": {
+          "model_id": {
             "type": "string",
             "maxLength": 255,
             "minLength": 1,
-            "title": "Upstream Model"
-          },
-          "api_base": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048,
-                "minLength": 1,
-                "format": "uri"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Base"
-          },
-          "settings": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Settings"
-          },
-          "secrets": {
-            "additionalProperties": {
-              "type": "string",
-              "format": "password",
-              "writeOnly": true
-            },
-            "type": "object",
-            "title": "Secrets"
+            "title": "Model Id"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "name",
-          "upstream_model"
+          "provider",
+          "model_id"
         ],
         "title": "ModelDeploymentCreate"
       },
       "ModelDeploymentUpdate": {
         "properties": {
-          "description": {
+          "provider": {
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 255
+                "maxLength": 100,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Description"
+            "title": "Provider"
           },
-          "upstream_model": {
+          "model_id": {
             "anyOf": [
               {
                 "type": "string",
@@ -4288,51 +4673,7 @@
                 "type": "null"
               }
             ],
-            "title": "Upstream Model"
-          },
-          "api_base": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2048,
-                "minLength": 1,
-                "format": "uri"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Base"
-          },
-          "settings": {
-            "anyOf": [
-              {
-                "additionalProperties": {
-                  "$ref": "#/components/schemas/JsonValue"
-                },
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Settings"
-          },
-          "set_secrets": {
-            "additionalProperties": {
-              "type": "string",
-              "format": "password",
-              "writeOnly": true
-            },
-            "type": "object",
-            "title": "Set Secrets"
-          },
-          "remove_secrets": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Remove Secrets"
+            "title": "Model Id"
           }
         },
         "additionalProperties": false,
@@ -4345,38 +4686,13 @@
             "type": "string",
             "title": "Name"
           },
-          "description": {
+          "provider": {
             "type": "string",
-            "title": "Description"
+            "title": "Provider"
           },
-          "upstream_model": {
+          "model_id": {
             "type": "string",
-            "title": "Upstream Model"
-          },
-          "api_base": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Api Base"
-          },
-          "settings": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "type": "object",
-            "title": "Settings"
-          },
-          "secret_names": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Secret Names"
+            "title": "Model Id"
           },
           "created_at": {
             "type": "string",
@@ -4392,15 +4708,163 @@
         "type": "object",
         "required": [
           "name",
-          "description",
-          "upstream_model",
-          "api_base",
-          "settings",
-          "secret_names",
+          "provider",
+          "model_id",
           "created_at",
           "updated_at"
         ],
         "title": "ModelDeploymentView"
+      },
+      "ModelProviderCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "title": "Name"
+          },
+          "config": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OpenAIProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AnthropicProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureOpenAIProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/BedrockProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OpenAICompatibleProviderConfig"
+              }
+            ],
+            "title": "Config",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "anthropic": "#/components/schemas/AnthropicProviderConfig",
+                "azure_openai": "#/components/schemas/AzureOpenAIProviderConfig",
+                "bedrock": "#/components/schemas/BedrockProviderConfig",
+                "openai": "#/components/schemas/OpenAIProviderConfig",
+                "openai_compatible": "#/components/schemas/OpenAICompatibleProviderConfig"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "config"
+        ],
+        "title": "ModelProviderCreate"
+      },
+      "ModelProviderUpdate": {
+        "properties": {
+          "config": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OpenAIProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AnthropicProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureOpenAIProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/BedrockProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OpenAICompatibleProviderConfig"
+              }
+            ],
+            "title": "Config",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "anthropic": "#/components/schemas/AnthropicProviderConfig",
+                "azure_openai": "#/components/schemas/AzureOpenAIProviderConfig",
+                "bedrock": "#/components/schemas/BedrockProviderConfig",
+                "openai": "#/components/schemas/OpenAIProviderConfig",
+                "openai_compatible": "#/components/schemas/OpenAICompatibleProviderConfig"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "config"
+        ],
+        "title": "ModelProviderUpdate"
+      },
+      "ModelProviderView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "config": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OpenAIProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AnthropicProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/AzureOpenAIProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/BedrockProviderConfig"
+              },
+              {
+                "$ref": "#/components/schemas/OpenAICompatibleProviderConfig"
+              }
+            ],
+            "title": "Config",
+            "discriminator": {
+              "propertyName": "provider",
+              "mapping": {
+                "anthropic": "#/components/schemas/AnthropicProviderConfig",
+                "azure_openai": "#/components/schemas/AzureOpenAIProviderConfig",
+                "bedrock": "#/components/schemas/BedrockProviderConfig",
+                "openai": "#/components/schemas/OpenAIProviderConfig",
+                "openai_compatible": "#/components/schemas/OpenAICompatibleProviderConfig"
+              }
+            }
+          },
+          "credential_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Credential Names"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "config",
+          "credential_names",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ModelProviderView"
       },
       "ModelUsageApiKeyBreakdown": {
         "properties": {
@@ -4453,6 +4917,21 @@
             ],
             "title": "Total Tokens"
           },
+          "cached_metered_requests": {
+            "type": "integer",
+            "title": "Cached Metered Requests"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
           "costed_requests": {
             "type": "integer",
             "title": "Costed Requests"
@@ -4495,6 +4974,8 @@
           "input_tokens",
           "output_tokens",
           "total_tokens",
+          "cached_metered_requests",
+          "cached_tokens",
           "costed_requests",
           "cost_usd",
           "api_key_id",
@@ -4555,6 +5036,21 @@
             ],
             "title": "Total Tokens"
           },
+          "cached_metered_requests": {
+            "type": "integer",
+            "title": "Cached Metered Requests"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
           "costed_requests": {
             "type": "integer",
             "title": "Costed Requests"
@@ -4584,6 +5080,8 @@
           "input_tokens",
           "output_tokens",
           "total_tokens",
+          "cached_metered_requests",
+          "cached_tokens",
           "costed_requests",
           "cost_usd",
           "model"
@@ -4641,6 +5139,21 @@
             ],
             "title": "Total Tokens"
           },
+          "cached_metered_requests": {
+            "type": "integer",
+            "title": "Cached Metered Requests"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
           "costed_requests": {
             "type": "integer",
             "title": "Costed Requests"
@@ -4671,6 +5184,8 @@
           "input_tokens",
           "output_tokens",
           "total_tokens",
+          "cached_metered_requests",
+          "cached_tokens",
           "costed_requests",
           "cost_usd",
           "ts"
@@ -4766,6 +5281,21 @@
             ],
             "title": "Total Tokens"
           },
+          "cached_metered_requests": {
+            "type": "integer",
+            "title": "Cached Metered Requests"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
           "costed_requests": {
             "type": "integer",
             "title": "Costed Requests"
@@ -4811,6 +5341,8 @@
           "input_tokens",
           "output_tokens",
           "total_tokens",
+          "cached_metered_requests",
+          "cached_tokens",
           "costed_requests",
           "cost_usd",
           "user_id",
@@ -5043,6 +5575,42 @@
         ],
         "title": "OciAuthProviderConfig"
       },
+      "OpenAICompatibleProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "openai_compatible",
+            "title": "Provider"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "base_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Base Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "base_url"
+        ],
+        "title": "OpenAICompatibleProviderConfig"
+      },
       "OpenAIModel": {
         "properties": {
           "id": {
@@ -5093,6 +5661,60 @@
           "data"
         ],
         "title": "OpenAIModelList"
+      },
+      "OpenAIProviderConfig": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "const": "openai",
+            "title": "Provider"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "password",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "title": "OpenAIProviderConfig"
       },
       "PropelAuthIntrospectionConfig": {
         "properties": {
@@ -5805,14 +6427,19 @@
             },
             "type": "array",
             "title": "Servers"
+          },
+          "model_requests": {
+            "type": "integer",
+            "title": "Model Requests"
           }
         },
         "type": "object",
         "required": [
-          "servers"
+          "servers",
+          "model_requests"
         ],
         "title": "UsageSeriesDocument",
-        "description": "Request totals per mounted server over a time window."
+        "description": "MCP and model request totals over a time window."
       },
       "UserAuthStatus": {
         "properties": {
@@ -5889,6 +6516,21 @@
             ],
             "title": "Total Tokens"
           },
+          "cached_metered_requests": {
+            "type": "integer",
+            "title": "Cached Metered Requests"
+          },
+          "cached_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Tokens"
+          },
           "costed_requests": {
             "type": "integer",
             "title": "Costed Requests"
@@ -5938,6 +6580,8 @@
           "input_tokens",
           "output_tokens",
           "total_tokens",
+          "cached_metered_requests",
+          "cached_tokens",
           "costed_requests",
           "cost_usd",
           "start",

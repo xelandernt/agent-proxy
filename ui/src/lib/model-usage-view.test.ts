@@ -15,6 +15,8 @@ const aggregate: ModelUsageAggregate = {
 	input_tokens: 10,
 	output_tokens: 5,
 	total_tokens: 15,
+	cached_metered_requests: 2,
+	cached_tokens: 4,
 	costed_requests: 1,
 	cost_usd: "0.100000000001",
 };
@@ -32,6 +34,10 @@ test("describes partial token and cost coverage", () => {
 	);
 	assert.equal(accountingCoverage(aggregate, "cost"), "1 of 3 requests costed");
 	assert.equal(
+		accountingCoverage(aggregate, "cached"),
+		"2 of 3 requests reported cached tokens",
+	);
+	assert.equal(
 		accountingCoverage({ ...aggregate, costed_requests: 3 }, "cost"),
 		null,
 	);
@@ -40,6 +46,7 @@ test("describes partial token and cost coverage", () => {
 test("charts unknown values as zero without changing report facts", () => {
 	const point = { ...aggregate, ts: "2026-08-18T12:00:00Z" };
 	assert.equal(modelUsagePointValue(point, "requests"), 3);
+	assert.equal(modelUsagePointValue(point, "cached"), 4);
 	assert.equal(
 		modelUsagePointValue({ ...point, total_tokens: null }, "tokens"),
 		0,

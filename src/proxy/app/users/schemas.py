@@ -35,7 +35,6 @@ class AvailableModelView(BaseModel):
     """Public model metadata available for API-key scope selection."""
 
     name: str
-    description: str
 
 
 class LoginRequest(BaseModel):

@@ -43,6 +43,7 @@ async def create_all_tables(engine: AsyncEngine) -> None:
     import proxy.app.users.models
     import proxy.auth_providers.persistence
     import proxy.model_deployments.models
+    import proxy.model_providers.models
     import proxy.servers.models  # noqa: F401
 
     async with engine.begin() as connection:

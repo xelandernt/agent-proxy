@@ -2,6 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import {
 	BotIcon,
 	ChartNoAxesCombinedIcon,
+	CloudIcon,
 	KeyRoundIcon,
 	LockIcon,
 	LockKeyholeIcon,
@@ -27,22 +28,26 @@ export function AdminNavigation() {
 	const [sidebarHovered, setSidebarHovered] = useState(false);
 	const [sidebarLocked, setSidebarLocked] = useState(false);
 	const isCallbackPath = location.pathname.endsWith("/admin/callback");
-	const providersActive =
+	const mcpAuthActive =
 		location.pathname.startsWith("/admin/auth-providers") ||
 		location.pathname.startsWith("/docs");
+	const modelProvidersActive = location.pathname.startsWith(
+		"/admin/model-providers",
+	);
 	const modelsActive =
 		location.pathname.startsWith("/admin/models") ||
 		location.pathname.startsWith("/account/models");
 	const accountActive =
 		location.pathname === "/account" || location.pathname === "/account/";
-	const usageActive =
-		location.pathname.startsWith("/admin/usage") ||
-		location.pathname.startsWith("/account/usage");
+	const adminUsageActive = location.pathname.startsWith("/admin/usage");
+	const accountUsageActive = location.pathname.startsWith("/account/usage");
 	const serversActive =
-		!providersActive &&
+		!mcpAuthActive &&
+		!modelProvidersActive &&
 		!modelsActive &&
 		!accountActive &&
-		!usageActive &&
+		!adminUsageActive &&
+		!accountUsageActive &&
 		location.pathname !== "/admin/callback";
 	const expanded = sidebarHovered || sidebarLocked;
 
@@ -96,28 +101,64 @@ export function AdminNavigation() {
 				</Link>
 
 				<nav className="flex flex-col gap-1" aria-label="Sections">
+					{authenticated && (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Link
+									to="/admin/usage"
+									className={cn(
+										navItemClass,
+										adminUsageActive
+											? "bg-accent text-foreground"
+											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+									)}
+									aria-current={adminUsageActive ? "page" : undefined}
+									aria-label="Model usage"
+								>
+									<ChartNoAxesCombinedIcon className="size-4 shrink-0" />
+									<span className={labelClass}>Usage</span>
+								</Link>
+							</TooltipTrigger>
+							<TooltipContent side="right">Model usage</TooltipContent>
+						</Tooltip>
+					)}
+					{expanded && authenticated && (
+						<p className="mt-3 px-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+							MCP
+						</p>
+					)}
+
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Link
-								to={authenticated ? "/admin/usage" : "/account/usage"}
-								className={cn(
-									navItemClass,
-									usageActive
-										? "bg-accent text-foreground"
-										: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-								)}
-								aria-current={usageActive ? "page" : undefined}
-								aria-label="Model usage"
-							>
-								<ChartNoAxesCombinedIcon className="size-4 shrink-0" />
-								<span className={labelClass}>
-									{authenticated ? "Usage" : "My usage"}
+							{authenticated ? (
+								<Link
+									to="/admin/auth-providers"
+									search={{ provider: undefined }}
+									className={cn(
+										navItemClass,
+										mcpAuthActive
+											? "bg-accent text-foreground"
+											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+									)}
+									aria-current={mcpAuthActive ? "page" : undefined}
+									aria-label="MCP authentication"
+								>
+									<KeyRoundIcon className="size-4 shrink-0" />
+									<span className={labelClass}>Auth</span>
+								</Link>
+							) : (
+								<span
+									className={cn(
+										navItemClass,
+										"cursor-not-allowed text-muted-foreground/50",
+									)}
+								>
+									<LockKeyholeIcon className="size-4 shrink-0" />
+									<span className={labelClass}>Auth</span>
 								</span>
-							</Link>
+							)}
 						</TooltipTrigger>
-						<TooltipContent side="right">
-							{authenticated ? "Model usage" : "Your model usage"}
-						</TooltipContent>
+						<TooltipContent side="right">MCP authentication</TooltipContent>
 					</Tooltip>
 
 					<Tooltip>
@@ -156,6 +197,12 @@ export function AdminNavigation() {
 						</TooltipTrigger>
 						<TooltipContent side="right">MCP servers</TooltipContent>
 					</Tooltip>
+
+					{expanded && authenticated && (
+						<p className="mt-3 px-2.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+							Models
+						</p>
+					)}
 
 					<Tooltip>
 						<TooltipTrigger asChild>
@@ -200,18 +247,17 @@ export function AdminNavigation() {
 						<TooltipTrigger asChild>
 							{authenticated ? (
 								<Link
-									to="/admin/auth-providers"
-									search={{ provider: undefined }}
+									to="/admin/model-providers"
 									className={cn(
 										navItemClass,
-										providersActive
+										modelProvidersActive
 											? "bg-accent text-foreground"
 											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
 									)}
-									aria-current={providersActive ? "page" : undefined}
-									aria-label="Providers"
+									aria-current={modelProvidersActive ? "page" : undefined}
+									aria-label="Model providers"
 								>
-									<KeyRoundIcon className="size-4 shrink-0" />
+									<CloudIcon className="size-4 shrink-0" />
 									<span className={labelClass}>Providers</span>
 								</Link>
 							) : (
@@ -228,8 +274,8 @@ export function AdminNavigation() {
 						</TooltipTrigger>
 						<TooltipContent side="right">
 							{authenticated
-								? "Providers"
-								: "Providers are available to administrators only"}
+								? "Model providers"
+								: "Model providers are available to administrators only"}
 						</TooltipContent>
 					</Tooltip>
 
@@ -239,6 +285,25 @@ export function AdminNavigation() {
 								Account
 							</p>
 						)}
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<Link
+									to="/account/usage"
+									className={cn(
+										navItemClass,
+										accountUsageActive
+											? "bg-accent text-foreground"
+											: "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+									)}
+									aria-current={accountUsageActive ? "page" : undefined}
+									aria-label="My usage"
+								>
+									<ChartNoAxesCombinedIcon className="size-4 shrink-0" />
+									<span className={labelClass}>My usage</span>
+								</Link>
+							</TooltipTrigger>
+							<TooltipContent side="right">Your model usage</TooltipContent>
+						</Tooltip>
 						<Tooltip>
 							<TooltipTrigger asChild>
 								<Link

@@ -1,4 +1,10 @@
 import { useMemo, useState } from "react";
+import {
+	chartTickIndices,
+	formatChartTime,
+	humanizeChartValue,
+	niceChartCeil,
+} from "#/lib/chart-axis";
 import type { SeriesBucket, SeriesReport } from "#/lib/mcp";
 import {
 	chartPoints,
@@ -29,38 +35,6 @@ const SERIES_COLORS = [
 
 const VIEWBOX = { width: 800, height: 200, padTop: 8, padBottom: 8 };
 const TICK_FRACTIONS = [0, 0.5, 1] as const;
-
-// Built once at module scope: gateway timestamps are UTC, and explicit
-// locale and time zone keep server and browser rendering identical.
-const TIME_FORMAT = new Intl.DateTimeFormat("en-US", {
-	month: "short",
-	day: "numeric",
-	hour: "2-digit",
-	minute: "2-digit",
-	timeZone: "UTC",
-});
-
-/** Round a maximum up to a "nice" number (1, 2, 5, 10 × 10^n). */
-function niceCeil(value: number): number {
-	const magnitude = 10 ** Math.floor(Math.log10(value));
-	const normalized = value / magnitude;
-	const nice =
-		normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
-	return nice * magnitude;
-}
-
-function humanize(value: number): string {
-	if (value < 1000) return String(value);
-	const units = ["k", "M", "B"];
-	let unit = -1;
-	let scaled = value;
-	while (scaled >= 1000 && unit < units.length - 1) {
-		scaled /= 1000;
-		unit += 1;
-	}
-	const digits = scaled % 1 === 0 ? scaled.toFixed(0) : scaled.toFixed(1);
-	return `${digits}${units[unit]}`;
-}
 
 export function UsageChart({ report }: { report: SeriesReport }) {
 	const [dimension, setDimension] = useState<DimensionId>("total");
@@ -167,7 +141,7 @@ function StackedAreas({
 		[points, dimension, names],
 	);
 
-	const yMax = niceCeil(cumulative.max);
+	const yMax = niceChartCeil(cumulative.max);
 	const width = VIEWBOX.width;
 	const plotHeight = VIEWBOX.height - VIEWBOX.padTop - VIEWBOX.padBottom;
 	const xFor = (index: number) =>
@@ -175,12 +149,7 @@ function StackedAreas({
 	const yFor = (value: number) =>
 		VIEWBOX.padTop + (1 - value / yMax) * plotHeight;
 
-	const maxTicks = 5;
-	const tickIndices = Array.from(
-		{ length: Math.min(maxTicks, points.length) },
-		(_, index) =>
-			Math.round((index * (points.length - 1)) / Math.max(1, maxTicks - 1)),
-	).filter((value, index, all) => all.indexOf(value) === index);
+	const tickIndices = chartTickIndices(points.length);
 
 	const areas = names.map((_name, seriesIndex) => {
 		const top = cumulative.rows[seriesIndex];
@@ -238,14 +207,14 @@ function StackedAreas({
 								transform: "translateY(-50%)",
 							}}
 						>
-							{humanize(yMax * fraction)}
+							{humanizeChartValue(yMax * fraction)}
 						</span>
 					);
 				})}
 			</div>
 			<div className="mt-1 relative h-4 font-mono text-[10px] text-muted-foreground">
 				{tickIndices.map((index, tickIndex) => {
-					const label = TIME_FORMAT.format(new Date(points[index].ts));
+					const label = formatChartTime(points[index].ts);
 					const first = tickIndex === 0;
 					const last = tickIndex === tickIndices.length - 1;
 					return (

@@ -17,6 +17,7 @@ import {
 	checkUserAuth,
 	endUserSession,
 } from "#/lib/auth";
+import { onAuthenticationExpired } from "#/lib/auth-session";
 
 export const Route = createFileRoute("/account")({ component: AccountLayout });
 
@@ -35,6 +36,10 @@ function AccountLayout() {
 	useEffect(() => {
 		if (!callback) check();
 	}, [callback, check]);
+	useEffect(
+		() => onAuthenticationExpired("user", () => setStatus("unauthenticated")),
+		[],
+	);
 	if (callback) return <Outlet />;
 	if (status === "checking")
 		return (

@@ -37,6 +37,7 @@ class ModelUsageEvent(Base):
     input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cached_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(20, 12), nullable=True)
     duration_ms: Mapped[int] = mapped_column(Integer)
     error_type: Mapped[str | None] = mapped_column(String(128), nullable=True)

@@ -7,6 +7,7 @@ from proxy.app.dependencies import ModelDeploymentServiceDep
 from proxy.model_deployments.repository import (
     ModelDeploymentNameTaken,
     ModelDeploymentNotFound,
+    ModelDeploymentProviderNotFound,
     ModelDeploymentReferenced,
 )
 from proxy.model_deployments.schemas import (
@@ -14,10 +15,7 @@ from proxy.model_deployments.schemas import (
     ModelDeploymentUpdate,
     ModelDeploymentView,
 )
-from proxy.security.credentials import (
-    CredentialEncryptionUnavailable,
-    InvalidCredentialCiphertext,
-)
+from proxy.model_providers.repository import ModelProviderNotFound
 
 router = APIRouter(
     prefix="/api/admin/models",
@@ -44,8 +42,8 @@ async def create_model(
         return await service.create(payload)
     except ModelDeploymentNameTaken as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    except CredentialEncryptionUnavailable as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+    except (ModelProviderNotFound, ModelDeploymentProviderNotFound) as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.get("/{name}", response_model=ModelDeploymentView)
@@ -69,13 +67,8 @@ async def update_model(
         return await service.update(name, payload)
     except ModelDeploymentNotFound as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except CredentialEncryptionUnavailable as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
-    except InvalidCredentialCiphertext as error:
-        raise HTTPException(
-            status_code=500,
-            detail="Stored model credentials could not be decrypted.",
-        ) from error
+    except (ModelProviderNotFound, ModelDeploymentProviderNotFound) as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.delete("/{name}", status_code=status.HTTP_204_NO_CONTENT)

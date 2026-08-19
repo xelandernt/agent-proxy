@@ -18,6 +18,8 @@ from proxy.app.users.service import UserAuthenticationError, UserService
 from proxy.llm.adapter import LiteLLMResponsesAdapter
 from proxy.model_deployments.repository import ModelDeploymentRepository
 from proxy.model_deployments.service import ModelDeploymentService
+from proxy.model_providers.repository import ModelProviderRepository
+from proxy.model_providers.service import ModelProviderService
 from proxy.security.credentials import CredentialCipher
 
 
@@ -87,11 +89,34 @@ def get_credential_cipher(request: Request) -> CredentialCipher:
 CredentialCipherDep = Annotated[CredentialCipher, Depends(get_credential_cipher)]
 
 
+def get_model_provider_repository(
+    session_factory: SessionFactoryDep,
+) -> ModelProviderRepository:
+    return ModelProviderRepository(session_factory)
+
+
+ModelProviderRepositoryDep = Annotated[
+    ModelProviderRepository, Depends(get_model_provider_repository)
+]
+
+
+def get_model_provider_service(
+    repository: ModelProviderRepositoryDep,
+    cipher: CredentialCipherDep,
+) -> ModelProviderService:
+    return ModelProviderService(repository, cipher)
+
+
+ModelProviderServiceDep = Annotated[
+    ModelProviderService, Depends(get_model_provider_service)
+]
+
+
 def get_model_deployment_service(
     repository: ModelDeploymentRepositoryDep,
-    cipher: CredentialCipherDep,
+    providers: ModelProviderServiceDep,
 ) -> ModelDeploymentService:
-    return ModelDeploymentService(repository, cipher)
+    return ModelDeploymentService(repository, providers)
 
 
 ModelDeploymentServiceDep = Annotated[

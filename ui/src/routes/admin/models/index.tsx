@@ -3,13 +3,7 @@ import { BoxIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "#/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "#/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "#/components/ui/card";
 import {
 	Empty,
 	EmptyContent,
@@ -83,8 +77,7 @@ function ModelsIndex() {
 					<EmptyHeader>
 						<EmptyTitle>No models configured</EmptyTitle>
 						<EmptyDescription>
-							Create a public model alias and connect it to any
-							LiteLLM-supported provider.
+							Create a provider first, then connect a public model name to it.
 						</EmptyDescription>
 					</EmptyHeader>
 					<EmptyContent>
@@ -105,25 +98,20 @@ function ModelsIndex() {
 								<CardTitle className="font-mono text-base">
 									{model.name}
 								</CardTitle>
-								<CardDescription>
-									{model.description || "No description"}
-								</CardDescription>
 							</CardHeader>
 							<CardContent className="flex flex-col gap-4">
-								<div className="space-y-1 text-xs text-muted-foreground">
+								<div className="flex flex-col gap-1 text-xs text-muted-foreground">
 									<p>
 										<span className="font-medium text-foreground">
-											Upstream:
+											Provider:
 										</span>{" "}
-										<code>{model.upstream_model}</code>
+										<code>{model.provider}</code>
 									</p>
 									<p>
 										<span className="font-medium text-foreground">
-											Credentials:
+											Model ID:
 										</span>{" "}
-										{model.secret_names.length
-											? model.secret_names.join(", ")
-											: "none"}
+										<code>{model.model_id}</code>
 									</p>
 								</div>
 								<div className="flex justify-end gap-2">

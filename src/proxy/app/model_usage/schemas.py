@@ -16,6 +16,8 @@ class ModelUsageAggregate(BaseModel):
     input_tokens: int | None
     output_tokens: int | None
     total_tokens: int | None
+    cached_metered_requests: int
+    cached_tokens: int | None
     costed_requests: int
     cost_usd: str | None
 

@@ -544,6 +544,7 @@ def test_servers_usage_series_fills_empty_servers(usage_client: TestClient) -> N
         time.sleep(0.05)
 
     assert response.status_code == 200
+    assert last["model_requests"] == 0
     servers = {entry["name"]: entry for entry in last["servers"]}
     assert set(servers) == {"calendar", "notes"}
     calendar = servers["calendar"]["points"]

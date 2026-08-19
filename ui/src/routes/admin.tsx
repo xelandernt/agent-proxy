@@ -17,6 +17,7 @@ import {
 	checkAdminAuth,
 	endAdminSession,
 } from "#/lib/auth";
+import { onAuthenticationExpired } from "#/lib/auth-session";
 
 export const Route = createFileRoute("/admin")({ component: AdminLayout });
 
@@ -38,6 +39,10 @@ function AdminLayout() {
 		if (onCallbackPath) return;
 		check();
 	}, [onCallbackPath, check]);
+	useEffect(
+		() => onAuthenticationExpired("admin", () => setStatus("unauthenticated")),
+		[],
+	);
 
 	if (onCallbackPath) return <Outlet />;
 

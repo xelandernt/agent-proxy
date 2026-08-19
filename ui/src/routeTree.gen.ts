@@ -26,9 +26,12 @@ import { Route as DocsProviderRouteImport } from './routes/docs/$provider'
 import { Route as AdminServerNameEditRouteImport } from './routes/admin/$serverName.edit'
 import { Route as AdminAuthProvidersIndexRouteImport } from './routes/admin/auth-providers/index'
 import { Route as AdminAuthProvidersNewRouteImport } from './routes/admin/auth-providers/new'
+import { Route as AdminModelProvidersIndexRouteImport } from './routes/admin/model-providers/index'
+import { Route as AdminModelProvidersNewRouteImport } from './routes/admin/model-providers/new'
 import { Route as AdminModelsIndexRouteImport } from './routes/admin/models/index'
 import { Route as AdminModelsNewRouteImport } from './routes/admin/models/new'
 import { Route as AdminAuthProvidersProviderNameEditRouteImport } from './routes/admin/auth-providers/$providerName.edit'
+import { Route as AdminModelProvidersProviderNameEditRouteImport } from './routes/admin/model-providers/$providerName.edit'
 import { Route as AdminModelsModelNameEditRouteImport } from './routes/admin/models/$modelName.edit'
 
 const IndexRoute = IndexRouteImport.update({
@@ -116,6 +119,17 @@ const AdminAuthProvidersNewRoute = AdminAuthProvidersNewRouteImport.update({
   path: '/auth-providers/new',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminModelProvidersIndexRoute =
+  AdminModelProvidersIndexRouteImport.update({
+    id: '/model-providers/',
+    path: '/model-providers/',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminModelProvidersNewRoute = AdminModelProvidersNewRouteImport.update({
+  id: '/model-providers/new',
+  path: '/model-providers/new',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminModelsIndexRoute = AdminModelsIndexRouteImport.update({
   id: '/models/',
   path: '/models/',
@@ -130,6 +144,12 @@ const AdminAuthProvidersProviderNameEditRoute =
   AdminAuthProvidersProviderNameEditRouteImport.update({
     id: '/auth-providers/$providerName/edit',
     path: '/auth-providers/$providerName/edit',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminModelProvidersProviderNameEditRoute =
+  AdminModelProvidersProviderNameEditRouteImport.update({
+    id: '/model-providers/$providerName/edit',
+    path: '/model-providers/$providerName/edit',
     getParentRoute: () => AdminRoute,
   } as any)
 const AdminModelsModelNameEditRoute =
@@ -156,10 +176,13 @@ export interface FileRoutesByFullPath {
   '/docs/': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
   '/admin/auth-providers/new': typeof AdminAuthProvidersNewRoute
+  '/admin/model-providers/new': typeof AdminModelProvidersNewRoute
   '/admin/models/new': typeof AdminModelsNewRoute
   '/admin/auth-providers/': typeof AdminAuthProvidersIndexRoute
+  '/admin/model-providers/': typeof AdminModelProvidersIndexRoute
   '/admin/models/': typeof AdminModelsIndexRoute
   '/admin/auth-providers/$providerName/edit': typeof AdminAuthProvidersProviderNameEditRoute
+  '/admin/model-providers/$providerName/edit': typeof AdminModelProvidersProviderNameEditRoute
   '/admin/models/$modelName/edit': typeof AdminModelsModelNameEditRoute
 }
 export interface FileRoutesByTo {
@@ -177,10 +200,13 @@ export interface FileRoutesByTo {
   '/docs': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
   '/admin/auth-providers/new': typeof AdminAuthProvidersNewRoute
+  '/admin/model-providers/new': typeof AdminModelProvidersNewRoute
   '/admin/models/new': typeof AdminModelsNewRoute
   '/admin/auth-providers': typeof AdminAuthProvidersIndexRoute
+  '/admin/model-providers': typeof AdminModelProvidersIndexRoute
   '/admin/models': typeof AdminModelsIndexRoute
   '/admin/auth-providers/$providerName/edit': typeof AdminAuthProvidersProviderNameEditRoute
+  '/admin/model-providers/$providerName/edit': typeof AdminModelProvidersProviderNameEditRoute
   '/admin/models/$modelName/edit': typeof AdminModelsModelNameEditRoute
 }
 export interface FileRoutesById {
@@ -201,10 +227,13 @@ export interface FileRoutesById {
   '/docs/': typeof DocsIndexRoute
   '/admin/$serverName/edit': typeof AdminServerNameEditRoute
   '/admin/auth-providers/new': typeof AdminAuthProvidersNewRoute
+  '/admin/model-providers/new': typeof AdminModelProvidersNewRoute
   '/admin/models/new': typeof AdminModelsNewRoute
   '/admin/auth-providers/': typeof AdminAuthProvidersIndexRoute
+  '/admin/model-providers/': typeof AdminModelProvidersIndexRoute
   '/admin/models/': typeof AdminModelsIndexRoute
   '/admin/auth-providers/$providerName/edit': typeof AdminAuthProvidersProviderNameEditRoute
+  '/admin/model-providers/$providerName/edit': typeof AdminModelProvidersProviderNameEditRoute
   '/admin/models/$modelName/edit': typeof AdminModelsModelNameEditRoute
 }
 export interface FileRouteTypes {
@@ -226,10 +255,13 @@ export interface FileRouteTypes {
     | '/docs/'
     | '/admin/$serverName/edit'
     | '/admin/auth-providers/new'
+    | '/admin/model-providers/new'
     | '/admin/models/new'
     | '/admin/auth-providers/'
+    | '/admin/model-providers/'
     | '/admin/models/'
     | '/admin/auth-providers/$providerName/edit'
+    | '/admin/model-providers/$providerName/edit'
     | '/admin/models/$modelName/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -247,10 +279,13 @@ export interface FileRouteTypes {
     | '/docs'
     | '/admin/$serverName/edit'
     | '/admin/auth-providers/new'
+    | '/admin/model-providers/new'
     | '/admin/models/new'
     | '/admin/auth-providers'
+    | '/admin/model-providers'
     | '/admin/models'
     | '/admin/auth-providers/$providerName/edit'
+    | '/admin/model-providers/$providerName/edit'
     | '/admin/models/$modelName/edit'
   id:
     | '__root__'
@@ -270,10 +305,13 @@ export interface FileRouteTypes {
     | '/docs/'
     | '/admin/$serverName/edit'
     | '/admin/auth-providers/new'
+    | '/admin/model-providers/new'
     | '/admin/models/new'
     | '/admin/auth-providers/'
+    | '/admin/model-providers/'
     | '/admin/models/'
     | '/admin/auth-providers/$providerName/edit'
+    | '/admin/model-providers/$providerName/edit'
     | '/admin/models/$modelName/edit'
   fileRoutesById: FileRoutesById
 }
@@ -407,6 +445,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuthProvidersNewRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/model-providers/': {
+      id: '/admin/model-providers/'
+      path: '/model-providers'
+      fullPath: '/admin/model-providers/'
+      preLoaderRoute: typeof AdminModelProvidersIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/model-providers/new': {
+      id: '/admin/model-providers/new'
+      path: '/model-providers/new'
+      fullPath: '/admin/model-providers/new'
+      preLoaderRoute: typeof AdminModelProvidersNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/models/': {
       id: '/admin/models/'
       path: '/models'
@@ -426,6 +478,13 @@ declare module '@tanstack/react-router' {
       path: '/auth-providers/$providerName/edit'
       fullPath: '/admin/auth-providers/$providerName/edit'
       preLoaderRoute: typeof AdminAuthProvidersProviderNameEditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/model-providers/$providerName/edit': {
+      id: '/admin/model-providers/$providerName/edit'
+      path: '/model-providers/$providerName/edit'
+      fullPath: '/admin/model-providers/$providerName/edit'
+      preLoaderRoute: typeof AdminModelProvidersProviderNameEditRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/models/$modelName/edit': {
@@ -462,10 +521,13 @@ interface AdminRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminServerNameEditRoute: typeof AdminServerNameEditRoute
   AdminAuthProvidersNewRoute: typeof AdminAuthProvidersNewRoute
+  AdminModelProvidersNewRoute: typeof AdminModelProvidersNewRoute
   AdminModelsNewRoute: typeof AdminModelsNewRoute
   AdminAuthProvidersIndexRoute: typeof AdminAuthProvidersIndexRoute
+  AdminModelProvidersIndexRoute: typeof AdminModelProvidersIndexRoute
   AdminModelsIndexRoute: typeof AdminModelsIndexRoute
   AdminAuthProvidersProviderNameEditRoute: typeof AdminAuthProvidersProviderNameEditRoute
+  AdminModelProvidersProviderNameEditRoute: typeof AdminModelProvidersProviderNameEditRoute
   AdminModelsModelNameEditRoute: typeof AdminModelsModelNameEditRoute
 }
 
@@ -476,11 +538,15 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminServerNameEditRoute: AdminServerNameEditRoute,
   AdminAuthProvidersNewRoute: AdminAuthProvidersNewRoute,
+  AdminModelProvidersNewRoute: AdminModelProvidersNewRoute,
   AdminModelsNewRoute: AdminModelsNewRoute,
   AdminAuthProvidersIndexRoute: AdminAuthProvidersIndexRoute,
+  AdminModelProvidersIndexRoute: AdminModelProvidersIndexRoute,
   AdminModelsIndexRoute: AdminModelsIndexRoute,
   AdminAuthProvidersProviderNameEditRoute:
     AdminAuthProvidersProviderNameEditRoute,
+  AdminModelProvidersProviderNameEditRoute:
+    AdminModelProvidersProviderNameEditRoute,
   AdminModelsModelNameEditRoute: AdminModelsModelNameEditRoute,
 }
 

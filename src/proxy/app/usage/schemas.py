@@ -63,6 +63,7 @@ class ServerSeries(BaseModel):
 
 
 class UsageSeriesDocument(BaseModel):
-    """Request totals per mounted server over a time window."""
+    """MCP and model request totals over a time window."""
 
     servers: list[ServerSeries]
+    model_requests: int

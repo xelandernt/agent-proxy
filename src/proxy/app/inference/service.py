@@ -193,6 +193,7 @@ class InferenceService:
                 input_tokens=accounting.input_tokens,
                 output_tokens=accounting.output_tokens,
                 total_tokens=accounting.total_tokens,
+                cached_tokens=accounting.cached_tokens,
                 cost_usd=accounting.cost_usd,
                 duration_ms=max(0, round((time.monotonic() - started) * 1000)),
                 error_type=error_type,

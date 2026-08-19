@@ -5,23 +5,29 @@ import type {
 	ApiKeyUpdate,
 	ModelDeploymentCreate,
 	ModelDeploymentUpdate,
+	ModelProviderCreate,
+	ModelProviderUpdate,
 	ModelUsageSeriesReport,
 	UserModelUsageReport,
 } from "#/api/generated/fastAPI";
 import {
 	createAdminModel,
+	createAdminModelProvider,
 	createUserApiKey,
 	deleteAdminModel,
+	deleteAdminModelProvider,
 	getAdminModelUsage,
 	getAdminModelUsageSeries,
 	getCurrentUser,
 	getUserModelUsage,
 	getUserModelUsageSeries,
+	listAdminModelProviders,
 	listAdminModels,
 	listUserApiKeys,
 	listUserModels,
 	revokeUserApiKey,
 	updateAdminModel,
+	updateAdminModelProvider,
 	updateUserApiKey,
 } from "#/lib/model-gateway";
 import {
@@ -29,6 +35,7 @@ import {
 	type ModelUsageFilters,
 	modelUsageQueryKey,
 } from "#/lib/model-usage-query";
+import { REFRESH_INTERVAL_MS } from "#/lib/queries";
 import { resolveUsageRange, type UsageRange } from "#/lib/usage-range";
 
 export type {
@@ -60,6 +67,7 @@ export function useModelUsage(
 	return useQuery<UserModelUsageReport | AdminModelUsageReport>({
 		queryKey: modelUsageQueryKey(audience, "summary", range, filters),
 		enabled: range !== null,
+		refetchInterval: REFRESH_INTERVAL_MS,
 		queryFn: async () => {
 			if (range === null) throw new Error("Usage range is unavailable.");
 			const params = usageParams(range, filters);
@@ -78,6 +86,7 @@ export function useModelUsageSeries(
 	return useQuery<ModelUsageSeriesReport>({
 		queryKey: modelUsageQueryKey(audience, "series", range, filters),
 		enabled: range !== null,
+		refetchInterval: REFRESH_INTERVAL_MS,
 		queryFn: async () => {
 			if (range === null) throw new Error("Usage range is unavailable.");
 			const params = {
@@ -93,6 +102,51 @@ export function useModelUsageSeries(
 
 export function useAdminModels() {
 	return useQuery({ queryKey: ["admin", "models"], queryFn: listAdminModels });
+}
+
+export function useAdminModelProviders() {
+	return useQuery({
+		queryKey: ["admin", "model-providers"],
+		queryFn: listAdminModelProviders,
+	});
+}
+
+export function useCreateModelProvider() {
+	const client = useQueryClient();
+	return useMutation({
+		mutationFn: (payload: ModelProviderCreate) =>
+			createAdminModelProvider(payload),
+		onSuccess: () =>
+			client.invalidateQueries({ queryKey: ["admin", "model-providers"] }),
+	});
+}
+
+export function useUpdateModelProvider() {
+	const client = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			name,
+			payload,
+		}: {
+			name: string;
+			payload: ModelProviderUpdate;
+		}) => updateAdminModelProvider(name, payload),
+		onSuccess: async () => {
+			await client.invalidateQueries({
+				queryKey: ["admin", "model-providers"],
+			});
+			await client.invalidateQueries({ queryKey: ["admin", "models"] });
+		},
+	});
+}
+
+export function useDeleteModelProvider() {
+	const client = useQueryClient();
+	return useMutation({
+		mutationFn: deleteAdminModelProvider,
+		onSuccess: () =>
+			client.invalidateQueries({ queryKey: ["admin", "model-providers"] }),
+	});
 }
 
 export function useCreateModel() {

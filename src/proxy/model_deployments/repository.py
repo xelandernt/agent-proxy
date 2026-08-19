@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -22,49 +21,40 @@ class ModelDeploymentReferenced(ValueError):
     pass
 
 
+class ModelDeploymentProviderNotFound(ValueError):
+    pass
+
+
 class ModelDeploymentRepository:
     def __init__(self, session_factory: async_sessionmaker) -> None:
         self._session_factory = session_factory
 
     async def list_all(self) -> list[ModelDeploymentRecord]:
         async with self._session_factory() as session:
-            rows = (
-                await session.execute(
-                    select(ModelDeploymentRecord).order_by(ModelDeploymentRecord.name)
+            return list(
+                (
+                    await session.execute(
+                        select(ModelDeploymentRecord).order_by(
+                            ModelDeploymentRecord.name
+                        )
+                    )
                 )
-            ).scalars()
-            return list(rows.all())
+                .scalars()
+                .all()
+            )
 
     async def get(self, name: str) -> ModelDeploymentRecord | None:
         async with self._session_factory() as session:
-            return (
-                await session.execute(
-                    select(ModelDeploymentRecord).where(
-                        ModelDeploymentRecord.name == name
-                    )
-                )
-            ).scalar_one_or_none()
+            return await session.get(ModelDeploymentRecord, name)
 
     async def create(
-        self,
-        *,
-        name: str,
-        description: str,
-        upstream_model: str,
-        api_base: str | None,
-        settings: dict[str, Any],
-        encrypted_secrets: str,
-        secret_names: list[str],
+        self, *, name: str, provider: str, model_id: str
     ) -> ModelDeploymentRecord:
         now = datetime.now(UTC)
         row = ModelDeploymentRecord(
             name=name,
-            description=description,
-            upstream_model=upstream_model,
-            api_base=api_base,
-            settings=settings,
-            encrypted_secrets=encrypted_secrets,
-            secret_names=secret_names,
+            provider=provider,
+            model_id=model_id,
             created_at=now,
             updated_at=now,
         )
@@ -74,43 +64,35 @@ class ModelDeploymentRepository:
                 await session.commit()
             except IntegrityError as error:
                 await session.rollback()
-                raise ModelDeploymentNameTaken(
-                    f"Model name '{name}' already exists."
+                if await session.get(ModelDeploymentRecord, name) is not None:
+                    raise ModelDeploymentNameTaken(
+                        f"Model name '{name}' already exists."
+                    ) from error
+                raise ModelDeploymentProviderNotFound(
+                    f"Unknown model provider '{provider}'."
                 ) from error
             await session.refresh(row)
-            return row
+        return row
 
     async def update(
-        self,
-        name: str,
-        *,
-        description: str,
-        upstream_model: str,
-        api_base: str | None,
-        settings: dict[str, Any],
-        encrypted_secrets: str,
-        secret_names: list[str],
+        self, name: str, *, provider: str, model_id: str
     ) -> ModelDeploymentRecord:
         async with self._session_factory() as session:
-            row = (
-                await session.execute(
-                    select(ModelDeploymentRecord).where(
-                        ModelDeploymentRecord.name == name
-                    )
-                )
-            ).scalar_one_or_none()
+            row = await session.get(ModelDeploymentRecord, name)
             if row is None:
                 raise ModelDeploymentNotFound(f"Unknown model '{name}'.")
-            row.description = description
-            row.upstream_model = upstream_model
-            row.api_base = api_base
-            row.settings = settings
-            row.encrypted_secrets = encrypted_secrets
-            row.secret_names = secret_names
+            row.provider = provider
+            row.model_id = model_id
             row.updated_at = datetime.now(UTC)
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError as error:
+                await session.rollback()
+                raise ModelDeploymentProviderNotFound(
+                    f"Unknown model provider '{provider}'."
+                ) from error
             await session.refresh(row)
-            return row
+        return row
 
     async def delete(self, name: str) -> None:
         async with self._session_factory() as session:

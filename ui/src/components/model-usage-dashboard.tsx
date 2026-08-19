@@ -31,13 +31,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "#/components/ui/empty";
-import {
-	Field,
-	FieldError,
-	FieldGroup,
-	FieldLabel,
-} from "#/components/ui/field";
-import { Input } from "#/components/ui/input";
+import { Field, FieldGroup, FieldLabel } from "#/components/ui/field";
 import {
 	Select,
 	SelectContent,
@@ -56,6 +50,13 @@ import {
 	TableRow,
 } from "#/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "#/components/ui/toggle-group";
+import { UsageRangePicker } from "#/components/usage-range-picker";
+import {
+	chartTickIndices,
+	formatChartTime,
+	humanizeChartValue,
+	niceChartCeil,
+} from "#/lib/chart-axis";
 import {
 	type ModelUsageAudience,
 	type ModelUsageFilters,
@@ -68,13 +69,18 @@ import {
 	type ModelUsageMetric,
 	modelUsagePointValue,
 } from "#/lib/model-usage-view";
+import { REFRESH_INTERVAL_MS } from "#/lib/queries";
+import { useRefetchCountdown, useSpinWhile } from "#/lib/refresh";
 import type { UsageRange } from "#/lib/usage-range";
+import { cn } from "#/lib/utils";
 
 const PRESETS = [
 	{ label: "24 hours", minutes: 24 * 60 },
 	{ label: "7 days", minutes: 7 * 24 * 60 },
 	{ label: "30 days", minutes: 30 * 24 * 60 },
 ] as const;
+
+const CHART_TICK_FRACTIONS = [0, 0.25, 0.5, 0.75, 1] as const;
 
 type Report = UserModelUsageReport | AdminModelUsageReport;
 
@@ -86,8 +92,6 @@ export function ModelUsageDashboard({
 	const [range, setRange] = useState<UsageRange>({
 		presetMinutes: 30 * 24 * 60,
 	});
-	const [customFrom, setCustomFrom] = useState("");
-	const [customTo, setCustomTo] = useState("");
 	const [filters, setFilters] = useState<ModelUsageFilters>({});
 	const facets = useModelUsage(audience, range, { userId: filters.userId });
 	const summary = useModelUsage(audience, range, filters);
@@ -98,28 +102,18 @@ export function ModelUsageDashboard({
 		audience === "admin" && facetReport && "users" in facetReport
 			? facetReport.users
 			: [];
-	const customError =
-		customFrom &&
-		customTo &&
-		new Date(`${customFrom}Z`) >= new Date(`${customTo}Z`)
-			? "The end must be later than the start."
-			: null;
-
-	const updateCustomRange = (from: string, to: string) => {
-		setCustomFrom(from);
-		setCustomTo(to);
-		if (!from || !to) return;
-		const next = { from: new Date(`${from}Z`), to: new Date(`${to}Z`) };
-		if (Number.isFinite(next.from.getTime()) && next.from < next.to)
-			setRange(next);
-	};
-
 	const error = summary.error ?? series.error;
 	const loading = summary.isLoading || series.isLoading;
+	const fetching = summary.isFetching || series.isFetching || facets.isFetching;
+	const countdown = useRefetchCountdown(
+		Math.max(summary.dataUpdatedAt, series.dataUpdatedAt),
+		REFRESH_INTERVAL_MS,
+	);
+	const spinning = useSpinWhile(fetching);
 	const refresh = () => {
 		void summary.refetch();
 		void series.refetch();
-		if (filters.model || filters.apiKeyId) void facets.refetch();
+		void facets.refetch();
 	};
 
 	return (
@@ -133,10 +127,18 @@ export function ModelUsageDashboard({
 						Requests, tokens, outcomes, and frozen USD cost in UTC.
 					</p>
 				</div>
-				<Button variant="outline" onClick={refresh} disabled={loading}>
-					<RefreshCwIcon data-icon="inline-start" />
-					Refresh
-				</Button>
+				<div className="flex items-center gap-3">
+					<span className="font-mono text-xs tabular-nums text-muted-foreground">
+						{countdown > 0 ? `refreshes in ${countdown}s` : "refreshing…"}
+					</span>
+					<Button variant="outline" onClick={refresh} disabled={loading}>
+						<RefreshCwIcon
+							data-icon="inline-start"
+							className={cn(spinning && "animate-spin")}
+						/>
+						Refresh
+					</Button>
+				</div>
 			</header>
 
 			<Card>
@@ -147,51 +149,12 @@ export function ModelUsageDashboard({
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="flex flex-col gap-4">
-					<div className="flex flex-wrap gap-2">
-						{PRESETS.map((preset) => (
-							<Button
-								key={preset.minutes}
-								variant={
-									"presetMinutes" in range &&
-									range.presetMinutes === preset.minutes
-										? "default"
-										: "outline"
-								}
-								size="sm"
-								onClick={() => setRange({ presetMinutes: preset.minutes })}
-							>
-								{preset.label}
-							</Button>
-						))}
-					</div>
-					<FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-						<Field data-invalid={Boolean(customError)}>
-							<FieldLabel htmlFor="usage-from">From (UTC)</FieldLabel>
-							<Input
-								id="usage-from"
-								type="datetime-local"
-								value={customFrom}
-								max={customTo || undefined}
-								aria-invalid={Boolean(customError)}
-								onChange={(event) =>
-									updateCustomRange(event.target.value, customTo)
-								}
-							/>
-						</Field>
-						<Field data-invalid={Boolean(customError)}>
-							<FieldLabel htmlFor="usage-to">To (UTC)</FieldLabel>
-							<Input
-								id="usage-to"
-								type="datetime-local"
-								value={customTo}
-								min={customFrom || undefined}
-								aria-invalid={Boolean(customError)}
-								onChange={(event) =>
-									updateCustomRange(customFrom, event.target.value)
-								}
-							/>
-							{customError && <FieldError>{customError}</FieldError>}
-						</Field>
+					<UsageRangePicker
+						range={range}
+						onChange={setRange}
+						presets={PRESETS}
+					/>
+					<FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 						{audience === "admin" && (
 							<FilterSelect
 								label="User"
@@ -280,19 +243,23 @@ function DashboardReport({
 	series: ModelUsageSeriesReport;
 }) {
 	const tokenCoverage = accountingCoverage(report, "tokens");
+	const cachedCoverage = accountingCoverage(report, "cached");
 	const costCoverage = accountingCoverage(report, "cost");
 	return (
 		<div className="flex flex-col gap-6">
-			{(tokenCoverage || costCoverage) && (
+			{(tokenCoverage || cachedCoverage || costCoverage) && (
 				<Alert>
 					<TriangleAlertIcon />
 					<AlertTitle>Partial accounting</AlertTitle>
 					<AlertDescription>
-						{[tokenCoverage, costCoverage].filter(Boolean).join("; ")}.
+						{[tokenCoverage, cachedCoverage, costCoverage]
+							.filter(Boolean)
+							.join("; ")}
+						.
 					</AlertDescription>
 				</Alert>
 			)}
-			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
 				<MetricCard
 					title="Requests"
 					value={report.requests.toLocaleString()}
@@ -307,6 +274,11 @@ function DashboardReport({
 					title="Frozen cost"
 					value={formatModelCost(report.cost_usd)}
 					detail={`${report.costed_requests} costed requests`}
+				/>
+				<MetricCard
+					title="Cached tokens"
+					value={report.cached_tokens?.toLocaleString() ?? "Unknown"}
+					detail={`${report.cached_metered_requests} reporting requests`}
 				/>
 				<MetricCard
 					title="Success rate"
@@ -361,13 +333,19 @@ function ModelUsageChart({ report }: { report: ModelUsageSeriesReport }) {
 		() => report.points.map((point) => modelUsagePointValue(point, metric)),
 		[report, metric],
 	);
-	const max = Math.max(1, ...values);
+	const peak = Math.max(0, ...values);
+	const yMax = niceChartCeil(peak);
+	const tickIndices = chartTickIndices(report.points.length);
+	const xFor = (index: number) =>
+		values.length <= 1 ? 400 : (index / (values.length - 1)) * 800;
+	const yFor = (value: number) => 190 - (value / yMax) * 180;
 	const path = values
-		.map(
-			(value, index) =>
-				`${index ? "L" : "M"}${values.length === 1 ? 400 : (index / (values.length - 1)) * 800},${190 - (value / max) * 180}`,
-		)
+		.map((value, index) => `${index ? "L" : "M"}${xFor(index)},${yFor(value)}`)
 		.join(" ");
+	const formatTick = (value: number) =>
+		metric === "cost"
+			? formatModelCost(String(value))
+			: humanizeChartValue(value);
 	return (
 		<div className="flex flex-col gap-4">
 			<ToggleGroup
@@ -380,35 +358,78 @@ function ModelUsageChart({ report }: { report: ModelUsageSeriesReport }) {
 			>
 				<ToggleGroupItem value="requests">Requests</ToggleGroupItem>
 				<ToggleGroupItem value="tokens">Tokens</ToggleGroupItem>
+				<ToggleGroupItem value="cached">Cached</ToggleGroupItem>
 				<ToggleGroupItem value="cost">Cost</ToggleGroupItem>
 			</ToggleGroup>
-			<div className="h-52 w-full">
-				<svg
-					viewBox="0 0 800 200"
-					preserveAspectRatio="none"
-					className="size-full"
-					role="img"
-					aria-label={`${metric} per ${report.bucket}`}
-				>
-					<line x1="0" x2="800" y1="190" y2="190" stroke="var(--line)" />
-					<path
-						d={path || "M0,190 L800,190"}
-						fill="none"
-						stroke="var(--lagoon)"
-						strokeWidth="3"
-						vectorEffect="non-scaling-stroke"
-					/>
-				</svg>
+			<div>
+				<div className="relative h-52 w-full">
+					<svg
+						viewBox="0 0 800 200"
+						preserveAspectRatio="none"
+						className="size-full"
+						role="img"
+						aria-label={`${metric} per ${report.bucket}`}
+					>
+						{CHART_TICK_FRACTIONS.map((fraction) => (
+							<line
+								key={fraction}
+								x1="0"
+								x2="800"
+								y1={yFor(yMax * fraction)}
+								y2={yFor(yMax * fraction)}
+								stroke="var(--line)"
+								vectorEffect="non-scaling-stroke"
+							/>
+						))}
+						<path
+							d={path || "M0,190 L800,190"}
+							fill="none"
+							stroke="var(--lagoon)"
+							strokeWidth="3"
+							vectorEffect="non-scaling-stroke"
+						/>
+					</svg>
+					{CHART_TICK_FRACTIONS.map((fraction) => (
+						<span
+							key={fraction}
+							className="absolute right-0 font-mono text-[10px] tabular-nums text-muted-foreground"
+							style={{
+								top: `${(yFor(yMax * fraction) / 200) * 100}%`,
+								transform: "translateY(-50%)",
+							}}
+						>
+							{formatTick(yMax * fraction)}
+						</span>
+					))}
+				</div>
+				<div className="relative mt-1 h-4 font-mono text-[10px] text-muted-foreground">
+					{tickIndices.map((index, tickIndex) => {
+						const first = tickIndex === 0;
+						const last = tickIndex === tickIndices.length - 1;
+						return (
+							<span
+								key={index}
+								className="absolute top-0 whitespace-nowrap"
+								style={{
+									left: `${(xFor(index) / 800) * 100}%`,
+									transform: first
+										? "none"
+										: last
+											? "translateX(-100%)"
+											: "translateX(-50%)",
+								}}
+							>
+								{formatChartTime(report.points[index].ts)}
+							</span>
+						);
+					})}
+				</div>
 			</div>
 			<p className="font-mono text-xs text-muted-foreground">
 				Peak:{" "}
 				{metric === "cost"
-					? formatModelCost(
-							String(
-								max === 1 && values.every((value) => value === 0) ? 0 : max,
-							),
-						)
-					: max.toLocaleString()}
+					? formatModelCost(String(peak))
+					: peak.toLocaleString()}
 			</p>
 		</div>
 	);
@@ -485,7 +506,12 @@ function BreakdownTable({
 									{row.requests}
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
-									{row.total_tokens ?? "—"}
+									<div>{row.total_tokens ?? "—"}</div>
+									<div className="text-xs text-muted-foreground">
+										{row.cached_tokens === null
+											? "cached —"
+											: `${row.cached_tokens} cached`}
+									</div>
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
 									{formatModelCost(row.cost_usd)}
@@ -501,7 +527,8 @@ function BreakdownTable({
 
 function DashboardSkeleton() {
 	return (
-		<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+		<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+			<Skeleton className="h-36" />
 			<Skeleton className="h-36" />
 			<Skeleton className="h-36" />
 			<Skeleton className="h-36" />

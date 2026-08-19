@@ -28,13 +28,16 @@ export function UsagePill() {
 		REFRESH_INTERVAL_MS,
 	);
 	const spinning = useSpinWhile(query.isFetching);
-	const total = windowTotal(query.data?.servers ?? []);
-	const perServer = (query.data?.servers ?? [])
-		.map((server) => ({
+	const mcpTotal = windowTotal(query.data?.servers ?? []);
+	const modelTotal = query.data?.model_requests ?? 0;
+	const total = mcpTotal + modelTotal;
+	const breakdown = [
+		{ name: "Models", total: modelTotal },
+		...(query.data?.servers ?? []).map((server) => ({
 			name: server.name,
 			total: server.points.reduce((sum, point) => sum + point.total, 0),
-		}))
-		.sort((a, b) => b.total - a.total);
+		})),
+	].sort((a, b) => b.total - a.total);
 
 	return (
 		<DropdownMenu>
@@ -70,11 +73,11 @@ export function UsagePill() {
 						</span>
 					</DropdownMenuItem>
 				</DropdownMenuGroup>
-				{perServer.length > 0 && (
+				{breakdown.length > 0 && (
 					<>
 						<DropdownMenuSeparator />
 						<DropdownMenuGroup>
-							{perServer.map((server) => (
+							{breakdown.map((server) => (
 								<DropdownMenuItem key={server.name} disabled>
 									<span className="min-w-0 truncate">{server.name}</span>
 									<span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">

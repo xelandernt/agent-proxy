@@ -24,6 +24,7 @@ def usage_record() -> ModelUsageRecord:
         input_tokens=2,
         output_tokens=3,
         total_tokens=5,
+        cached_tokens=1,
         cost_usd=Decimal("0.00125"),
         duration_ms=10,
         error_type=None,

@@ -25,6 +25,8 @@ class UsageTotals:
     input_tokens: int | None
     output_tokens: int | None
     total_tokens: int | None
+    cached_metered_requests: int
+    cached_tokens: int | None
     costed_requests: int
     cost_usd: Decimal | None
 
@@ -160,6 +162,8 @@ def _aggregate_columns() -> tuple[Any, ...]:
         func.sum(ModelUsageEvent.input_tokens),
         func.sum(ModelUsageEvent.output_tokens),
         func.sum(ModelUsageEvent.total_tokens),
+        func.count(ModelUsageEvent.cached_tokens),
+        func.sum(ModelUsageEvent.cached_tokens),
         func.count(ModelUsageEvent.cost_usd),
         func.sum(ModelUsageEvent.cost_usd),
     )
@@ -188,6 +192,8 @@ def _totals(row: Sequence[Any]) -> UsageTotals:
         input_tokens=row[4],
         output_tokens=row[5],
         total_tokens=row[6],
-        costed_requests=row[7],
-        cost_usd=row[8],
+        cached_metered_requests=row[7],
+        cached_tokens=row[8],
+        costed_requests=row[9],
+        cost_usd=row[10],
     )

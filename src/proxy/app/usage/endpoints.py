@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from proxy.app.dependencies import ModelUsageServiceDep
 from proxy.app.usage.repository import UsageRepository
 from proxy.app.usage.schemas import SeriesReport, UsageReport, UsageSeriesDocument
 from proxy.app.usage.service import UsageService, bucket_count
@@ -94,6 +95,7 @@ def _require_server(request: Request, name: str) -> None:
 async def servers_usage_series(
     request: Request,
     service: UsageServiceDependency,
+    model_usage: ModelUsageServiceDep,
     from_: Annotated[datetime | None, Query(alias="from")] = None,
     to: datetime | None = None,
     bucket: UsageBucket | None = None,
@@ -105,7 +107,8 @@ async def servers_usage_series(
     manager = request.app.state.server_manager
     names = [server.name for server in manager.snapshot()]
     return UsageSeriesDocument(
-        servers=await service.series_by_server(start, end, resolved, names)
+        servers=await service.series_by_server(start, end, resolved, names),
+        model_requests=await model_usage.request_count(start, end),
     )
 
 

@@ -33,6 +33,7 @@ class LLMAccounting:
     output_tokens: int | None
     total_tokens: int | None
     cost_usd: Decimal | None
+    cached_tokens: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,9 +120,7 @@ def _result(value: Any, public_model: str, *, streaming: bool = False) -> LLMRes
     response = _terminal_response(value) if streaming else value
     return LLMResult(
         payload=payload,
-        accounting=_accounting(
-            response, calculate_cost=streaming and response is not None
-        ),
+        accounting=_accounting(response, calculate_cost=response is not None),
     )
 
 
@@ -138,6 +137,18 @@ def _terminal_response(value: Any) -> Any | None:
 
 def _accounting(value: Any, *, calculate_cost: bool) -> LLMAccounting:
     usage = _field(value, "usage")
+    input_details = _field(
+        usage,
+        "input_tokens_details",
+        _field(usage, "prompt_tokens_details"),
+    )
+    cached_tokens = _field(input_details, "cached_tokens")
+    if cached_tokens is None:
+        cached_tokens = _field(
+            usage,
+            "cache_read_input_tokens",
+            _field(usage, "prompt_cache_hit_tokens"),
+        )
     cost = _cost(_field(usage, "cost"))
     if cost is None:
         hidden = _field(value, "_hidden_params")
@@ -156,6 +167,7 @@ def _accounting(value: Any, *, calculate_cost: bool) -> LLMAccounting:
             _field(usage, "output_tokens", _field(usage, "completion_tokens"))
         ),
         total_tokens=_non_negative_integer(_field(usage, "total_tokens")),
+        cached_tokens=_non_negative_integer(cached_tokens),
         cost_usd=cost,
     )
 

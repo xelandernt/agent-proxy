@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CircleHelpIcon, ExternalLinkIcon } from "lucide-react";
 import { useState } from "react";
+import { SecretInput } from "#/components/secret-input";
 import {
 	Select,
 	SelectContent,
@@ -131,22 +132,26 @@ function FieldInput({
 				: typeof value === "string"
 					? value
 					: "";
+	if (spec.kind === "secret") {
+		return (
+			<SecretInput
+				label={label ?? "Secret"}
+				value={raw}
+				onChange={(next) => onChange(parseTextValue(spec.kind, next))}
+			/>
+		);
+	}
 	return (
 		<input
+			aria-label={label}
 			type={
-				spec.kind === "secret"
-					? "password"
-					: spec.kind === "url"
-						? "url"
-						: spec.kind === "number"
-							? "number"
-							: "text"
+				spec.kind === "url" ? "url" : spec.kind === "number" ? "number" : "text"
 			}
 			value={raw}
 			onChange={(event) =>
 				onChange(parseTextValue(spec.kind, event.target.value))
 			}
-			placeholder={spec.kind === "secret" ? "enter a new value" : ""}
+			placeholder=""
 			className="h-9 w-full rounded-md border bg-transparent px-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
 		/>
 	);
