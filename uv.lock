@@ -22,6 +22,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings", extra = ["yaml"] },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "urllib3" },
     { name = "uvicorn" },
 ]
 
@@ -50,6 +51,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.12.0" },
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.14.1" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.43" },
+    { name = "urllib3", specifier = ">=2.7.0" },
     { name = "uvicorn", specifier = ">=0.48.0" },
 ]
 
